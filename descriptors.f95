@@ -50,7 +50,7 @@ module descriptors_module
    use topology_module 
    use mpi_context_module
    use table_module 
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
    use permutation_maker_module  
 #endif
    use CInOutput_module 
@@ -436,13 +436,13 @@ module descriptors_module
       logical :: initialised = .false.
    endtype distance_Nb
 
-#ifdef DESCRIPTORS_EXTERNAL
-#include "descriptors_external_types.inc"
+#ifdef DESCRIPTORS_NONCOMMERCIAL
+#include "descriptors_noncommercial_types.inc"
 #endif
 
    ! 
    ! All the descriptors need to be public so that they are visible to the python wrapper
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
    public :: soap, general_monomer, bispectrum_so4, bispectrum_so3, behler, distance_2b, &
         coordination, angle_3b, co_angle_3b, co_distance_2b, cosnx, trihis, water_monomer, &
         water_dimer, a2_dimer, bond_real_space, power_so3, power_so4, an_monomer, general_dimer, &
@@ -488,7 +488,7 @@ module descriptors_module
       type(as_distance_2b)  :: descriptor_as_distance_2b
       type(alex)            :: descriptor_alex
       type(distance_Nb)     :: descriptor_distance_Nb
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       type(AN_monomer)      :: descriptor_AN_monomer
       type(general_monomer) :: descriptor_general_monomer  
       type(general_dimer)   :: descriptor_general_dimer  
@@ -532,7 +532,7 @@ module descriptors_module
    public :: SphericalYCartesian
      
    interface initialise
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       module procedure descriptor_initialise, RadialFunction_initialise, fourier_so4_initialise, &
       bispectrum_SO4_initialise, bispectrum_SO3_initialise, behler_initialise, distance_2b_initialise, &
       coordination_initialise, angle_3b_initialise, co_angle_3b_initialise, co_distance_2b_initialise, cosnx_initialise, trihis_initialise, &
@@ -551,7 +551,7 @@ module descriptors_module
    public :: initialise
 
    interface finalise
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       module procedure descriptor_finalise, descriptor_data_finalise, RadialFunction_finalise, fourier_so4_finalise, cplx_2d_array1_finalise, cplx_3d_array2_finalise, &
       bispectrum_SO4_finalise, bispectrum_SO3_finalise, behler_finalise, distance_2b_finalise, coordination_finalise, angle_3b_finalise, co_angle_3b_finalise, &
       co_distance_2b_finalise, cosnx_finalise, trihis_finalise, water_monomer_finalise, water_dimer_finalise, rdf_finalise, as_distance_2b_finalise,  alex_finalise, &
@@ -568,7 +568,7 @@ module descriptors_module
    public :: finalise
 
    interface calc
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       module procedure descriptor_calc, descriptor_calc_array, bispectrum_SO4_calc, bispectrum_SO3_calc, behler_calc, distance_2b_calc, coordination_calc, angle_3b_calc, co_angle_3b_calc, &
       co_distance_2b_calc, cosnx_calc, trihis_calc, water_monomer_calc, water_dimer_calc, A2_dimer_calc, AB_dimer_calc,  atom_real_space_calc, &
       power_so3_calc, power_SO4_calc, soap_calc, rdf_calc, as_distance_2b_calc, &
@@ -585,7 +585,7 @@ module descriptors_module
    public :: calc
 
    interface cutoff
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       module procedure descriptor_cutoff, bispectrum_SO4_cutoff, bispectrum_SO3_cutoff, behler_cutoff, distance_2b_cutoff, coordination_cutoff, angle_3b_cutoff, co_angle_3b_cutoff, &
       co_distance_2b_cutoff, cosnx_cutoff, trihis_cutoff, water_monomer_cutoff, water_dimer_cutoff, A2_dimer_cutoff, AB_dimer_cutoff, atom_real_space_cutoff, &
       power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff, &
@@ -600,7 +600,7 @@ module descriptors_module
    public :: cutoff
 
    interface descriptor_sizes
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       module procedure descriptor_sizes, bispectrum_SO4_sizes, bispectrum_SO3_sizes, behler_sizes, distance_2b_sizes, coordination_sizes, angle_3b_sizes, co_angle_3b_sizes, &
       co_distance_2b_sizes, cosnx_sizes, trihis_sizes, water_monomer_sizes, water_dimer_sizes, A2_dimer_sizes, AB_dimer_sizes, atom_real_space_sizes, &
       power_so3_sizes, power_SO4_sizes, soap_sizes,  rdf_sizes, as_distance_2b_sizes, &
@@ -625,8 +625,8 @@ module descriptors_module
    contains
 
 
-#ifdef DESCRIPTORS_EXTERNAL
-#include "descriptors_external.inc"
+#ifdef DESCRIPTORS_NONCOMMERCIAL
+#include "descriptors_noncommercial.inc"
 #endif
      
    function get_descriptor_type(args_str,error)
@@ -813,7 +813,7 @@ module descriptors_module
          call initialise(this%descriptor_alex,args_str,error)
       case(DT_DISTANCE_NB)
          call initialise(this%descriptor_distance_Nb,args_str,error)
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       case(DT_BOND_REAL_SPACE)
          call initialise(this%descriptor_bond_real_space,args_str,error)
       case(DT_AN_MONOMER)
@@ -888,7 +888,7 @@ module descriptors_module
             call finalise(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             call finalise(this%descriptor_distance_Nb,error)
-#ifdef DESCRIPTOR_EXTERNAL
+#ifdef DESCRIPTOR_NONCOMMERCIAL
          case(DT_COM_DIMER)
             call finalise(this%descriptor_com_dimer,error)
          case(DT_MOLECULE_LO_D)
@@ -967,7 +967,7 @@ module descriptors_module
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
          case(DT_DISTANCE_NB)
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_MOLECULE_LO_D)
             RAISE_ERROR("descriptor_MPI_setup: molecule_lo_d not MPI ready.", error)
          case(DT_BOND_REAL_SPACE)
@@ -3222,7 +3222,7 @@ module descriptors_module
             call calc(this%descriptor_alex,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_DISTANCE_Nb)
             call calc(this%descriptor_distance_Nb,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             call calc(this%descriptor_bond_real_space,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_AN_MONOMER)
@@ -9038,7 +9038,7 @@ module descriptors_module
             descriptor_dimensions = alex_dimensions(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             descriptor_dimensions = distance_Nb_dimensions(this%descriptor_distance_Nb,error)
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             descriptor_dimensions = bond_real_space_dimensions(this%descriptor_bond_real_space,error)
          case(DT_AN_MONOMER)
@@ -9479,7 +9479,7 @@ module descriptors_module
             descriptor_cutoff = cutoff(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             descriptor_cutoff = cutoff(this%descriptor_distance_Nb,error)
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             descriptor_cutoff = cutoff(this%descriptor_bond_real_space,error)
          case(DT_MOLECULE_LO_D)
@@ -9916,7 +9916,7 @@ module descriptors_module
          case(DT_DISTANCE_Nb)
             call distance_Nb_sizes(this%descriptor_distance_Nb,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             call bond_real_space_sizes(this%descriptor_bond_real_space,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
@@ -10831,7 +10831,7 @@ call print("mask present ? "//present(mask))
             descriptor_n_permutations = NP_A2_DIMER
          case(DT_AB_DIMER)
             descriptor_n_permutations = NP_AB_DIMER
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_AN_MONOMER)
             if(this%descriptor_AN_monomer%do_atomic) then
                descriptor_n_permutations = factorial(this%descriptor_AN_monomer%N-1)
@@ -10869,7 +10869,7 @@ call print("mask present ? "//present(mask))
 
    subroutine descriptor_permutations(this,permutations,error)
       type(descriptor), intent(in) :: this  
-#ifdef DESCRIPTORS_EXTERNAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
       type(permutation_data_type) :: my_permutation_data  
 #endif
       integer, dimension(:,:), intent(out) :: permutations
@@ -10916,8 +10916,8 @@ call print("mask present ? "//present(mask))
          case(DT_AB_DIMER)
             permutations(:,1) = (/1, 2, 3, 4, 5, 6/) ! original order
             permutations(:,2) = (/2, 1, 3, 4, 6, 5/) ! swap monomers
-#ifdef DESCRIPTORS_EXTERNAL
-#include "descriptors_external_permutations.inc"
+#ifdef DESCRIPTORS_NONCOMMERCIAL
+#include "descriptors_noncommercial_permutations.inc"
 #endif
          case(DT_DISTANCE_NB)
             permutations = this%descriptor_distance_Nb%permutations

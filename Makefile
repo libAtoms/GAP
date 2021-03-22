@@ -43,9 +43,9 @@ include Makefile.inc
 include Makefile.rules
 
 
-ifeq (${HAVE_DESCRIPTORS_EXTERNAL},1)
-  DEFINES += -DDESCRIPTORS_EXTERNAL
-  GAP1_F95_FILES = make_permutations_v2
+ifeq (${HAVE_DESCRIPTORS_NONCOMMERCIAL},1)
+  DEFINES += -DDESCRIPTORS_NONCOMMERCIAL
+  GAP1_F95_FILES = make_permutations_noncommercial_v2
 else
   GAP1_F95_FILES = 
 endif
