@@ -1,0 +1,649 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Installation of QUIP, quippy and GAP &mdash; GAP  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+  
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="The gap_fit program" href="gap_fit.html" />
+    <link rel="prev" title="GAP and SOAP documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> GAP
+          
+
+          
+            
+            <img src="_static/hybrid.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+    
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation of QUIP, quippy and GAP</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#precompiled-containers">Precompiled Containers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#compilation-instructions">Compilation Instructions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-by-step">Step by step</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#installing-the-jupyter-notebook">Installing the Jupyter notebook</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#custom-settings">Custom settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#common-problems">Common Problems</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#permission-errors-when-installing">Permission errors when installing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#importerror-when-importing">ImportError when importing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#possible-problems-installing-atomeye-module">Possible problems installing atomeye module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#error-compiling-ipmodel-gap">Error compiling IPModel_GAP</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+</ul>
+
+            
+          
+    <p></p>
+    <ul>
+        <li><a href="genindex.html">Index</a></li>
+        <li><a href="py-modindex.html">Module Index</a></li>
+        <li><a href="search.html">Search Page</a></li>
+        <li><a href="_modules/index.html">Module Source Code</a></li>
+    </ul>
+  
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GAP</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Installation of QUIP, quippy and GAP</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<div class="section" id="installation-of-quip-quippy-and-gap">
+<span id="installation"></span><h1>Installation of QUIP, quippy and GAP<a class="headerlink" href="#installation-of-quip-quippy-and-gap" title="Permalink to this headline">¶</a></h1>
+<p>These instructions provide more details on the compilation and
+installation of <code class="docutils literal notranslate"><span class="pre">QUIP</span></code> (Fortran library and main programs) and
+and <code class="docutils literal notranslate"><span class="pre">GAP</span></code> (Fortran add-on to QUIP), and the <code class="docutils literal notranslate"><span class="pre">quippy</span></code> (Python interface).</p>
+<div class="section" id="precompiled-containers">
+<h2>Precompiled Containers<a class="headerlink" href="#precompiled-containers" title="Permalink to this headline">¶</a></h2>
+<p>If you have access to <a class="reference external" href="https://hub.docker.com">Docker</a> or
+<a class="reference external" href="http://singularity.lbl.gov">Singularity</a>, you can try one of the
+<a class="reference external" href="https://github.com/libAtoms/quip-docker">precompiled images</a>
+to get up and running quickly.</p>
+</div>
+<div class="section" id="compilation-instructions">
+<h2>Compilation Instructions<a class="headerlink" href="#compilation-instructions" title="Permalink to this headline">¶</a></h2>
+<p>First try the quickstart below, which should work with most Linux systems.</p>
+<div class="section" id="quick-start">
+<h3>Quick start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h3>
+<p>Install <a class="footnote-reference brackets" href="#id2" id="id1">1</a> the prerequisites: GCC, gfortran, Python, and the linear algebra
+libraries.  For example, on Ubuntu, do (in a terminal):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ sudo apt-get install gcc gfortran python python-pip libblas-dev liblapack-dev
+</pre></div>
+</div>
+<p>For other systems, replace the <code class="docutils literal notranslate"><span class="pre">apt-get</span></code> part with your system package manager.
+Beware that the packages might also have slightly different names; these can
+usually be found with a quick search.</p>
+<p>Don’t forget the <code class="docutils literal notranslate"><span class="pre">quippy</span></code> prerequisites:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pip install numpy ase f90wrap
+</pre></div>
+</div>
+<p>Now you can get the code and compile:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone --recursive https://github.com/libAtoms/QUIP.git
+$ export QUIP_ARCH=linux_x86_64_gfortran
+$ export QUIPPY_INSTALL_OPTS=--user  # omit for a system-wide installation
+$ make config
+</pre></div>
+</div>
+<p>Answer all the questions with their defaults (by pressing enter) for now, just
+to get things working.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ make
+$ make install-quippy
+</pre></div>
+</div>
+<p>And now open a Python terminal and see if it works:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python
+&gt;&gt;&gt; import quippy
+&gt;&gt;&gt;
+</pre></div>
+</div>
+<p>If the import completes successfully (i.e. with no output) then the
+installation was successful.  You may want to continue with <a class="reference internal" href="#installing-the-jupyter-notebook">Installing the
+Jupyter notebook</a> to run the interactive tutorials.</p>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>If this isn’t your machine and you don’t have root access, these
+packages might already be installed by the system administrator.  If not,
+ask them.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="step-by-step">
+<h3>Step by step<a class="headerlink" href="#step-by-step" title="Permalink to this headline">¶</a></h3>
+<p>If that didn’t work, try these step-by-step instructions
+instructions excerpted from the top-level <a class="reference external" href="https://github.com/libAtoms/QUIP/blob/public/README.md">README</a>.  The <code class="docutils literal notranslate"><span class="pre">README</span></code> file
+is the most up-to-date source of installation information.</p>
+<blockquote>
+<div><ol class="arabic">
+<li><p>To compile QUIP the minimum requirements are:</p>
+<ul class="simple">
+<li><p>A working Fortran compiler. QUIP is tested with <cite>gfortran</cite> 4.4 and
+later, and <cite>ifort</cite> 11.1.</p></li>
+<li><p>Linear algebra libraries BLAS and LAPACK. QUIP is tested with
+reference versions <cite>libblas-dev</cite> and <cite>liblapack-dev</cite> on Ubuntu
+12.04, and <cite>mkl</cite> 11.1 with <cite>ifort</cite>.</p></li>
+</ul>
+</li>
+<li><p>Clone the QUIP repository from GitHub. The <cite>–recursive</cite> option
+brings in submodules automatically (If you don’t do this, then
+you will need to run <cite>git submodule update –init –recursive</cite>
+from the top-level QUIP directory after cloning) ::
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">git</span> <span class="pre">clone</span> <span class="pre">--recursive</span> <span class="pre">https://github.com/libAtoms/QUIP.git</span>
+<span class="pre">`</span></code></p></li>
+<li><p>Decide your architecture by looking in the <cite>arch/</cite> directory, and
+define an environmental variable <cite>QUIP_ARCH</cite>, e.g.::
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">export</span> <span class="pre">QUIP_ARCH=linux_x86_64_gfortran</span>
+<span class="pre">`</span></code>
+for standard gfortran on Linux. Here is where you can adjust which
+compiler is being used, if you do not like the defaults. You may need to
+create your own <cite>arch/Makefile.${QUIP_ARCH}</cite> file based on an existing file for
+more exotic systems.</p></li>
+<li><p>Customise QUIP, set the maths libraries and provide linking options::
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">make</span> <span class="pre">config</span>
+<span class="pre">`</span></code>
+Makefile.config will create a build directory, <cite>build/${QUIP_ARCH}</cite>,
+and all the building happen there. First it will ask you some
+questions about where you keep libraries and other stuff, if you
+don’t use something it is asking for, just leave it blank. The
+answers will be stored in <cite>Makefile.inc</cite> in the <cite>build/${QUIP_ARCH}</cite>
+directory, and you can edit them later (e.g. to change compiler, optimisation
+or debug options).</p>
+<p>If you later make significant changes to the configuration such as
+enabling or disabling tight-binding support you should force a
+full rebuild by doing a <cite>make deepclean; make</cite>.</p>
+</li>
+<li><p>Compile all programs, modules and libraries::
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">make</span>
+<span class="pre">`</span></code>
+From the top-level <cite>QUIP</cite> directory. All programs are built in
+<cite>build/${QUIP_ARCH}/</cite>. You can also find compiled object files
+and libraries (<cite>libquip.a</cite>) in that directory. Programs can be
+called directly from that directory.</p>
+<p>Other useful make targets include:</p>
+<ul class="simple">
+<li><p><cite>make install</cite> : copies all compiled programs it can find to
+<cite>QUIP_INSTALLDIR</cite>, if it’s defined and is a directory (full path
+required), and copies bundled structures to <cite>QUIP_STRUCTS_DIR</cite>
+if it is defined.</p></li>
+<li><p><cite>make libquip</cite>:   Compile QUIP as a library and link to it.
+This will make all the various libraries and combine them into one:
+<cite>build/${QUIP_ARCH}/libquip.a</cite>, which is what you need to link with
+(as well as LAPACK).</p></li>
+</ul>
+</li>
+<li><p>A good starting point is to use the <cite>quip</cite> program, which can
+calculate the properties of an atomic configuration using a
+variety of models. For example::
+<a href="#id3"><span class="problematic" id="id4">``</span></a><a href="#id5"><span class="problematic" id="id6">`</span></a>bash
+quip at_file=test.xyz init_args=’IP LJ’ </p>
+<blockquote>
+<div><p>param_file=share/Parameters/ip.parms.LJ.xml E</p>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">assuming</span> <span class="pre">that</span> <span class="pre">you</span> <span class="pre">have</span> <span class="pre">a</span> <span class="pre">file</span> <span class="pre">called</span> <span class="pre">`test.xyz`</span> <span class="pre">with</span> <span class="pre">the</span> <span class="pre">following</span>
+<span class="pre">data</span> <span class="pre">in</span> <span class="pre">it</span> <span class="pre">representing</span> <span class="pre">Cu</span> <span class="pre">atoms</span> <span class="pre">in</span> <span class="pre">a</span> <span class="pre">cubic</span> <span class="pre">fcc</span> <span class="pre">lattice::</span>
+<span class="pre">`</span></code>
+4
+Lattice=”3.61 0 0 0 3.61 0 0 0 3.61” Properties=species:S:1:pos:R:3
+Cu     0.000 0.000 0.000
+Cu     0.000 1.805 1.805
+Cu     1.805 0.000 1.805
+Cu     1.805 1.805 0.000
+<a href="#id7"><span class="problematic" id="id8">``</span></a>`
+The Lennard-Jones parameters in the above example are defined in the
+<cite>ip.parms.LJ.xml</cite> file under <cite>share/Parameters</cite> (ensure the path
+to this file is correct). The format of the atomic configuration is
+given in
+[Extended XYZ](<a class="reference external" href="http://libatoms.github.io/QUIP/io.html#extendedxyz">http://libatoms.github.io/QUIP/io.html#extendedxyz</a>)
+format, in which the first line is the number of atoms, the second line
+is a series of key=value pairs, which must at least contain the Lattice
+key giving the periodic bounding box and the Properties key that
+describes the remaining lines. The value of Properties is a sequence of
+triplets separated by a colon (:), that give the name, type and number
+of columns, with the type given by I for integers, R for reals, S for
+strings.</p>
+<p>Most string arguments can be replaced by <cite>–help</cite> and QUIP programs
+will  then print  a  list  of allowable  keywords  with brief  help
+messages as to their usage,  so e.g. <cite>init_args=–help</cite> will give a
+list of potential model  types (and some combinations). The parsing
+is recursive,  so <cite>init_args=”IP –help”</cite>  will then proceed  to list
+the types of interatomic potentials (IP) that are available.</p>
+</li>
+<li><p>To compile the Python wrappers (<cite>quippy</cite>), the minimum requirements
+are:
+- Python 3
+- [NumPy](<a class="reference external" href="http://www.numpy.org">http://www.numpy.org</a>) (<cite>numpy&gt;=1.5.0</cite>)
+- [Atomic Simulation Environment ](<a class="reference external" href="https://wiki.fysik.dtu.dk/ase/">https://wiki.fysik.dtu.dk/ase/</a>) (<cite>ase&gt;=3.17.0</cite>)
+- [f90wrap](<a class="reference external" href="https://github.com/jameskermode/f90wrap">https://github.com/jameskermode/f90wrap</a>)
+- (optional) [SciPy](<a class="reference external" href="http://www.scipy.org">http://www.scipy.org</a>)
+- (optional) [matscipy](<a class="reference external" href="https://github.com/libAtoms/matscipy">https://github.com/libAtoms/matscipy</a>).</p>
+<p>Note: If you are using a Python virtual environment (virtualenv) and would like
+to install <cite>quippy</cite> into it, ensure the environment is activated
+(<cite>source &lt;env_dir&gt;/bin/activate</cite>, where <cite>&lt;env_dir&gt;</cite> is the root of
+your virtual environment) _before_ building <cite>quippy</cite> (otherwise library
+versions may cause unexpected conflicts).</p>
+<p>The required version of <cite>f90wrap</cite> can be installed with:
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">git</span> <span class="pre">submodule</span> <span class="pre">update</span> <span class="pre">--init</span> <span class="pre">--recursive</span>
+<span class="pre">pip</span> <span class="pre">install</span> <span class="pre">src/f90wrap</span>
+<span class="pre">`</span></code></p>
+</li>
+</ol>
+<ol class="arabic simple" start="9">
+<li><p>To compile the Python wrappers (<cite>quippy</cite>), run::
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">make</span> <span class="pre">quippy</span>
+<span class="pre">`</span></code>
+Quippy can be used by adding the <cite>lib</cite> directory in
+<cite>quippy/build/${QUIP_ARCH}</cite> to your <cite>$PYTHONPATH</cite>, however it can be
+more convenient to install into a specific Python distribution::
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">make</span> <span class="pre">install-quippy</span>
+<span class="pre">`</span></code>
+will either install into the current virtualenv or attempt to install
+systemwide (usually fails without <cite>sudo</cite>). To install only for the
+current user (into <cite>~/.local</cite>), execute the command
+<cite>QUIPPY_INSTALL_OPTS=–user make install-quippy</cite>,
+or use <cite>QUIPPY_INSTALL_OPTS=–prefix=&lt;directory&gt;</cite> to install into a
+specific directory. <cite>QUIPPY_INSTALL_OPTS</cite> can also be set in the file
+<cite>build/${QUIP_ARCH}/Makefile.inc</cite>.</p></li>
+<li><p>More details on the quippy installation process and troubleshooting for</p></li>
+</ol>
+<blockquote>
+<div><p>common build problems are available in the
+[online documentation](<a class="reference external" href="http://libatoms.github.io/QUIP/">http://libatoms.github.io/QUIP/</a>).</p>
+</div></blockquote>
+<ol class="arabic simple" start="11">
+<li><p>To run the unit and regression tests, which depend on <cite>quippy</cite>:</p></li>
+</ol>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">make</span> <span class="pre">test</span>
+<span class="pre">`</span></code></p>
+</div></blockquote>
+<ol class="arabic simple" start="12">
+<li><p>To get back to a state near to a fresh clone, use</p></li>
+</ol>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">make</span> <span class="pre">distclean</span>
+<span class="pre">`</span></code></p>
+</div></blockquote>
+<ol class="arabic" start="13">
+<li><p>Some functionality is only available if you check out other
+modules within the <cite>QUIP/src/</cite> directories, e.g. the <cite>ThirdParty</cite>
+(DFTB parameters, TTM3f water model), <cite>GAP</cite> (Gaussian
+Approximation Potential models and training). These packages are
+not distributed with QUIP because they come with different licensing
+restrictions, but you can get them [here](<a class="reference external" href="http://www.libatoms.org/gap/gap_download.html">http://www.libatoms.org/gap/gap_download.html</a>)</p>
+<p>GAP is a machine learning method that uses Gaussian process
+regression, and needs large data files to run. You can find
+potentials that have been published as well as training data in
+our [data repository](<a class="reference external" href="http://www.libatoms.org/Home/DataRepository">http://www.libatoms.org/Home/DataRepository</a>), see also the [online docs](<a class="reference external" href="https://libatoms.github.io/GAP">https://libatoms.github.io/GAP</a>).</p>
+</li>
+<li><p>In order to run QUIP potentials via LAMMPS, <cite>make libquip</cite> to get QUIP
+into library form, and then follow the instructions in the
+[LAMMPS documentation](<a class="reference external" href="http://lammps.sandia.gov/doc/pair_quip.html">http://lammps.sandia.gov/doc/pair_quip.html</a>). You need at least 11 Aug 2017 version or later.</p></li>
+</ol>
+<p># Developer notes:</p>
+<p>## Fixing/updating the version f90wrap:</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">cd</span> <span class="pre">src/f90wrap</span>
+<span class="pre">`</span></code>
+<code class="docutils literal notranslate"><span class="pre">`bash</span>
+<span class="pre">git</span> <span class="pre">checkout</span> <span class="pre">&lt;commit&gt;</span>
+<span class="pre">`</span></code>
+OR
+<a href="#id9"><span class="problematic" id="id10">``</span></a><a href="#id11"><span class="problematic" id="id12">`</span></a>bash
+git checkout master</p>
+<p><code class="docutils literal notranslate"><span class="pre">`</span>
+<span class="pre">Updating</span> <span class="pre">the</span> <span class="pre">version</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">`QUIP`</span> <span class="pre">repository:</span>
+<span class="pre">`</span></code>
+cd ../..
+git add src/f90wrap
+git commit -m “updating the version of f90wrap”
+<a href="#id13"><span class="problematic" id="id14">``</span></a><a href="#id15"><span class="problematic" id="id16">`</span></a></p>
+</div></blockquote>
+</div></blockquote>
+<p>If that still doesn’t work or you’re using a nonstandard architecture, try
+looking at <a class="reference internal" href="#custom-settings">Custom settings</a> and <a class="reference internal" href="#common-problems">Common Problems</a>.  As a last resort you can
+consult the <a class="reference external" href="https://github.com/libAtoms/QUIP/issues">issue tracker on Github</a>.</p>
+</div>
+<div class="section" id="installing-the-jupyter-notebook">
+<h3>Installing the Jupyter notebook<a class="headerlink" href="#installing-the-jupyter-notebook" title="Permalink to this headline">¶</a></h3>
+<p><a class="reference external" href="http://jupyter.org/">Jupyter</a> is an environment for interactive computing that makes using Python
+much easier and more intuitive.  Especially useful is its notebook environment,
+which provides a handy way to experiment with code, see the results, and have a
+record of your progress.  The interactive getting-started tutorial is a Jupyter
+notebook that you can run and modify yourself.</p>
+<p>To get Jupyter up and running, the following should suffice <a class="footnote-reference brackets" href="#id18" id="id17">2</a>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pip install jupyter
+$ jupyter notebook
+</pre></div>
+</div>
+<p>This will open a new window in your browser that you can use to navigate
+through your filesystem.  To access the interactive tutorials, you can run the
+<code class="docutils literal notranslate"><span class="pre">jupyter</span> <span class="pre">notebook</span></code> command from your <code class="docutils literal notranslate"><span class="pre">QUIP/src/GAP/doc/Examples</span></code> directory (or any
+enclosing directory) then navigate to the notebooks and open
+<code class="docutils literal notranslate"><span class="pre">Introduction.ipynb</span></code> to get started.</p>
+<dl class="footnote brackets">
+<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id17">2</a></span></dt>
+<dd><p>This assumes you’ve already run <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python-pip;</span> <span class="pre">pip</span>
+<span class="pre">install</span> <span class="pre">numpy;</span> <span class="pre">pip</span> <span class="pre">install</span> <span class="pre">ase</span></code> as in the <a class="reference internal" href="#quick-start">Quick start</a>.</p>
+</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="custom-settings">
+<h2>Custom settings<a class="headerlink" href="#custom-settings" title="Permalink to this headline">¶</a></h2>
+<dl>
+<dt><strong class="makevar">MATHS_LINKOPTS</strong></dt><dd><p>Library options needed to link to BLAS and LAPACK libraries. Any working
+BLAS/LAPACK installation is fine. If you are using Linux, ATLAS is
+a good option, and you should use something like the following:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">L</span><span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span><span class="o">/</span><span class="n">atlas</span> <span class="o">-</span><span class="n">llapack</span> <span class="o">-</span><span class="n">lf77blas</span> <span class="o">-</span><span class="n">lcblas</span> <span class="o">-</span><span class="n">latlas</span>
+</pre></div>
+</div>
+<p>On Mac OS X, there are build in LAPACK libraries in the Accelerate
+framework, which you can use by entering</p>
+<blockquote>
+<div><p>-framework Accelerate</p>
+</div></blockquote>
+</dd>
+<dt><strong class="makevar">FOX_LIBDIR</strong>, <strong class="makevar">FOX_INCDIR</strong> and <strong class="makevar">FOX_LIBS</strong></dt><dd><p>Directories containing FoX libraries and header files, and required link options.
+Should be read automatically from QUIP Makefiles.</p>
+</dd>
+<dt><strong class="makevar">QUIPPY_INSTALL_OPTS</strong></dt><dd><p>Installation options, e.g. specify <code class="docutils literal notranslate"><span class="pre">--user</span></code> to install for the current
+user <code class="docutils literal notranslate"><span class="pre">--prefix=${PREFIX}</span></code> to install in a non-default location.</p>
+</dd>
+<dt><strong class="makevar">HAVE_NETCDF4</strong></dt><dd><p>Should be set to 1 to enable NetCDF4 support. Should be read automatically from QUIP.</p>
+</dd>
+<dt><strong class="makevar">NETCDF4_LIBS</strong>, <strong class="makevar">NETCDF4_FLAGS</strong></dt><dd><p>Linker flags for compiling with NetCDF4 support, and flags for finding
+header files. Should be read automatically from QUIP.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="common-problems">
+<span id="install-faq"></span><h2>Common Problems<a class="headerlink" href="#common-problems" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="permission-errors-when-installing">
+<h3>Permission errors when installing<a class="headerlink" href="#permission-errors-when-installing" title="Permalink to this headline">¶</a></h3>
+<p>If you are installing as root, you may need to make sure the value of
+the <span class="target" id="index-0"></span><code class="xref std std-envvar docutils literal notranslate"><span class="pre">QUIP_ARCH</span></code> gets through to the install script, e.g.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">QUIP_ARCH</span><span class="o">=</span><span class="n">darwin_x86_64_gfortran</span> <span class="n">make</span> <span class="n">install</span><span class="o">-</span><span class="n">quippy</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="importerror-when-importing">
+<h3>ImportError when importing<a class="headerlink" href="#importerror-when-importing" title="Permalink to this headline">¶</a></h3>
+<p>If you get an <code class="xref py py-exc docutils literal notranslate"><span class="pre">ImportError</span></code> with a message about unresolved
+dependancies then something went wrong with the linking process -
+check that all the libraries you’re linking against are correct. You
+can used <cite>ldd</cite> on Linux of <cite>otool -L</cite> on Mac OS X to check which
+libraries the <code class="file docutils literal notranslate"><span class="pre">_quippy.so</span></code> Python extension is linked against.</p>
+</div>
+<div class="section" id="possible-problems-installing-atomeye-module">
+<h3>Possible problems installing atomeye module<a class="headerlink" href="#possible-problems-installing-atomeye-module" title="Permalink to this headline">¶</a></h3>
+<dl>
+<dt>If you get an <code class="xref py py-exc docutils literal notranslate"><span class="pre">ImportError</span></code> with a message ::</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">atomeye</span>
+<span class="go">ImportError: dlopen(/Users/silvia/lib/python/_atomeye.so, 2): Symbol not found: _Config_load_libatoms</span>
+<span class="go">Referenced from: /Users/silvia/lib/python/_atomeye.so</span>
+<span class="go">Expected in: flat namespace</span>
+<span class="go">in /Users/silvia/lib/python/_atomeye.so</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<p>be sure that you have set <span class="target" id="index-1"></span><code class="xref std std-envvar docutils literal notranslate"><span class="pre">QUIP_ROOT</span></code> variable before starting the compilation.
+If not make clean and recompile again</p>
+<dl>
+<dt>If you get an <code class="xref py py-exc docutils literal notranslate"><span class="pre">ImportError</span></code> with a message ::</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">atomeye</span>
+<span class="go">ImportError: dlopen(/Users/silvia/lib/python/_atomeye.so, 2): Symbol not found: __gfortran_adjustl</span>
+<span class="go">Referenced from: /Users/silvia/lib/python/_atomeye.so</span>
+<span class="go">Expected in: flat namespace</span>
+<span class="go">in /Users/silvia/lib/python/_atomeye.so</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<p>be sure that the gfortran libraries are properly set in <strong class="makevar">ATOMEYE_LIBS</strong> in Makefile.atomeye</p>
+</div>
+<div class="section" id="error-compiling-ipmodel-gap">
+<h3>Error compiling IPModel_GAP<a class="headerlink" href="#error-compiling-ipmodel-gap" title="Permalink to this headline">¶</a></h3>
+<p>If you get the following error during compilation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">Potentials</span><span class="o">/</span><span class="n">IPModel_GAP</span><span class="o">.</span><span class="n">f95</span><span class="p">:</span><span class="mf">51.22</span><span class="p">:</span>
+
+<span class="n">use</span> <span class="n">descriptors_module</span>
+                      <span class="mi">1</span>
+<span class="n">Fatal</span> <span class="n">Error</span><span class="p">:</span> <span class="n">Can</span><span class="s1">&#39;t open module file &#39;</span><span class="n">descriptors_module</span><span class="o">.</span><span class="n">mod</span><span class="s1">&#39; for reading at (1): No such file or directory</span>
+</pre></div>
+</div>
+<p>The <cite>GAP</cite> module is not publicly available, so the
+<code class="file docutils literal notranslate"><span class="pre">Makefile.inc</span></code> must contain <strong class="makevar">HAVE_GAP</strong> = 1.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="gap_fit.html" class="btn btn-neutral float-right" title="The gap_fit program" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral float-left" title="GAP and SOAP documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
