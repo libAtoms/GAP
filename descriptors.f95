@@ -2811,6 +2811,8 @@ module descriptors_module
       integer :: nEdges, nConnectivities, nMonomerConnectivities
       integer, dimension(:), allocatable :: n_permutations, connectivityList
       integer, dimension(:,:), allocatable :: atom_permutations, distance_matrix_index, edges
+      integer :: xml_version
+      logical :: has_compact_clusters
 
       logical, dimension(:,:,:), allocatable :: allConnectivities
 
@@ -2823,7 +2825,8 @@ module descriptors_module
       call param_register(params, 'cutoff', PARAM_MANDATORY, this%cutoff, help_string="Cutoff for distance_Nb-type descriptors")
       call param_register(params, 'cutoff_transition_width', '0.5', this%cutoff_transition_width, help_string="Transition width of cutoff for distance_Nb-type descriptors")
       call param_register(params, 'order', PARAM_MANDATORY, this%order, help_string="Many-body order, in terms of number of neighbours")
-      call param_register(params, 'compact_clusters', "T", this%compact_clusters, help_string="If true, generate clusters where the atoms have at least one connection to the central atom. If false, only clusters where all atoms are connected are generated.")
+      call param_register(params, 'compact_clusters', "T", this%compact_clusters, help_string="If true, generate clusters where the atoms have at least one connection to the central atom. If false, only clusters where all atoms are connected are generated.", has_value_target=has_compact_clusters)
+      call param_register(params, 'xml_version', '1596837814', xml_version, help_string="Version of GAP the XML potential file was created")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='distance_Nb_initialise args_str')) then
          RAISE_ERROR("distance_Nb_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -2833,6 +2836,18 @@ module descriptors_module
       if( this%order < 1 ) then
          RAISE_ERROR("distance_Nb_initialise: order must be greater than 0",error)
       endif
+
+      if (.not. has_compact_clusters) then
+        ! no compact_clusters specified explicitly, default depends on version
+        if (xml_version < 1596837814) then
+          ! before version where default was changed from false to true
+          this%compact_clusters = .false.
+        else
+          ! after version where default was changed from false to true
+          this%compact_clusters = .true.
+        endif
+      endif
+
 
       allocate(this%Z(this%order))
       default_Z = ""
