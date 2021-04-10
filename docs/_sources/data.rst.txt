@@ -16,6 +16,7 @@ We collect links to published GAP models and their fitting databases.
      - `V. Deringer and G. Csanyi Phys. Rev. B 95, 094203 (2017) <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.95.094203>`_
    * - `Si <https://doi.org/10.17863/CAM.65004>`_
      - `A. P. Bartok et al. Physical Review X, 8(4), 1939 (2018) <http://doi.org/10.1103/PhysRevX.8.041048>`_
+   * - `Ge2Sb2Te5 <https://www.repository.cam.ac.uk/handle/1810/279038>`_
+     - `F. Mocanu et al. J. Phys. Chem. B 122, 38, 8998–9006 (2018) <https://doi.org/10.1021/acs.jpcb.8b06476>`_
+
        
-
-
