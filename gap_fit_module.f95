@@ -67,7 +67,8 @@ module gap_fit_module
      character(len=STRING_LENGTH) :: at_file='', core_ip_args = '', e0_str, local_property0_str, &
      energy_parameter_name, local_property_parameter_name, force_parameter_name, virial_parameter_name, &
      stress_parameter_name, hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
-     config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name
+     config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name, &
+     local_property_mask_parameter_name
 
      character(len=10240) :: command_line = ''
      real(dp), dimension(total_elements) :: e0, local_property0
@@ -134,7 +135,7 @@ contains
           energy_parameter_name, local_property_parameter_name, force_parameter_name, &
           virial_parameter_name, stress_parameter_name, hessian_parameter_name, &
           config_type_parameter_name, sigma_parameter_name, config_type_sigma_string, &
-          gp_file, template_file, force_mask_parameter_name
+          gp_file, template_file, force_mask_parameter_name, local_property_mask_parameter_name
 
      character(len=STRING_LENGTH) ::  gap_str, verbosity, sparse_method_str, covariance_type_str, e0_method, &
         parameter_name_prefix
@@ -168,6 +169,7 @@ contains
      config_type_parameter_name => this%config_type_parameter_name
      sigma_parameter_name => this%sigma_parameter_name
      force_mask_parameter_name => this%force_mask_parameter_name
+     local_property_mask_parameter_name => this%local_property_mask_parameter_name
      config_type_sigma_string => this%config_type_sigma_string
      sigma_per_atom => this%sigma_per_atom
      do_copy_at_file => this%do_copy_at_file
@@ -243,6 +245,9 @@ contains
      call param_register(params, 'force_mask_parameter_name', 'force_mask', force_mask_parameter_name, &
           help_string="To exclude forces on specific atoms from the fit. In the XYZ, it must be a logical column.")
      
+     call param_register(params, 'local_property_mask_parameter_name', 'local_property_mask', local_property_mask_parameter_name, &
+          help_string="To exclude local_properties on specific atoms from the fit. In the XYZ, it must be a logical column.")
+
      call param_register(params, 'parameter_name_prefix', '', parameter_name_prefix, &
           help_string="Prefix that gets uniformly appended in front of {energy,local_property,force,virial,...}_parameter_name")
      
@@ -304,6 +309,8 @@ contains
         config_type_parameter_name = trim(parameter_name_prefix) // trim(config_type_parameter_name)
         sigma_parameter_name = trim(parameter_name_prefix) // trim(sigma_parameter_name)
         force_mask_parameter_name = trim(parameter_name_prefix) // trim(force_mask_parameter_name)
+        local_property_mask_parameter_name = trim(parameter_name_prefix) // trim(local_property_mask_parameter_name)
+        local_property_parameter_name = trim(parameter_name_prefix) // trim(local_property_parameter_name)
      endif
    
      if( len_trim(this%gp_file) > 216 ) then    ! The filename's length is limited to 255 char.s in some filesystem. 
@@ -655,12 +662,13 @@ contains
     type(Atoms) :: at
 
     integer :: n_con
-    logical :: has_ener, has_force, has_virial, has_stress_3_3, has_stress_voigt, has_hessian, has_local_property, has_force_mask, exclude_atom
+    logical :: has_ener, has_force, has_virial, has_stress_3_3, has_stress_voigt, has_hessian, has_local_property, has_force_mask, &
+       exclude_atom, has_local_property_mask
     real(dp) :: ener, virial(3,3), stress_3_3(3,3)
     real(dp) :: stress_voigt(6)
     real(dp), pointer, dimension(:,:) :: f, hessian_eigenvector_j
     real(dp), pointer, dimension(:) :: local_property
-    logical, pointer, dimension(:) :: force_mask
+    logical, pointer, dimension(:) :: force_mask, local_property_mask
     integer :: i, j, k
     integer :: n_descriptors, n_cross, n_hessian
 
@@ -684,6 +692,7 @@ contains
        has_hessian = get_value(this%at(n_con)%params,"n_"//this%hessian_parameter_name,n_hessian)
        has_local_property = assign_pointer(this%at(n_con),this%local_property_parameter_name, local_property)
        has_force_mask = assign_pointer(this%at(n_con),trim(this%force_mask_parameter_name),force_mask)
+       has_local_property_mask = assign_pointer(this%at(n_con),trim(this%local_property_mask_parameter_name),local_property_mask)
 
        if( has_ener ) then
           this%n_ener = this%n_ener + 1
@@ -717,12 +726,16 @@ contains
        endif
 
        if( has_local_property ) then
-          this%n_local_property = this%n_local_property + this%at(n_con)%N
+          if( has_local_property_mask ) then
+             this%n_local_property = this%n_local_property + count(local_property_mask)
+          else
+             this%n_local_property = this%n_local_property + this%at(n_con)%N
+          endif
        endif
 
-       if( has_local_property .and. ( has_ener .or. has_force .or. has_virial .or. has_hessian ) ) then
-          call system_abort("fit_n_from_xyz: local_property and (energy or force or virial or hessian) present in configuration, currently not allowed.")
-       endif
+!       if( has_local_property .and. ( has_ener .or. has_force .or. has_virial .or. has_hessian ) ) then
+!          call system_abort("fit_n_from_xyz: local_property and (energy or force or virial or hessian) present in configuration, currently not allowed.")
+!       endif
 
        do i = 1, this%n_coordinate
           call descriptor_sizes(this%my_descriptor(i),this%at(n_con),n_descriptors,n_cross)
@@ -786,7 +799,8 @@ contains
     integer :: n_con
     logical :: has_ener, has_force, has_virial, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
        has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_hessian_sigma, &
-       has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, exclude_atom
+       has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, has_local_property_mask, &
+       exclude_atom
     real(dp) :: ener, ener_core, my_cutoff, energy_sigma, force_sigma, virial_sigma, hessian_sigma, local_property_sigma, &
        grad_covariance_cutoff, use_force_sigma
     real(dp), dimension(3) :: pos
@@ -796,7 +810,7 @@ contains
     real(dp), dimension(:), pointer :: force_atom_sigma
     real(dp), dimension(:,:), pointer :: f, hessian_eigenvector_i, f_hessian, force_component_sigma
     real(dp), dimension(:), pointer :: local_property
-    logical, dimension(:), pointer :: force_mask
+    logical, dimension(:), pointer :: force_mask, local_property_mask
     real(dp), dimension(:,:), allocatable :: f_core
     integer, dimension(:,:), allocatable :: force_loc, permutations
     integer :: ie, i, j, n, k, l, i_coordinate, n_hessian, n_energy_sigma, n_force_sigma, n_force_atom_sigma, &
@@ -866,6 +880,7 @@ contains
        has_force_component_sigma = assign_pointer(this%at(n_con),'force_component_'//trim(this%sigma_parameter_name),force_component_sigma)
        has_local_property_sigma = get_value(this%at(n_con)%params,'local_property_'//trim(this%sigma_parameter_name),local_property_sigma)
        has_force_mask = assign_pointer(this%at(n_con),trim(this%force_mask_parameter_name),force_mask)
+       has_local_property_mask = assign_pointer(this%at(n_con),trim(this%local_property_mask_parameter_name),local_property_mask)
 
        if ((.not. has_virial) .and. (has_stress_3_3 .or. has_stress_voigt)) then
           if (has_stress_voigt) then
@@ -1041,7 +1056,15 @@ contains
           endif
           allocate(local_property_loc(this%at(n_con)%N))
           do i = 1, this%at(n_con)%N
-             local_property_loc(i) = gp_addFunctionValue(this%my_gp,local_property(i),local_property_sigma)
+             if(has_local_property_mask) then
+                if( local_property_mask(i) ) then
+                   local_property_loc(i) = gp_addFunctionValue(this%my_gp,local_property(i),local_property_sigma)
+                else
+                   local_property_loc(i) = EXCLUDE_LOC
+                endif
+             else
+                local_property_loc(i) = gp_addFunctionValue(this%my_gp,local_property(i),local_property_sigma)
+             endif
           enddo
        endif
 
@@ -1123,8 +1146,13 @@ contains
           elseif( has_local_property ) then
              do i = 1, size(my_descriptor_data%x)
                 if( .not. my_descriptor_data%x(i)%has_data) cycle
-                xloc(i) = gp_addCoordinates(this%my_gp,my_descriptor_data%x(i)%data(:),i_coordinate, &
-                cutoff_in=my_descriptor_data%x(i)%covariance_cutoff, current_y=local_property_loc(my_descriptor_data%x(i)%ci(1)),config_type=n_config_type)
+                if( local_property_loc(my_descriptor_data%x(i)%ci(1)) == EXCLUDE_LOC ) then
+                   xloc(i) = gp_addCoordinates(this%my_gp,my_descriptor_data%x(i)%data(:),i_coordinate, &
+                   cutoff_in=my_descriptor_data%x(i)%covariance_cutoff, config_type=n_config_type)
+                else
+                   xloc(i) = gp_addCoordinates(this%my_gp,my_descriptor_data%x(i)%data(:),i_coordinate, &
+                   cutoff_in=my_descriptor_data%x(i)%covariance_cutoff, current_y=local_property_loc(my_descriptor_data%x(i)%ci(1)),config_type=n_config_type)
+                endif
              enddo
           else
              do i = 1, size(my_descriptor_data%x)
@@ -1174,9 +1202,16 @@ contains
        enddo
 
        if( has_local_property ) then
-          if( n_descriptors /= this%at(n_con)%N ) then
-             RAISE_ERROR("fit_data_from_xyz: local_propertyes found in configuration, but number of descriptors do not match &
+          if( has_local_property_mask ) then
+             !if( n_descriptors /= count(local_property_mask) ) then
+             !   RAISE_ERROR("fit_data_from_xyz: local_properties found in configuration, but number of descriptors do not match &
+             !   & the number of properties is the configuration",error)
+             !endif
+          else
+             if( n_descriptors /= this%at(n_con)%N ) then
+                RAISE_ERROR("fit_data_from_xyz: local_properties found in configuration, but number of descriptors do not match &
                 & the number of atoms. Check your descriptors.",error)
+             endif
           endif
        endif
 
