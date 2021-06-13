@@ -29,8 +29,9 @@ forces, and optionally virial stress. All of these are specified in
 the extended XYZ file. Following the definition of the extended XYZ
 file, the energy needs to be in units of eV, the forces in units of
 eV/A and the virial stress in units of eV (this is the regular stress
-multiplied by the volume). The atomic positions need to be in
-Angstroms, and the periodic unit cell is specified by three cartesian
+multiplied by the volume). Watch out for the definition of the sign of
+the stress! For example VASP uses the opposite sign convention to QUIP.
+The atomic positions need to be in Angstroms, and the periodic unit cell is specified by three cartesian
 lattice vectors.
 
 An example structure in extended XYZ format::
@@ -133,9 +134,25 @@ descriptor) not formally be zero for isolated atoms.
 Descriptors and Kernels
 ***********************
 
-blah blah
 
-blah blah
+SOAP hyperparameters
+########################
+
+This section contains notes about choosing hyperparameters for the SOAP descriptor.
+
+cutoff
+************
+
+Every finite range potential can be cast in the form of a sum over site
+energies or atomic energies, and the cut-off radius defines the range of
+this local term. The actual interaction range is of course twice the
+cut-off radius, because atoms up to this distance can potentially
+interact with one another via a many-body term centered on an atom in
+between them.  When we approximate a quantum mechanical potential
+energy (which is not formally local) using a local site energy with
+cut-off radius, the error we necessarily incur can be
+characterised in theform of a force variance.
+
 
 
 

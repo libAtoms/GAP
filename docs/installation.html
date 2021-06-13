@@ -3,9 +3,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>Installation of QUIP, quippy and GAP &mdash; GAP  documentation</title>
   
@@ -19,7 +19,10 @@
   
     <link rel="shortcut icon" href="_static/favicon.ico"/>
   
+
   
+  
+
   
 
   
@@ -32,10 +35,7 @@
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
         <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -57,7 +57,7 @@
           
 
           
-            <a href="index.html" class="icon icon-home" alt="Documentation Home"> GAP
+            <a href="index.html" class="icon icon-home"> GAP
           
 
           
@@ -163,6 +163,8 @@
 
 
 
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="wy-breadcrumbs">
@@ -174,7 +176,7 @@
     
       <li class="wy-breadcrumbs-aside">
         
-            
+          
             <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
           
         
@@ -293,7 +295,15 @@ you will need to run <cite>git submodule update –init –recursive</cite>
 from the top-level QUIP directory after cloning) ::
 <code class="docutils literal notranslate"><span class="pre">`bash</span>
 <span class="pre">git</span> <span class="pre">clone</span> <span class="pre">--recursive</span> <span class="pre">https://github.com/libAtoms/QUIP.git</span>
-<span class="pre">`</span></code></p></li>
+<span class="pre">`</span></code></p>
+<p>One submodule is the GAP code, which can be found in <cite>src/GAP</cite>.
+Note that GAP is distributed under a diferent
+[license](<a class="reference external" href="https://github.com/libAtoms/GAP/blob/main/LICENSE.md">https://github.com/libAtoms/GAP/blob/main/LICENSE.md</a>).</p>
+<p>GAP is a machine learning method that uses Gaussian process
+regression, and needs large data files to run. You can find
+potentials that have been published as well as training data in
+our [data repository](<a class="reference external" href="http://www.libatoms.org/Home/DataRepository">http://www.libatoms.org/Home/DataRepository</a>), see also the [online docs](<a class="reference external" href="https://libatoms.github.io/GAP">https://libatoms.github.io/GAP</a>).</p>
+</li>
 <li><p>Decide your architecture by looking in the <cite>arch/</cite> directory, and
 define an environmental variable <cite>QUIP_ARCH</cite>, e.g.::
 <code class="docutils literal notranslate"><span class="pre">`bash</span>
@@ -342,9 +352,9 @@ This will make all the various libraries and combine them into one:
 calculate the properties of an atomic configuration using a
 variety of models. For example::
 <a href="#id3"><span class="problematic" id="id4">``</span></a><a href="#id5"><span class="problematic" id="id6">`</span></a>bash
-quip at_file=test.xyz init_args=’IP LJ’ </p>
+quip atoms_filename=test.xyz init_args=’IP LJ’ </p>
 <blockquote>
-<div><p>param_file=share/Parameters/ip.parms.LJ.xml E</p>
+<div><p>param_filename=share/Parameters/ip.parms.LJ.xml E</p>
 </div></blockquote>
 <p><code class="docutils literal notranslate"><span class="pre">`</span>
 <span class="pre">assuming</span> <span class="pre">that</span> <span class="pre">you</span> <span class="pre">have</span> <span class="pre">a</span> <span class="pre">file</span> <span class="pre">called</span> <span class="pre">`test.xyz`</span> <span class="pre">with</span> <span class="pre">the</span> <span class="pre">following</span>
@@ -436,27 +446,19 @@ specific directory. <cite>QUIPPY_INSTALL_OPTS</cite> can also be set in the file
 <span class="pre">make</span> <span class="pre">distclean</span>
 <span class="pre">`</span></code></p>
 </div></blockquote>
-<ol class="arabic" start="13">
+<ol class="arabic simple" start="13">
 <li><p>Some functionality is only available if you check out other
 modules within the <cite>QUIP/src/</cite> directories, e.g. the <cite>ThirdParty</cite>
-(DFTB parameters, TTM3f water model), <cite>GAP</cite> (Gaussian
-Approximation Potential models and training). These packages are
-not distributed with QUIP because they come with different licensing
-restrictions, but you can get them [here](<a class="reference external" href="http://www.libatoms.org/gap/gap_download.html">http://www.libatoms.org/gap/gap_download.html</a>)</p>
-<p>GAP is a machine learning method that uses Gaussian process
-regression, and needs large data files to run. You can find
-potentials that have been published as well as training data in
-our [data repository](<a class="reference external" href="http://www.libatoms.org/Home/DataRepository">http://www.libatoms.org/Home/DataRepository</a>), see also the [online docs](<a class="reference external" href="https://libatoms.github.io/GAP">https://libatoms.github.io/GAP</a>).</p>
-</li>
+(DFTB parameters, TTM3f water model).</p></li>
 <li><p>In order to run QUIP potentials via LAMMPS, <cite>make libquip</cite> to get QUIP
 into library form, and then follow the instructions in the
 [LAMMPS documentation](<a class="reference external" href="http://lammps.sandia.gov/doc/pair_quip.html">http://lammps.sandia.gov/doc/pair_quip.html</a>). You need at least 11 Aug 2017 version or later.</p></li>
 </ol>
 <p># Developer notes:</p>
-<p>## Fixing/updating the version f90wrap:</p>
+<p>## Fixing/updating the version of GAP or f90wrap:</p>
 <blockquote>
 <div><p><code class="docutils literal notranslate"><span class="pre">`bash</span>
-<span class="pre">cd</span> <span class="pre">src/f90wrap</span>
+<span class="pre">cd</span> <span class="pre">src/GAP</span> <span class="pre">#</span> <span class="pre">or</span> <span class="pre">src/f90wrap</span>
 <span class="pre">`</span></code>
 <code class="docutils literal notranslate"><span class="pre">`bash</span>
 <span class="pre">git</span> <span class="pre">checkout</span> <span class="pre">&lt;commit&gt;</span>
@@ -468,8 +470,8 @@ git checkout master</p>
 <span class="pre">Updating</span> <span class="pre">the</span> <span class="pre">version</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">`QUIP`</span> <span class="pre">repository:</span>
 <span class="pre">`</span></code>
 cd ../..
-git add src/f90wrap
-git commit -m “updating the version of f90wrap”
+git add src/GAP # or src/f90wrap
+git commit -m “updating the version of GAP”
 <a href="#id13"><span class="problematic" id="id14">``</span></a><a href="#id15"><span class="problematic" id="id16">`</span></a></p>
 </div></blockquote>
 </div></blockquote>
@@ -595,37 +597,29 @@ If not make clean and recompile again</p>
            
           </div>
           <footer>
-  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="gap_fit.html" class="btn btn-neutral float-right" title="The gap_fit program" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="index.html" class="btn btn-neutral float-left" title="GAP and SOAP documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+        <a href="gap_fit.html" class="btn btn-neutral float-right" title="The gap_fit program" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="GAP and SOAP documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        
-        &copy; Copyright 2019, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode
+        &#169; Copyright 2019, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode.
 
     </p>
   </div>
     
     
     
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     
     provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
-
         </div>
       </div>
 
