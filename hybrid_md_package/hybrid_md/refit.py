@@ -6,8 +6,21 @@ from time import time
 import ase.io
 import numpy as np
 
+from hybrid_md.state_objects import HybridMD
 
-def refit(state):
+
+def refit(state: HybridMD):
+    """Refit a GAP model, with in-place update
+
+    This is a generic very simple solution, that should work as a
+    first try starting from scratch. Change this function to your
+    own system and fitting settings as needed.
+
+    Parameters
+    ----------
+    state: HybridMD
+
+    """
     # 2B + SOAP model
     gp_name = "GAP.xml"
     soap_n_sparse = 200
@@ -39,14 +52,17 @@ def refit(state):
     # NEW descriptor str, with 2b and SOAP concatenated with the ":" character in the gap string.
     fit_str = (
         f"gap_fit at_file=train.xyz gp_file={gp_name} "
-        f"energy_parameter_name=QM_energy force_parameter_name=QM_forces virial_parameter_name=QM_virial "
+        f"energy_parameter_name=QM_energy force_parameter_name=QM_forces"
+        f" virial_parameter_name=QM_virial "
         f"sparse_jitter=1.0e-8 do_copy_at_file=F sparse_separate_file=F "
         f"default_sigma={{ {default_sigma} }} e0_method=average "
         f"gap={{ {desc_str_soap} : {desc_str_2b} }}"
     )
 
     # fit the 2b+SOAP model
-    proc = subprocess.run(fit_str, shell=True, capture_output=True, text=True)
+    proc = subprocess.run(
+        fit_str, shell=True, capture_output=True, text=True, check=True
+    )
 
     # print the outputs to file
     with open(f"stdout_{gp_name}_at_{time()}__.txt", "w") as file:

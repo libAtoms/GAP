@@ -1,7 +1,7 @@
 import click
 
-from refit import refit
-from state_objects import HybridMD
+from hybrid_md.refit import refit
+from hybrid_md.state_objects import HybridMD
 
 VERBOSE = True
 
@@ -82,7 +82,8 @@ def pre_step(seed, md_iteration):
     elif (md_iteration - state.num_initial_steps) % state.check_interval == 0:
         # check steps during the run
         do_ab_initio = True
-        do_update_cell = True  # this is the only case when the previous electronic state needs changing
+        # this is the only case when the previous electronic state needs changing
+        do_update_cell = True
         do_comparison = True
     else:
         # this is a generic step with PP
@@ -170,7 +171,8 @@ def post_step(seed, md_iteration):
 
     if VERBOSE:
         print(
-            f"Hybrid-MD: POST Step, exit:{int(state.do_update_model):4}, md_iteration:{md_iteration:3}"
+            f"Hybrid-MD: POST Step, exit:"
+            f"{int(state.do_update_model):4}, md_iteration:{md_iteration:3}"
         )
 
     # exit status
