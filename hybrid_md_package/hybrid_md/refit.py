@@ -1,3 +1,13 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+"""
+Refitting of model on the fly
+
+This is a generic refitting function, specific ones and tweaks of
+this one with the same interface are to be implemented here.
+"""
+
 import os.path
 import shutil
 import subprocess

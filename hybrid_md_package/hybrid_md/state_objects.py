@@ -1,3 +1,10 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+"""
+Objects representing the state of a calculation
+"""
+
 import ase.io
 import numpy as np
 import yaml

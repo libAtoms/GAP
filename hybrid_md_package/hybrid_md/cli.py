@@ -1,7 +1,15 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+"""
+CLI of hybrid MD implementation.
+
+The QM calculators should call this with the subcommands at correct points in the calculation.
+"""
+
 import sys
 
 import click
-
 from hybrid_md.refit import refit
 from hybrid_md.state_objects import HybridMD
 
