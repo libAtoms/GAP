@@ -1,3 +1,5 @@
+import sys
+
 import click
 
 from hybrid_md.refit import refit
@@ -36,9 +38,9 @@ def initialise(seed):
 
     # exit status
     if state.num_initial_steps == 0:
-        exit(0)
+        sys.exit(0)
     else:
-        exit(1)
+        sys.exit(1)
 
 
 @main.command("pre-step")
@@ -124,7 +126,7 @@ def pre_step(seed, md_iteration):
         )
 
     # pass the result back
-    exit(return_value)
+    sys.exit(return_value)
 
 
 @main.command("post-step")
@@ -177,6 +179,12 @@ def post_step(seed, md_iteration):
 
     # exit status
     if state.do_update_model:
-        exit(1)
+        sys.exit(1)
     else:
-        exit(0)
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
+    # in case main() does not exit
+    sys.exit(-999)
