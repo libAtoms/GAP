@@ -113,13 +113,14 @@ class HybridMD:
             self.tolerance_met = self.tolerances and tolerance > value
 
             # line to be printed
-            ok = self.bool_to_str(tolerance > value)
+            yes_no = self.bool_to_str(tolerance > value)
 
-            return f" {name:>12} | {value:16.8f} | {tolerance:16.8f} | {unit:10} | {ok:3} | <-- Hybrid-MD\n"
-        else:
-            return f" {name:>12} | {value:16.8f} |              Off | {unit:10} |     | <-- Hybrid-MD\n"
+            return f" {name:>12} | {value:16.8f} | {tolerance:16.8f} | {unit:10} | {yes_no:3} | <-- Hybrid-MD\n"
 
-    def tolerance_line_cumulative(self, name: str, value: float, unit: str):
+        return f" {name:>12} | {value:16.8f} |              Off | {unit:10} |     | <-- Hybrid-MD\n"
+
+    @staticmethod
+    def tolerance_line_cumulative(name: str, value: float, unit: str):
 
         return f" {name:>12}{value:30.8f}               | {unit:10} | <-- Hybrid-MD-Cumul\n"
 
@@ -234,23 +235,25 @@ class HybridMD:
         # energy difference per atom
         return np.abs(self.energy_ff[-1] - self.energy_qm[-1]) / self.len_atoms
 
-    def get_fmax(self, z: int = None):
-        if z is None:
+    def get_fmax(self, atomic_number: int = None):
+        if atomic_number is None:
             # species agnostic maximum force component difference
             return np.max(np.abs(self.forces_pp[-1] - self.forces_pw[-1]))
-        else:
-            return self.max_abs(
-                self.forces_pp[-1, self.z_mask(z)] - self.forces_pw[-1, self.z_mask(z)]
-            )
 
-    def get_frmse(self, z: int = None):
-        if z is None:
+        return self.max_abs(
+            self.forces_pp[-1, self.z_mask(atomic_number)]
+            - self.forces_pw[-1, self.z_mask(atomic_number)]
+        )
+
+    def get_frmse(self, atomic_number: int = None):
+        if atomic_number is None:
             # species agnostic force component RMSE
             return self.rmse(self.forces_pp[-1] - self.forces_pw[-1])
-        else:
-            return self.rmse(
-                self.forces_pp[-1, self.z_mask(z)] - self.forces_pw[-1, self.z_mask(z)]
-            )
+
+        return self.rmse(
+            self.forces_pp[-1, self.z_mask(atomic_number)]
+            - self.forces_pw[-1, self.z_mask(atomic_number)]
+        )
 
     def get_vmax(self):
         # maximum virial component difference
@@ -266,14 +269,15 @@ class HybridMD:
         # cumulative energy RMSE per atom
         return self.rmse((self.energy_ff - self.energy_qm) / self.len_atoms)
 
-    def get_cumulative_force_rmse(self, z: int = None):
-        if z is None:
+    def get_cumulative_force_rmse(self, atomic_number: int = None):
+        if atomic_number is None:
             # species agnostic force component RMSE
             return self.rmse(self.forces_pp - self.forces_pw)
-        else:
-            return self.rmse(
-                self.forces_pp[:, self.z_mask(z)] - self.forces_pw[:, self.z_mask(z)]
-            )
+
+        return self.rmse(
+            self.forces_pp[:, self.z_mask(atomic_number)]
+            - self.forces_pw[:, self.z_mask(atomic_number)]
+        )
 
     def get_cumulative_virial_rmse(self):
         return self.rmse(self.virial_pw - self.virial_pp)
@@ -297,12 +301,11 @@ class HybridMD:
     def max_abs(array):
         return np.max(np.abs(array))
 
-    def z_mask(self, z: int):
-        return self.atomic_numbers == z
+    def z_mask(self, atomic_number: int):
+        return self.atomic_numbers == atomic_number
 
     @staticmethod
     def bool_to_str(value):
         if value:
             return "Yes"
-        else:
-            return " No"
+        return " No"
