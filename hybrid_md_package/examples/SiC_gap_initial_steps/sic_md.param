@@ -1,0 +1,37 @@
+cut_off_energy = 200 eV
+elec_energy_tol = 0.0001 eV
+finite_basis_corr = 0
+fix_occupancy = true
+backup_interval = 0
+calculate_stress = true
+popn_calculate   = false
+write_checkpoint = none
+
+comment = MD with Hybrid method
+task = molecular dynamics
+
+# These settings make sure that forces printed in .md have no thermostat contribution
+md_ensemble = NVT
+md_thermostat = NOSE-HOOVER
+md_barostat   = Parrinello-Rahman
+md_ion_t = 500 fs
+md_cell_t = 2000 fs
+md_delta_t = 2 fs
+md_num_iter = 50
+md_temperature = 75 K
+md_sample_iter = 10
+
+%BLOCK DEVEL_CODE
+  PP=T
+  MD: PP=T :ENDMD
+  pp:
+      QUIP=T
+      QUIP_PARAM_FILE=GAP.xml
+      quip_init_args:IP GAP:endquip_init_args
+  :endpp
+
+  MD_PP_HYBRID=T
+  pp_hybrid:
+      hybrid-md
+  :endpp_hybrid
+%ENDBLOCK DEVEL_CODE
