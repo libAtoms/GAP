@@ -18,7 +18,9 @@ VERBOSE = True
 
 @click.group("hybrid-md")
 def main():
-    pass
+    """
+    Hybrid MD main CLI. See the subcommands for more details.
+    """
 
 
 @main.command("initialise")
