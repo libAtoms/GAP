@@ -114,20 +114,20 @@ class HybridMD:
     # -----------------------------------------------------------------------------------
     # Error table for IO
 
-    def tolerance_line(self, name: str, value: float, tolerance, unit: str):
+    def _tolerance_line(self, name: str, value: float, tolerance, unit: str):
         if tolerance is not None:
             # checks tolerance as well
             self.tolerance_met = self.tolerances and tolerance > value
 
             # line to be printed
-            yes_no = self.bool_to_str(tolerance > value)
+            yes_no = self._bool_to_str(tolerance > value)
 
             return f" {name:>12} | {value:16.8f} | {tolerance:16.8f} | {unit:10} | {yes_no:3} | <-- Hybrid-MD\n"
 
         return f" {name:>12} | {value:16.8f} |              Off | {unit:10} |     | <-- Hybrid-MD\n"
 
     @staticmethod
-    def tolerance_line_cumulative(name: str, value: float, unit: str):
+    def _tolerance_line_cumulative(name: str, value: float, unit: str):
 
         return f" {name:>12}{value:30.8f}               | {unit:10} | <-- Hybrid-MD-Cumul\n"
 
@@ -164,16 +164,16 @@ class HybridMD:
             separator,
             "    Parameter |      value       |     tolerance    |    units   | OK? | <-- Hybrid-MD\n",
             separator,
-            self.tolerance_line(
+            self._tolerance_line(
                 "|Ediff|", self.get_ediff(), self.get_tolerance("ediff"), "eV/at"
             ),
-            self.tolerance_line(
+            self._tolerance_line(
                 "max |Fdiff|", self.get_fmax(), self.get_tolerance("fmax"), "eV/Å",
             ),
-            self.tolerance_line(
+            self._tolerance_line(
                 "force RMSE", self.get_frmse(), self.get_tolerance("frmse"), "eV/Å",
             ),
-            self.tolerance_line(
+            self._tolerance_line(
                 "max |Vdiff|", self.get_vmax(), self.get_tolerance("vmax"), "eV"
             ),
             separator,
@@ -193,13 +193,13 @@ class HybridMD:
             separator,
             f"  Cumulative RMSE       value            count: {self.get_count():>8}  |    units   |{postfix}\n",
             separator,
-            self.tolerance_line_cumulative(
+            self._tolerance_line_cumulative(
                 "Energy", self.get_cumulative_energy_rmse(), "eV/atom"
             ),
-            self.tolerance_line_cumulative(
+            self._tolerance_line_cumulative(
                 "Forces", self.get_cumulative_force_rmse(), "eV/Å"
             ),
-            self.tolerance_line_cumulative(
+            self._tolerance_line_cumulative(
                 "Virial", self.get_cumulative_virial_rmse(), "eV"
             ),
             separator,
@@ -223,18 +223,18 @@ class HybridMD:
         self.atomic_numbers = frames[0].get_atomic_numbers()
 
         # energy : (n_frames)
-        self.energy_qm = self.unpack_info(frames, "QM_energy")
-        self.energy_ff = self.unpack_info(frames, "FF_energy")
+        self.energy_qm = self._unpack_info(frames, "QM_energy")
+        self.energy_ff = self._unpack_info(frames, "FF_energy")
 
         # forces : (n_frames, n_atoms, 3)
-        self.forces_pw = self.unpack_arrays(frames, "QM_forces")
-        self.forces_pp = self.unpack_arrays(frames, "FF_forces")
+        self.forces_pw = self._unpack_arrays(frames, "QM_forces")
+        self.forces_pp = self._unpack_arrays(frames, "FF_forces")
 
         # virial : (n_frames, 6)
         if "QM virial" in frames[0].info.keys():
             self.use_virial = True
-            self.virial_pw = self.unpack_info(frames, "QM_virial")
-            self.virial_pp = self.unpack_info(frames, "FF_virial")
+            self.virial_pw = self._unpack_info(frames, "QM_virial")
+            self.virial_pp = self._unpack_info(frames, "FF_virial")
 
     # -----------------------------------------------------------------------------------
     # last step's error measures
@@ -247,19 +247,19 @@ class HybridMD:
             # species agnostic maximum force component difference
             return np.max(np.abs(self.forces_pp[-1] - self.forces_pw[-1]))
 
-        return self.max_abs(
-            self.forces_pp[-1, self.z_mask(atomic_number)]
-            - self.forces_pw[-1, self.z_mask(atomic_number)]
+        return self._max_abs(
+            self.forces_pp[-1, self._z_mask(atomic_number)]
+            - self.forces_pw[-1, self._z_mask(atomic_number)]
         )
 
     def get_frmse(self, atomic_number: int = None):
         if atomic_number is None:
             # species agnostic force component RMSE
-            return self.rmse(self.forces_pp[-1] - self.forces_pw[-1])
+            return self._rmse(self.forces_pp[-1] - self.forces_pw[-1])
 
-        return self.rmse(
-            self.forces_pp[-1, self.z_mask(atomic_number)]
-            - self.forces_pw[-1, self.z_mask(atomic_number)]
+        return self._rmse(
+            self.forces_pp[-1, self._z_mask(atomic_number)]
+            - self.forces_pw[-1, self._z_mask(atomic_number)]
         )
 
     def get_vmax(self):
@@ -274,45 +274,45 @@ class HybridMD:
 
     def get_cumulative_energy_rmse(self):
         # cumulative energy RMSE per atom
-        return self.rmse((self.energy_ff - self.energy_qm) / self.len_atoms)
+        return self._rmse((self.energy_ff - self.energy_qm) / self.len_atoms)
 
     def get_cumulative_force_rmse(self, atomic_number: int = None):
         if atomic_number is None:
             # species agnostic force component RMSE
-            return self.rmse(self.forces_pp - self.forces_pw)
+            return self._rmse(self.forces_pp - self.forces_pw)
 
-        return self.rmse(
-            self.forces_pp[:, self.z_mask(atomic_number)]
-            - self.forces_pw[:, self.z_mask(atomic_number)]
+        return self._rmse(
+            self.forces_pp[:, self._z_mask(atomic_number)]
+            - self.forces_pw[:, self._z_mask(atomic_number)]
         )
 
     def get_cumulative_virial_rmse(self):
-        return self.rmse(self.virial_pw - self.virial_pp)
+        return self._rmse(self.virial_pw - self.virial_pp)
 
     # -----------------------------------------------------------------------------------
     # helper functions
 
     @staticmethod
-    def unpack_info(frames, key: str):
+    def _unpack_info(frames, key: str):
         return np.array([at.info[key] for at in frames])
 
     @staticmethod
-    def unpack_arrays(frames, key: str):
+    def _unpack_arrays(frames, key: str):
         return np.array([at.arrays[key] for at in frames])
 
     @staticmethod
-    def rmse(array):
+    def _rmse(array):
         return np.sqrt(np.mean(np.square(array)))
 
     @staticmethod
-    def max_abs(array):
+    def _max_abs(array):
         return np.max(np.abs(array))
 
-    def z_mask(self, atomic_number: int):
+    def _z_mask(self, atomic_number: int):
         return self.atomic_numbers == atomic_number
 
     @staticmethod
-    def bool_to_str(value):
+    def _bool_to_str(value):
         if value:
             return "Yes"
         return " No"
