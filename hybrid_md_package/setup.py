@@ -1,5 +1,8 @@
 import setuptools
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setuptools.setup(
     name="hybrid_md",
     version="0.0.1",
@@ -9,4 +12,13 @@ setuptools.setup(
     [console_scripts]
     hybrid-md=hybrid_md.cli:main
     """,
+    description="Hybrid Molecular Dynamics for Quantum Mechanics codes with Force Fields",
+    author="Tamas K. Stenczel",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    classifiers=[
+        "Intended Audience :: Science/Research",
+        "Programming Language :: Python :: 3",
+    ],
+    zip_safe=True,
 )
