@@ -7,6 +7,6 @@ setuptools.setup(
     install_requires=["click>=7.0", "numpy", "ase", "pyyaml"],
     entry_points="""
     [console_scripts]
-    wfl=hybrid_md.cli:main
+    hybrid-md=hybrid_md.cli:main
     """,
 )
