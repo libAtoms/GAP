@@ -1,3 +1,7 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+
 cut_off_energy = 200 eV
 elec_energy_tol = 0.0001 eV
 finite_basis_corr = 0

@@ -1,3 +1,6 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
 import setuptools
 
 with open("README.md", "r") as fh:
