@@ -1,3 +1,7 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+
 cut_off_energy = 200 eV
 elec_energy_tol = 0.0001 eV
 finite_basis_corr = 0
@@ -22,16 +26,21 @@ md_temperature = 75 K
 md_sample_iter = 10
 
 %BLOCK DEVEL_CODE
+
+  ! generally turns on PP, this is needed together with "MD_PP_HYBRID=T"
   PP=T
   MD: PP=T :ENDMD
+
+  ! settings of model called through QUIP
   pp:
       QUIP=T
       QUIP_PARAM_FILE=GAP.xml
       quip_init_args:IP GAP:endquip_init_args
   :endpp
 
+  ! settings of PP Hybrid MD
   MD_PP_HYBRID=T
-  pp_hybrid:
-      hybrid-md
-  :endpp_hybrid
+  md_pp_hybrid_exec:
+    hybrid-md
+  :endmd_pp_hybrid_exec
 %ENDBLOCK DEVEL_CODE

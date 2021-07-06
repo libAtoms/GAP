@@ -1,3 +1,7 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+
 # this is an input file for PP-Hybrid MD
 
 can_update: true # if updates are to be performed
