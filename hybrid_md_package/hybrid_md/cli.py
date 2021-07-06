@@ -28,9 +28,9 @@ def main():
 def initialise(seed):
     """Initialisation of the Hybrid MD run.
 
-    Answers:
-    - 0: start with PP
-    - 1: start with ab-initio
+    Answer: integer exit code (three bits encoded)
+    - i_exit &  1: read log and put in code's log
+    - i_exit &  2: start with ab-initio (on True), else GAP
     """
 
     # create the initial state object
@@ -46,11 +46,14 @@ def initialise(seed):
             f" -- num_initial_steps {state.num_initial_steps}",
         )
 
-    # exit status
+    # write the log for the .castep file
+    state.io_initial_step_banner()
+
+    # exit status -- log reading always ON
     if state.num_initial_steps == 0:
-        sys.exit(0)
-    else:
         sys.exit(1)
+    else:
+        sys.exit(3)
 
 
 @main.command("pre-step")
@@ -60,10 +63,11 @@ def pre_step(seed, md_iteration):
     """Start of the MD-Hybrid step, called by md step
 
     Answer: integer exit code (three bits encoded)
-    - i_exit & 1: do ab-initio now
-    - i_exit & 2: do ab-initio in next iteration (rest of loop)
-    - i_exit & 4: do update cell
-    - i_exit & 8: use ab-initio forces in MD
+    - i_exit &  1: read log and put in code's log
+    - i_exit &  2: do ab-initio now
+    - i_exit &  4: do ab-initio in next iteration (rest of loop)
+    - i_exit &  8: do update cell
+    - i_exit & 16: use ab-initio forces in MD
     """
 
     # state of object
@@ -117,12 +121,12 @@ def pre_step(seed, md_iteration):
     # dump state
     state.dump()
 
-    return_value = 0
+    return_value = 0  # log reading off for this one
     for num, val in [
-        (1, do_ab_initio),
-        (2, next_ab_initio),
-        (4, do_update_cell),
-        (8, use_pw_forces),
+        (2, do_ab_initio),
+        (4, next_ab_initio),
+        (8, do_update_cell),
+        (16, use_pw_forces),
     ]:
         return_value += num * int(val)
 
@@ -145,9 +149,9 @@ def pre_step(seed, md_iteration):
 def post_step(seed, md_iteration):
     """End of the MD-Hybrid step, called by md.f90
 
-    Answers:
-    - 0: do nothing
-    - 1: update PP model
+    Answer: integer exit code (three bits encoded)
+    - i_exit &  1: read log and put in code's log
+    - i_exit &  2: read the GAP model again
     """
 
     # state of object
@@ -187,11 +191,9 @@ def post_step(seed, md_iteration):
             f"{int(state.do_update_model):4}, md_iteration:{md_iteration:3}"
         )
 
-    # exit status
-    if state.do_update_model:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+    # exit status -- log reading always ON
+    exit_code = int(state.do_comparison) + 2 * int(state.do_update_model)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

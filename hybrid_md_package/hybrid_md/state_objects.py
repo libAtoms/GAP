@@ -36,7 +36,7 @@ class HybridMD:
         self.seed = seed
 
         self.state_filename = f"{self.seed}.hybrid-md-state.yaml"
-        self.log_filename = f"{self.seed}.hybrid-md-log"
+        self.log_filename = f"{self.seed}.hybrid-md-temporary-log"
         self.input_filename = f"{self.seed}.hybrid-md-input.yaml"
         self.xyz_filename = f"{self.seed}.hybrid-md.xyz"
 
@@ -112,6 +112,31 @@ class HybridMD:
             raise ValueError("Requesting initial DFT steps but cannot update model!")
 
     # -----------------------------------------------------------------------------------
+    # step's IO
+
+    def io_initial_step_banner(self):
+        lines = ["\n", "Using Hybrid MD\n", "! input file" + "-" * 66 + "\n"]
+
+        with open(self.input_filename, "r") as file:
+            lines.extend(file.readlines())
+
+        lines.append("! end of input file" + "-" * 61)
+        lines.append("")
+
+        self.write_to_tmp_log(lines, append=False)
+
+    def write_to_tmp_log(self, lines, append):
+        # write log to temporary file
+
+        if append:
+            mode = "a"
+        else:
+            mode = "w"
+
+        with open(self.log_filename, mode) as file:
+            file.writelines(lines)
+
+    # -----------------------------------------------------------------------------------
     # Error table for IO
 
     def _tolerance_line(self, name: str, value: float, tolerance, unit: str):
@@ -180,8 +205,7 @@ class HybridMD:
             f"{refit_str:>72} <-- Hybrid-MD\n",
         ]
 
-        with open(self.log_filename, "a") as file:
-            file.writelines(lines)
+        self.write_to_tmp_log(lines, append=True)
 
     def cumulative_error_table(self):
 
@@ -205,8 +229,7 @@ class HybridMD:
             separator,
         ]
 
-        with open(self.log_filename, "a") as file:
-            file.writelines(lines)
+        self.write_to_tmp_log(lines, append=True)
 
     def get_tolerance(self, key: str):
         if not self.use_virial and key in ["vmax"]:
