@@ -1,0 +1,13 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+
+# this is an input file for PP-Hybrid MD
+can_update: true # if updates are to be performed
+check_interval: 5
+num_initial_steps: 5
+tolerances:
+  ediff: 0.01   # eV
+  fmax:  0.250  # eV/A
+  frmse: 0.200  # eV/A
+  vmax: null    # eV (virial)
