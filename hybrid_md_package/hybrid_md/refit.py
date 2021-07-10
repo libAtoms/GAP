@@ -15,7 +15,6 @@ from time import time
 
 import ase.io
 import numpy as np
-
 from hybrid_md.state_objects import HybridMD
 
 
@@ -34,7 +33,7 @@ def refit(state: HybridMD):
     # 2B + SOAP model
     gp_name = "GAP.xml"
     soap_n_sparse = 200
-    frames_train = ase.io.read(state.xyz_filename, ":")
+    frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
 
     # save the previous model
     if os.path.isfile(gp_name):

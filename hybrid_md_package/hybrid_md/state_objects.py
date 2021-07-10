@@ -41,6 +41,7 @@ class HybridMD:
         self.xyz_filename = f"{self.seed}.hybrid-md.xyz"
 
         self.use_virial = False  # if we are using virials in the calculations
+        self.previous_data = None
 
         # read input -> tolerances, etc.
         self.read_input()
@@ -104,6 +105,7 @@ class HybridMD:
         self.can_update = data.get("can_update", False)
         self.check_interval = data.get("check_interval", 1)
         self.num_initial_steps = data.get("num_initial_steps", 0)
+        self.previous_data = data.get("previous_data", None)
 
     def validate_settings(self):
         # any validation of the settings
@@ -258,6 +260,16 @@ class HybridMD:
             self.use_virial = True
             self.virial_pw = self._unpack_info(frames, "QM_virial")
             self.virial_pp = self._unpack_info(frames, "FF_virial")
+
+    def get_previous_data(self):
+        # read the previous data from files given
+        if self.previous_data is None:
+            return []
+        else:
+            frames = []
+            for fn in self.previous_data:
+                frames.extend(ase.io.read(fn, ":"))
+            return frames
 
     # -----------------------------------------------------------------------------------
     # last step's error measures
