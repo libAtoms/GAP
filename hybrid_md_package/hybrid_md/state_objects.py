@@ -42,6 +42,7 @@ class HybridMD:
 
         self.use_virial = False  # if we are using virials in the calculations
         self.previous_data = None
+        self.refit_function_name = None
 
         # read input -> tolerances, etc.
         self.read_input()
@@ -106,6 +107,7 @@ class HybridMD:
         self.check_interval = data.get("check_interval", 1)
         self.num_initial_steps = data.get("num_initial_steps", 0)
         self.previous_data = data.get("previous_data", None)
+        self.refit_function_name = data.get("refit_function", None)
 
     def validate_settings(self):
         # any validation of the settings

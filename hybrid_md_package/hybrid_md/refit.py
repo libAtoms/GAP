@@ -8,6 +8,7 @@ This is a generic refitting function, specific ones and tweaks of
 this one with the same interface are to be implemented here.
 """
 
+import importlib
 import os.path
 import shutil
 import subprocess
@@ -21,6 +22,46 @@ from hybrid_md.state_objects import HybridMD
 def refit(state: HybridMD):
     """Refit a GAP model, with in-place update
 
+    This is a generic one, which can import the functio
+
+    Parameters
+    ----------
+    state: HybridMD
+
+    """
+    if state.refit_function_name is None:
+        return refit_generic(state, None, None)
+    else:
+        refit_function_import = state.refit_function_name
+
+        # separate import path
+        module_name = ".".join(refit_function_import.split(".")[:-1])
+        function_name = refit_function_import.split(".")[-1]
+
+        # import the module of the refit function
+        try:
+            module = importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            raise RuntimeError(f"Refit function's module not found: {module_name}")
+
+        # class of the calculator
+        if hasattr(module, function_name):
+            refit_function = getattr(module, function_name)
+            assert callable(refit_function)
+        else:
+            raise RuntimeError(
+                f"Refit function ({function_name}) not found in module {module_name}"
+            )
+
+        # YAY, all great now
+        return refit_function(state)
+
+
+def refit_generic(
+    state: HybridMD, descriptor_strs: str = None, default_sigma: str = None
+):
+    """Refit a GAP model, with in-place update
+
     This is a generic very simple solution, that should work as a
     first try starting from scratch. Change this function to your
     own system and fitting settings as needed.
@@ -28,12 +69,33 @@ def refit(state: HybridMD):
     Parameters
     ----------
     state: HybridMD
+    descriptor_strs : str
+        descriptor strings, ':' separated, no brackets around them
+    default_sigma : str
+        default sigma, four numbers separated by ':'
 
     """
+    if default_sigma is None:
+        default_sigma = "0.005 0.050 0.1 1.0"
+
     # 2B + SOAP model
     gp_name = "GAP.xml"
-    soap_n_sparse = 200
     frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
+
+    if descriptor_strs is None:
+        # generic 2B+SOAP, need the frames for delta
+        delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train]) / 4
+        desc_str_2b = (
+            f"distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
+            f"compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
+            f"f0=0.0 add_species=T delta={delta}"
+        )
+        desc_str_soap = (
+            f"soap n_sparse=200 n_max=8 l_max=4 cutoff=4.0 cutoff_transition_width=1.0 "
+            f"atom_sigma=0.5 add_species=True "
+            f"delta={delta} covariance_type=dot_product zeta=4 sparse_method=cur_points"
+        )
+        descriptor_strs = desc_str_2b + " : " + desc_str_soap
 
     # save the previous model
     if os.path.isfile(gp_name):
@@ -41,31 +103,15 @@ def refit(state: HybridMD):
 
     # training structures & delta
     ase.io.write("train.xyz", frames_train)
-    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train]) / 4
 
-    # descriptors
-    desc_str_2b = (
-        f"distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
-        f"compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
-        f"f0=0.0 add_species=T delta={delta}"
-    )
-    desc_str_soap = (
-        f"soap n_sparse={soap_n_sparse} n_max=8 l_max=4 cutoff=4.0 cutoff_transition_width=1.0 "
-        f"atom_sigma=0.5 add_species=True "
-        f"delta={delta} covariance_type=dot_product zeta=4 sparse_method=cur_points"
-    )
-
-    # use lower kernel regularisation
-    default_sigma = "0.001 0.020 0.1 1.0"
-
-    # NEW descriptor str, with 2b and SOAP concatenated with the ":" character in the gap string.
+    # assemble the fitting string
     fit_str = (
         f"gap_fit at_file=train.xyz gp_file={gp_name} "
         f"energy_parameter_name=QM_energy force_parameter_name=QM_forces"
         f" virial_parameter_name=QM_virial "
         f"sparse_jitter=1.0e-8 do_copy_at_file=F sparse_separate_file=F "
         f"default_sigma={{ {default_sigma} }} e0_method=average "
-        f"gap={{ {desc_str_soap} : {desc_str_2b} }}"
+        f"gap={{ {descriptor_strs} }}"
     )
 
     # fit the 2b+SOAP model
