@@ -57,6 +57,41 @@ def refit(state: HybridMD):
         return refit_function(state)
 
 
+def refit_turbo_si_c(state: HybridMD):
+    # Refit function with TurboSOAP for the SiC example
+
+    frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
+    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train]) / 4
+
+    # descriptors
+    desc_str_2b = (
+        f"distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
+        f"compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
+        f"f0=0.0 add_species=T delta={delta}"
+    )
+
+    # turbo SOAP
+    soap_n_sparse = 200
+    soap_common = (
+        " n_species=2 species_Z={{6 14}} rcut_hard=4.5 rcut_soft=3.5 alpha_max={{10 10}} l_max=6 "
+        "atom_sigma_r={{0.3 0.3}} atom_sigma_t={{0.3 0.3}} atom_sigma_r_scaling={{0.10 0.10}} "
+        "atom_sigma_t_scaling={{0.10 0.10}} amplitude_scaling={{1. 1.}} radial_enhancement=1 "
+        "basis=poly3gauss scaling_mode=polynomial central_weight={{1. 1.}} f0=0.0 "
+        "covariance_type=dot_product zeta=4 sparse_method=cur_points add_species=F "
+    )
+    desc_str_soap = (
+        f"soap_turbo central_index=1 n_sparse={soap_n_sparse} delta={delta} {soap_common} : "
+        f"soap_turbo central_index=2 n_sparse={soap_n_sparse} delta={delta} {soap_common} "
+    )
+
+    descriptor_strs = desc_str_2b + " : " + desc_str_soap
+
+    # use lower kernel regularisation
+    default_sigma = "0.005 0.050 0.1 1.0"
+
+    return refit_generic(state, descriptor_strs, default_sigma)
+
+
 def refit_generic(
     state: HybridMD, descriptor_strs: str = None, default_sigma: str = None
 ):
