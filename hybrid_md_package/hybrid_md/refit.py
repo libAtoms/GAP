@@ -59,6 +59,21 @@ def refit(state: HybridMD):
 
 def refit_turbo_si_c(state: HybridMD):
     # Refit function with TurboSOAP for the SiC example
+    return refit_turbo_two_species(state, "6 14")
+
+
+def refit_turbo_h_c(state: HybridMD):
+    # Hydrogen and Carbon
+    return refit_turbo_two_species(state, "1 6", 300)
+
+
+def refit_turbo_fe_h(state: HybridMD):
+    # Hydrogen and Iron
+    return refit_turbo_two_species(state, "1 26", 200)
+
+
+def refit_turbo_two_species(state: HybridMD, species_str: str, soap_n_sparse=200):
+    # refit with turbo-soap, given two species
 
     frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
     delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train]) / 4
@@ -71,9 +86,9 @@ def refit_turbo_si_c(state: HybridMD):
     )
 
     # turbo SOAP
-    soap_n_sparse = 200
     soap_common = (
-        " n_species=2 species_Z={{6 14}} rcut_hard=4.5 rcut_soft=3.5 alpha_max={{10 10}} l_max=6 "
+        f" n_species=2 species_Z={{ {species_str} }} rcut_hard=4.5 rcut_soft=3.5 "
+        "alpha_max={{10 10}} l_max=6 "
         "atom_sigma_r={{0.3 0.3}} atom_sigma_t={{0.3 0.3}} atom_sigma_r_scaling={{0.10 0.10}} "
         "atom_sigma_t_scaling={{0.10 0.10}} amplitude_scaling={{1. 1.}} radial_enhancement=1 "
         "basis=poly3gauss scaling_mode=polynomial central_weight={{1. 1.}} f0=0.0 "
@@ -93,7 +108,7 @@ def refit_turbo_si_c(state: HybridMD):
 
 
 def refit_generic(
-    state: HybridMD, descriptor_strs: str = None, default_sigma: str = None
+        state: HybridMD, descriptor_strs: str = None, default_sigma: str = None
 ):
     """Refit a GAP model, with in-place update
 
@@ -138,13 +153,15 @@ def refit_generic(
 
     # training structures & delta
     ase.io.write("train.xyz", frames_train)
+    if os.path.isfile("train.xyz.idx"):
+        os.remove("train.xyz.idx")
 
     # assemble the fitting string
     fit_str = (
         f"gap_fit at_file=train.xyz gp_file={gp_name} "
         f"energy_parameter_name=QM_energy force_parameter_name=QM_forces"
         f" virial_parameter_name=QM_virial "
-        f"sparse_jitter=1.0e-8 do_copy_at_file=F sparse_separate_file=F "
+        f"sparse_jitter=1.0e-8 do_copy_at_file=F sparse_separate_file=T "
         f"default_sigma={{ {default_sigma} }} e0_method=average "
         f"gap={{ {descriptor_strs} }}"
     )
