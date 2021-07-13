@@ -147,16 +147,3 @@
       logical :: initialised = .false.
    endtype soap_express
 
-
-   type soap_turbo
-      ! User controllable parameters
-      real(dp) :: rcut_hard, rcut_soft, nf
-      integer  :: n_species, radial_enhancement, central_index, l_max
-      character(len=STRING_LENGTH) :: basis, scaling_mode, compress_file
-
-      real(dp), dimension(:), allocatable :: atom_sigma_r, atom_sigma_r_scaling, &
-         atom_sigma_t, atom_sigma_t_scaling, amplitude_scaling, central_weight
-      integer, dimension(:), allocatable :: species_Z, alpha_max, compress_indices
-
-      logical :: initialised = .false., compress = .false.
-   endtype soap_turbo
