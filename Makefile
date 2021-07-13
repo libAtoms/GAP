@@ -50,6 +50,10 @@ else
   GAP1_F95_FILES = 
 endif
 
+SOAP_TURBO_F95_FILES = soap_turbo_functions soap_turbo_radial soap_turbo_angular soap_turbo
+SOAP_TURBO_F95_SOURCES =  ${addsuffix .f90, ${SOAP_TURBO_F95_FILES}}
+SOAP_TURBO_F95_OBJS =  ${addsuffix .o, ${SOAP_TURBO_F95_FILES}}
+
 GAP1_F95_FILES += descriptors gp_predict descriptors_wrapper clustering 
 GAP1_F95_SOURCES = ${addsuffix .f95, ${GAP1_F95_FILES}}
 GAP1_F95_OBJS = ${addsuffix .o, ${GAP1_F95_FILES}}
@@ -89,13 +93,13 @@ Programs: ${PROGRAMS}
 	#cp ${QUIP_ROOT}/src/GAP/teach_sparse .
 
 ${PROGRAMS}: % : ${LIBFILES} ${GAP2_F95_OBJS} ${GAPFIT_LIBFILE}  %.o
-	$(LINKER) $(LINKFLAGS) -o $@ ${F90OPTS} $@.o ${GAPFIT_LIBFILE} ${LIBS} ${LINKOPTS}
+	$(LINKER) $(LINKFLAGS) -o $@ ${F95OPTS} $@.o ${GAPFIT_LIBFILE} ${LIBS} ${LINKOPTS}
 
 
 
-${GAP_LIBFILE}: ${GAP1_F95_OBJS}
+${GAP_LIBFILE}: ${SOAP_TURBO_F95_OBJS}  ${GAP1_F95_OBJS}
 ifneq (${LIBTOOL},)
-	${LIBTOOL} -o ${GAP_LIBFILE} ${GAP1_F95_OBJS}
+	${LIBTOOL} -o ${GAP_LIBFILE}  ${SOAP_TURBO_F95_OBJS} ${GAP1_F95_OBJS}
 else
 	${AR} ${AR_ADD} ${GAP_LIBFILE} $?
 endif
