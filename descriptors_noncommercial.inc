@@ -4820,34 +4820,6 @@
 
    endsubroutine soap_express_finalise
 
-   subroutine soap_turbo_finalise(this,error)
-      type(soap_turbo), intent(inout) :: this
-      integer, optional, intent(out) :: error
-
-      INIT_ERROR(error)
-
-      if(.not. this%initialised) return
-      this%rcut_hard = 0.0_dp
-      this%rcut_soft = 0.0_dp
-      this%nf = 0.0_dp
-      this%n_species = 0
-      this%radial_enhancement = 0
-      this%central_index = 0
-      this%l_max = 0
-
-      if(allocated(this%alpha_max)) deallocate(this%alpha_max)
-      if(allocated(this%atom_sigma_r)) deallocate(this%atom_sigma_r)
-      if(allocated(this%atom_sigma_r_scaling)) deallocate(this%atom_sigma_r_scaling)
-      if(allocated(this%atom_sigma_t)) deallocate(this%atom_sigma_t)
-      if(allocated(this%atom_sigma_t_scaling)) deallocate(this%atom_sigma_t_scaling)
-      if(allocated(this%amplitude_scaling)) deallocate(this%amplitude_scaling)
-      if(allocated(this%central_weight)) deallocate(this%central_weight)
-      if(allocated(this%species_Z)) deallocate(this%species_Z)
-
-      this%initialised = .false.
-
-   endsubroutine soap_turbo_finalise
-
 !!!!!!!!
 !!! Joint work of A. P. Bartok and Miguel Caro ENDS here
 !!!!!!!!

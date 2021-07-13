@@ -461,15 +461,15 @@ module descriptors_module
         water_dimer, a2_dimer, bond_real_space, power_so3, power_so4, an_monomer, general_dimer, &
         general_trimer, rdf, as_distance_2b, molecule_lo_d, alex,  com_dimer,  distance_nb, &
         descriptor_data_mono, fourier_so4_type, radialfunction_type, transfer_parameters_type, &
-        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3, soap_express, &
-        soap_turbo
+        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3, soap_express
 #else
    public :: soap, bispectrum_so4, bispectrum_so3, behler, distance_2b, &
         coordination, angle_3b, co_angle_3b, co_distance_2b, cosnx, trihis, water_monomer, &
         water_dimer, a2_dimer, power_so3, power_so4, &
         rdf, as_distance_2b,  alex,  distance_nb, &
         descriptor_data_mono, fourier_so4_type, radialfunction_type, transfer_parameters_type, &
-        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3
+        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3, &
+        soap_turbo
 #endif
    
    !=======================================================================
@@ -501,6 +501,7 @@ module descriptors_module
       type(as_distance_2b)  :: descriptor_as_distance_2b
       type(alex)            :: descriptor_alex
       type(distance_Nb)     :: descriptor_distance_Nb
+      type(soap_turbo)      :: descriptor_soap_turbo
 #ifdef DESCRIPTORS_NONCOMMERCIAL
       type(AN_monomer)      :: descriptor_AN_monomer
       type(general_monomer) :: descriptor_general_monomer  
@@ -510,7 +511,6 @@ module descriptors_module
       type(com_dimer)       :: descriptor_com_dimer 
       type(soap_express)    :: descriptor_soap_express
       type(bond_real_space) :: descriptor_bond_real_space
-      type(soap_turbo)      :: descriptor_soap_turbo
 #endif
    endtype
      
@@ -552,13 +552,13 @@ module descriptors_module
       water_monomer_initialise, water_dimer_initialise, A2_dimer_initialise, AB_dimer_initialise, distance_Nb_initialise,  rdf_initialise, as_distance_2b_initialise, alex_initialise, &
       atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise, &
       general_monomer_initialise, general_dimer_initialise, general_trimer_initialise,  molecule_lo_d_initialise,  AN_monomer_initialise, &
-      bond_real_space_initialise, transfer_initialise, com_dimer_initialise,  soap_express_initialise, soap_turbo_initialise
+      bond_real_space_initialise, transfer_initialise, com_dimer_initialise,  soap_express_initialise
 #else
       module procedure descriptor_initialise, RadialFunction_initialise, fourier_so4_initialise, &
       bispectrum_SO4_initialise, bispectrum_SO3_initialise, behler_initialise, distance_2b_initialise, &
       coordination_initialise, angle_3b_initialise, co_angle_3b_initialise, co_distance_2b_initialise, cosnx_initialise, trihis_initialise, &
       water_monomer_initialise, water_dimer_initialise, A2_dimer_initialise, AB_dimer_initialise, distance_Nb_initialise,  rdf_initialise, as_distance_2b_initialise, alex_initialise, &
-      atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise 
+      atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise, soap_turbo_initialise
 #endif
    endinterface initialise
    public :: initialise
@@ -570,12 +570,12 @@ module descriptors_module
       co_distance_2b_finalise, cosnx_finalise, trihis_finalise, water_monomer_finalise, water_dimer_finalise, rdf_finalise, as_distance_2b_finalise,  alex_finalise, &
       A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise,  &
       AN_monomer_finalise, general_monomer_finalise, general_dimer_finalise, general_trimer_finalise,  molecule_lo_d_finalise, com_dimer_finalise, &
-      bond_real_space_finalise, soap_express_finalise, soap_turbo_finalise
+      bond_real_space_finalise, soap_express_finalise
 #else
       module procedure descriptor_finalise, descriptor_data_finalise, RadialFunction_finalise, fourier_so4_finalise, cplx_2d_array1_finalise, cplx_3d_array2_finalise, &
       bispectrum_SO4_finalise, bispectrum_SO3_finalise, behler_finalise, distance_2b_finalise, coordination_finalise, angle_3b_finalise, co_angle_3b_finalise, &
       co_distance_2b_finalise, cosnx_finalise, trihis_finalise, water_monomer_finalise, water_dimer_finalise, rdf_finalise, as_distance_2b_finalise,  alex_finalise, &
-      A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise  
+      A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise, soap_turbo_finalise
 #endif
    endinterface finalise
    public :: finalise
@@ -586,13 +586,13 @@ module descriptors_module
       co_distance_2b_calc, cosnx_calc, trihis_calc, water_monomer_calc, water_dimer_calc, A2_dimer_calc, AB_dimer_calc,  atom_real_space_calc, &
       power_so3_calc, power_SO4_calc, soap_calc, rdf_calc, as_distance_2b_calc, &
       distance_Nb_calc, alex_calc, &
-      AN_monomer_calc,  soap_express_calc, general_monomer_calc, general_dimer_calc, general_trimer_calc,  molecule_lo_d_calc, com_dimer_calc, bond_real_space_calc, &
-      soap_turbo_calc
+      AN_monomer_calc,  soap_express_calc, general_monomer_calc, general_dimer_calc, general_trimer_calc,  molecule_lo_d_calc, com_dimer_calc, bond_real_space_calc
 #else
       module procedure descriptor_calc, descriptor_calc_array, bispectrum_SO4_calc, bispectrum_SO3_calc, behler_calc, distance_2b_calc, coordination_calc, angle_3b_calc, co_angle_3b_calc, &
       co_distance_2b_calc, cosnx_calc, trihis_calc, water_monomer_calc, water_dimer_calc, A2_dimer_calc, AB_dimer_calc,  atom_real_space_calc, &
       power_so3_calc, power_SO4_calc, soap_calc, rdf_calc, as_distance_2b_calc, &
-      distance_Nb_calc, alex_calc 
+      distance_Nb_calc, alex_calc, soap_turbo_calc
+ 
 #endif
    endinterface calc
    public :: calc
@@ -602,12 +602,11 @@ module descriptors_module
       module procedure descriptor_cutoff, bispectrum_SO4_cutoff, bispectrum_SO3_cutoff, behler_cutoff, distance_2b_cutoff, coordination_cutoff, angle_3b_cutoff, co_angle_3b_cutoff, &
       co_distance_2b_cutoff, cosnx_cutoff, trihis_cutoff, water_monomer_cutoff, water_dimer_cutoff, A2_dimer_cutoff, AB_dimer_cutoff, atom_real_space_cutoff, &
       power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff, &
-      molecule_lo_d_cutoff, com_dimer_cutoff, soap_express_cutoff, AN_monomer_cutoff, general_monomer_cutoff, general_dimer_cutoff, general_trimer_cutoff,  bond_real_space_cutoff, &
-      soap_turbo_cutoff
+      molecule_lo_d_cutoff, com_dimer_cutoff, soap_express_cutoff, AN_monomer_cutoff, general_monomer_cutoff, general_dimer_cutoff, general_trimer_cutoff,  bond_real_space_cutoff
 #else
       module procedure descriptor_cutoff, bispectrum_SO4_cutoff, bispectrum_SO3_cutoff, behler_cutoff, distance_2b_cutoff, coordination_cutoff, angle_3b_cutoff, co_angle_3b_cutoff, &
       co_distance_2b_cutoff, cosnx_cutoff, trihis_cutoff, water_monomer_cutoff, water_dimer_cutoff, A2_dimer_cutoff, AB_dimer_cutoff, atom_real_space_cutoff, &
-      power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff 
+      power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff, soap_turbo_cutoff 
 #endif
    endinterface cutoff
    public :: cutoff
@@ -618,13 +617,12 @@ module descriptors_module
       co_distance_2b_sizes, cosnx_sizes, trihis_sizes, water_monomer_sizes, water_dimer_sizes, A2_dimer_sizes, AB_dimer_sizes, atom_real_space_sizes, &
       power_so3_sizes, power_SO4_sizes, soap_sizes,  rdf_sizes, as_distance_2b_sizes, &
       alex_sizes, distance_Nb_sizes, &
-      molecule_lo_d_sizes, com_dimer_sizes,  soap_express_sizes, AN_monomer_sizes, general_monomer_sizes, general_dimer_sizes, general_trimer_sizes,  bond_real_space_sizes, &
-      soap_turbo_sizes
+      molecule_lo_d_sizes, com_dimer_sizes,  soap_express_sizes, AN_monomer_sizes, general_monomer_sizes, general_dimer_sizes, general_trimer_sizes,  bond_real_space_sizes
 #else
       module procedure descriptor_sizes, bispectrum_SO4_sizes, bispectrum_SO3_sizes, behler_sizes, distance_2b_sizes, coordination_sizes, angle_3b_sizes, co_angle_3b_sizes, &
       co_distance_2b_sizes, cosnx_sizes, trihis_sizes, water_monomer_sizes, water_dimer_sizes, A2_dimer_sizes, AB_dimer_sizes, atom_real_space_sizes, &
       power_so3_sizes, power_SO4_sizes, soap_sizes,  rdf_sizes, as_distance_2b_sizes, &
-      alex_sizes, distance_Nb_sizes 
+      alex_sizes, distance_Nb_sizes, soap_turbo_sizes 
 #endif
    endinterface descriptor_sizes
    public :: descriptor_sizes
@@ -826,6 +824,8 @@ module descriptors_module
          call initialise(this%descriptor_alex,args_str,error)
       case(DT_DISTANCE_NB)
          call initialise(this%descriptor_distance_Nb,args_str,error)
+      case(DT_SOAP_TURBO)
+         call initialise(this%descriptor_soap_turbo,args_str,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
       case(DT_BOND_REAL_SPACE)
          call initialise(this%descriptor_bond_real_space,args_str,error)
@@ -843,8 +843,6 @@ module descriptors_module
          call initialise(this%descriptor_general_trimer,args_str,error)
       case(DT_SOAP_EXPRESS)
          call initialise(this%descriptor_soap_express,args_str,error)
-      case(DT_SOAP_TURBO)
-         call initialise(this%descriptor_soap_turbo,args_str,error)
 #endif
       endselect
 
@@ -980,6 +978,8 @@ module descriptors_module
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
          case(DT_DISTANCE_NB)
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
+         case(DT_SOAP_TURBO)
+            call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_MOLECULE_LO_D)
             RAISE_ERROR("descriptor_MPI_setup: molecule_lo_d not MPI ready.", error)
@@ -996,8 +996,6 @@ module descriptors_module
          case(DT_COM_DIMER) 
             call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error) 
          case(DT_SOAP_EXPRESS)
-            call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
-         case(DT_SOAP_TURBO)
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
 #endif
          case default
@@ -3159,6 +3157,34 @@ module descriptors_module
 
    endsubroutine soap_turbo_initialise
 
+   subroutine soap_turbo_finalise(this,error)
+      type(soap_turbo), intent(inout) :: this
+      integer, optional, intent(out) :: error
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) return
+      this%rcut_hard = 0.0_dp
+      this%rcut_soft = 0.0_dp
+      this%nf = 0.0_dp
+      this%n_species = 0
+      this%radial_enhancement = 0
+      this%central_index = 0
+      this%l_max = 0
+
+      if(allocated(this%alpha_max)) deallocate(this%alpha_max)
+      if(allocated(this%atom_sigma_r)) deallocate(this%atom_sigma_r)
+      if(allocated(this%atom_sigma_r_scaling)) deallocate(this%atom_sigma_r_scaling)
+      if(allocated(this%atom_sigma_t)) deallocate(this%atom_sigma_t)
+      if(allocated(this%atom_sigma_t_scaling)) deallocate(this%atom_sigma_t_scaling)
+      if(allocated(this%amplitude_scaling)) deallocate(this%amplitude_scaling)
+      if(allocated(this%central_weight)) deallocate(this%central_weight)
+      if(allocated(this%species_Z)) deallocate(this%species_Z)
+
+      this%initialised = .false.
+
+   endsubroutine soap_turbo_finalise
+
    subroutine soap_turbo_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(soap_turbo), intent(in) :: this
       type(atoms), intent(in) :: at
@@ -3389,6 +3415,8 @@ module descriptors_module
             call calc(this%descriptor_alex,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_DISTANCE_Nb)
             call calc(this%descriptor_distance_Nb,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+         case(DT_SOAP_TURBO)
+            call calc(this%descriptor_soap_turbo,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             call calc(this%descriptor_bond_real_space,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
@@ -3406,8 +3434,6 @@ module descriptors_module
             call calc(this%descriptor_molecule_lo_d,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)  
          case(DT_SOAP_EXPRESS)
             call calc(this%descriptor_soap_express,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
-         case(DT_SOAP_TURBO)
-            call calc(this%descriptor_soap_turbo,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 #endif
          case default
             RAISE_ERROR("descriptor_calc: unknown descriptor type "//this%descriptor_type,error)
@@ -9428,6 +9454,8 @@ module descriptors_module
             descriptor_dimensions = alex_dimensions(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             descriptor_dimensions = distance_Nb_dimensions(this%descriptor_distance_Nb,error)
+         case(DT_SOAP_TURBO)
+            descriptor_dimensions = soap_turbo_dimensions(this%descriptor_soap_turbo,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             descriptor_dimensions = bond_real_space_dimensions(this%descriptor_bond_real_space,error)
@@ -9445,8 +9473,6 @@ module descriptors_module
             descriptor_dimensions = molecule_lo_d_dimensions(this%descriptor_molecule_lo_d,error)  
          case(DT_SOAP_EXPRESS)
             descriptor_dimensions = soap_express_dimensions(this%descriptor_soap_express,error)
-         case(DT_SOAP_TURBO)
-            descriptor_dimensions = soap_turbo_dimensions(this%descriptor_soap_turbo,error)
 #endif
          case default
             RAISE_ERROR("descriptor_dimensions: unknown descriptor type "//this%descriptor_type,error)
@@ -9869,6 +9895,8 @@ module descriptors_module
             descriptor_cutoff = cutoff(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             descriptor_cutoff = cutoff(this%descriptor_distance_Nb,error)
+         case(DT_SOAP_TURBO)
+            descriptor_cutoff = cutoff(this%descriptor_soap_turbo,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             descriptor_cutoff = cutoff(this%descriptor_bond_real_space,error)
@@ -9886,8 +9914,6 @@ module descriptors_module
             descriptor_cutoff = cutoff(this%descriptor_com_dimer,error) 
          case(DT_SOAP_EXPRESS)
             descriptor_cutoff = cutoff(this%descriptor_soap_express,error)
-         case(DT_SOAP_TURBO)
-            descriptor_cutoff = cutoff(this%descriptor_soap_turbo,error)
 #endif
          case default
             RAISE_ERROR("descriptor_cutoff: unknown descriptor type "//this%descriptor_type,error)
@@ -10321,6 +10347,9 @@ module descriptors_module
          case(DT_DISTANCE_Nb)
             call distance_Nb_sizes(this%descriptor_distance_Nb,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
+         case(DT_SOAP_TURBO)
+            call soap_turbo_sizes(this%descriptor_soap_turbo,at, &
+               n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             call bond_real_space_sizes(this%descriptor_bond_real_space,at, &
@@ -10346,9 +10375,6 @@ module descriptors_module
          case(DT_SOAP_EXPRESS)
             call soap_express_sizes(this%descriptor_soap_express,at, &
                  n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
-         case(DT_SOAP_TURBO)
-            call soap_turbo_sizes(this%descriptor_soap_turbo,at, &
-               n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
 #endif
          case default
             RAISE_ERROR("descriptor_sizes: unknown descriptor type "//this%descriptor_type,error)
