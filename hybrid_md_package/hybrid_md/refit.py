@@ -67,9 +67,45 @@ def refit_turbo_h_c(state: HybridMD):
     return refit_turbo_two_species(state, "1 6", 300)
 
 
-def refit_turbo_fe_h(state: HybridMD):
+def refit_fe_h(state: HybridMD):
     # Hydrogen and Iron
-    return refit_turbo_two_species(state, "1 26", 200)
+
+    frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
+    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train]) / 4
+
+    # soap
+    soap_n_sparse = 300
+
+    # there is no H-H interaction YET
+    desc_str_2b = (
+        "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
+        "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
+        f"f0=0.0 add_species=F delta={delta} "
+        "Z={{1 26}} : "
+        "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
+        "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
+        f"f0=0.0 add_species=F delta={delta} "
+        "Z={{26 26}} "
+    )
+
+    # turbo SOAP
+    soap_common = (
+        f"soap n_sparse={soap_n_sparse} n_max=8 l_max=4 delta={delta} covariance_type=dot_product "
+        f"zeta=4 sparse_method=cur_points n_species=2 "
+    )
+    desc_str_soap = (
+        f"{soap_common} cutoff=3.0 cutoff_transition_width=0.6 atom_sigma=0.3 Z=1 "
+        + "species_Z={{1 26}} : "
+        f"{soap_common} cutoff=5.5 cutoff_transition_width=1.0 atom_sigma=0.5 Z=26 "
+        + "species_Z={{1 26}}"
+    )
+
+    descriptor_strs = desc_str_2b + " : " + desc_str_soap
+
+    # use lower kernel regularisation
+    default_sigma = "0.002 0.050 1.0 1.0"
+
+    return refit_generic(state, descriptor_strs, default_sigma)
 
 
 def refit_turbo_two_species(state: HybridMD, species_str: str, soap_n_sparse=200):
@@ -86,29 +122,22 @@ def refit_turbo_two_species(state: HybridMD, species_str: str, soap_n_sparse=200
     )
 
     # turbo SOAP
-    soap_common = (
-        f" n_species=2 species_Z={{ {species_str} }} rcut_hard=4.5 rcut_soft=3.5 "
-        "alpha_max={{10 10}} l_max=6 "
-        "atom_sigma_r={{0.3 0.3}} atom_sigma_t={{0.3 0.3}} atom_sigma_r_scaling={{0.10 0.10}} "
-        "atom_sigma_t_scaling={{0.10 0.10}} amplitude_scaling={{1. 1.}} radial_enhancement=1 "
-        "basis=poly3gauss scaling_mode=polynomial central_weight={{1. 1.}} f0=0.0 "
-        "covariance_type=dot_product zeta=4 sparse_method=cur_points add_species=F "
-    )
     desc_str_soap = (
-        f"soap_turbo central_index=1 n_sparse={soap_n_sparse} delta={delta} {soap_common} : "
-        f"soap_turbo central_index=2 n_sparse={soap_n_sparse} delta={delta} {soap_common} "
+        f"soap n_sparse=200 n_max=8 l_max=4 cutoff=4.5 cutoff_transition_width=1.0 "
+        f"atom_sigma=0.5 add_species=True "
+        f"delta={delta} covariance_type=dot_product zeta=4 sparse_method=cur_points"
     )
 
     descriptor_strs = desc_str_2b + " : " + desc_str_soap
 
     # use lower kernel regularisation
-    default_sigma = "0.005 0.050 0.1 1.0"
+    default_sigma = "0.001 0.050 0.1 1.0"
 
     return refit_generic(state, descriptor_strs, default_sigma)
 
 
 def refit_generic(
-        state: HybridMD, descriptor_strs: str = None, default_sigma: str = None
+    state: HybridMD, descriptor_strs: str = None, default_sigma: str = None
 ):
     """Refit a GAP model, with in-place update
 
@@ -166,10 +195,15 @@ def refit_generic(
         f"gap={{ {descriptor_strs} }}"
     )
 
+    with open("debug_output.txt", "w") as file:
+        file.write(fit_str)
+
     # fit the 2b+SOAP model
+    os.environ["OMP_NUM_THREADS"] = "32"
     proc = subprocess.run(
         fit_str, shell=True, capture_output=True, text=True, check=True
     )
+    os.environ["OMP_NUM_THREADS"] = "1"
 
     # print the outputs to file
     with open(f"stdout_{gp_name}_at_{time()}__.txt", "w") as file:
