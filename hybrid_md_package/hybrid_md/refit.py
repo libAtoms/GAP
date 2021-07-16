@@ -71,7 +71,7 @@ def refit_fe_h(state: HybridMD):
     # Hydrogen and Iron
 
     frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
-    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train]) / 4
+    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train])
 
     # soap
     soap_n_sparse = 300
@@ -90,8 +90,8 @@ def refit_fe_h(state: HybridMD):
 
     # turbo SOAP
     soap_common = (
-        f"soap n_sparse={soap_n_sparse} n_max=8 l_max=4 delta={delta} covariance_type=dot_product "
-        f"zeta=4 sparse_method=cur_points n_species=2 "
+        f"soap n_sparse={soap_n_sparse} n_max=8 l_max=4 delta={delta * 10} covariance_type=dot_product "
+        f"zeta=4 sparse_method=cur_points n_species=2 add_species=F "
     )
     desc_str_soap = (
         f"{soap_common} cutoff=3.0 cutoff_transition_width=0.6 atom_sigma=0.3 Z=1 "
@@ -112,7 +112,7 @@ def refit_turbo_two_species(state: HybridMD, species_str: str, soap_n_sparse=200
     # refit with turbo-soap, given two species
 
     frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
-    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train]) / 4
+    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train if len(at) > 1])
 
     # descriptors
     desc_str_2b = (
@@ -122,10 +122,23 @@ def refit_turbo_two_species(state: HybridMD, species_str: str, soap_n_sparse=200
     )
 
     # turbo SOAP
+    soap_common = (
+        f" n_species=2 species_Z={{{{ {species_str} }}}} rcut_hard=4.5 rcut_soft=3.5 "
+        "alpha_max={{10 10}} l_max=6 "
+        "atom_sigma_r={{0.3 0.3}} atom_sigma_t={{0.3 0.3}} atom_sigma_r_scaling={{0.10 0.10}} "
+        "atom_sigma_t_scaling={{0.10 0.10}} amplitude_scaling={{1. 1.}} radial_enhancement=1 "
+        "basis=poly3gauss scaling_mode=polynomial central_weight={{1. 1.}} f0=0.0 "
+        "covariance_type=dot_product zeta=4 sparse_method=cur_points add_species=F "
+    )
+
+    print(soap_common)
+
     desc_str_soap = (
-        f"soap n_sparse=200 n_max=8 l_max=4 cutoff=4.5 cutoff_transition_width=1.0 "
-        f"atom_sigma=0.5 add_species=True "
-        f"delta={delta} covariance_type=dot_product zeta=4 sparse_method=cur_points"
+        f"soap_turbo central_index=1 n_sparse={soap_n_sparse} delta={delta * 10} "
+        + soap_common
+        + " : "
+        f"soap_turbo central_index=2 n_sparse={soap_n_sparse} delta={delta * 10} "
+        + soap_common
     )
 
     descriptor_strs = desc_str_2b + " : " + desc_str_soap
@@ -186,12 +199,14 @@ def refit_generic(
         os.remove("train.xyz.idx")
 
     # assemble the fitting string
+    e0_method = "e0_method=average"
+
     fit_str = (
         f"gap_fit at_file=train.xyz gp_file={gp_name} "
         f"energy_parameter_name=QM_energy force_parameter_name=QM_forces"
-        f" virial_parameter_name=QM_virial "
+        f" virial_parameter_name=QM_virial_NOPE "
         f"sparse_jitter=1.0e-8 do_copy_at_file=F sparse_separate_file=T "
-        f"default_sigma={{ {default_sigma} }} e0_method=average "
+        f"default_sigma={{ {default_sigma} }} {e0_method} "
         f"gap={{ {descriptor_strs} }}"
     )
 
