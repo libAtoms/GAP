@@ -81,6 +81,10 @@ def refit_fe_h(state: HybridMD):
         "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
         "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
         f"f0=0.0 add_species=F delta={delta} "
+        "Z={{1 1}} : "
+        "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
+        "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
+        f"f0=0.0 add_species=F delta={delta} "
         "Z={{1 26}} : "
         "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
         "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
@@ -112,7 +116,9 @@ def refit_turbo_two_species(state: HybridMD, species_str: str, soap_n_sparse=200
     # refit with turbo-soap, given two species
 
     frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
-    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train if len(at) > 1])
+    delta = np.std(
+        [at.info["QM_energy"] / len(at) for at in frames_train if len(at) > 1]
+    )
 
     # descriptors
     desc_str_2b = (
@@ -214,7 +220,7 @@ def refit_generic(
         file.write(fit_str)
 
     # fit the 2b+SOAP model
-    os.environ["OMP_NUM_THREADS"] = "32"
+    os.environ["OMP_NUM_THREADS"] = "40"
     proc = subprocess.run(
         fit_str, shell=True, capture_output=True, text=True, check=True
     )
