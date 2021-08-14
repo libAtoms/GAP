@@ -440,7 +440,7 @@ module descriptors_module
       ! User controllable parameters
       real(dp) :: rcut_hard, rcut_soft, nf
       integer  :: n_species, radial_enhancement, central_index, l_max
-      character(len=STRING_LENGTH) :: basis, scaling_mode, compress_file
+      character(len=STRING_LENGTH) :: basis, scaling_mode, compress_file, compress_mode
 
       real(dp), dimension(:), allocatable :: atom_sigma_r, atom_sigma_r_scaling, &
          atom_sigma_t, atom_sigma_t_scaling, amplitude_scaling, central_weight
@@ -3051,6 +3051,8 @@ module descriptors_module
    endsubroutine distance_Nb_permutations
 
    subroutine soap_turbo_initialise(this,args_str,error)
+      use soap_turbo_compress
+
       type(soap_turbo), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       integer, optional, intent(out) :: error
@@ -3082,6 +3084,7 @@ module descriptors_module
       call param_register(params, 'basis', "poly3", this%basis, help_string="poly3 or poly3gauss")
       call param_register(params, 'scaling_mode', "polynomial", this%scaling_mode, help_string="TODO")
       call param_register(params, 'compress_file', "None", this%compress_file, help_string="TODO")
+      call param_register(params, 'compress_mode', "None", this%compress_mode, help_string="TODO")
       call param_register(params, 'central_index', "1", this%central_index, help_string="Index of central atom species_Z in the >species< array")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
@@ -3089,17 +3092,6 @@ module descriptors_module
       endif
 
       call finalise(params)
-
-      if( this%compress_file /= "None" )then
-        this%compress = .true.
-        open(unit=10, file=this%compress_file, status="old")
-        read(10, *) (i, j=1,this%n_species), i, n
-        allocate(this%compress_indices(1:n))
-                do i = 1, n
-          read(10, *) this%compress_indices(i)
-        end do
-        close(10)
-      end if
 
       allocate(this%atom_sigma_r(this%n_species))
       allocate(this%atom_sigma_r_scaling(this%n_species))
@@ -3146,6 +3138,32 @@ module descriptors_module
          call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z, &
             help_string="Atomic number of species, including the central atom")
       endif
+
+!     Handle compression options here
+      if( this%compress_file /= "None" .or. this%compress_mode /= "None" )then
+        if( this%compress_file /= "None" .and. this%compress_mode /= "None" )then
+          RAISE_ERROR("compress_file and compress_mode can't be set at the same time; choose one or the other",error)
+        end if
+        this%compress = .true.
+        if( this%compress_file /= "None" )then
+          open(unit=10, file=this%compress_file, status="old")
+          read(10, *) (i, j=1,this%n_species), i, n
+          allocate(this%compress_indices(1:n))
+          do i = 1, n
+            read(10, *) this%compress_indices(i)
+          end do
+          close(10)
+        else
+!         The first call gets the dimension of the compresses SOAP vector
+          call get_compress_indices( this%compress_mode, this%alpha_max, this%l_max, &
+                                     n, this%compress_indices, "get_dim" )
+!         The second call sets the indices of the full SOAP components that we keep to
+!         build the compressed SOAP vector
+          allocate(this%compress_indices(1:n))
+          call get_compress_indices( this%compress_mode, this%alpha_max, this%l_max, &
+                                     n, this%compress_indices, "set_indices" )
+        end if
+      end if
 
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
