@@ -80,21 +80,23 @@ def pre_step(seed, md_iteration):
         )
 
     # mimicking the Fortran solution
-    do_ab_initio = False  # 1
-    next_ab_initio = False  # 2
-    do_update_cell = False  # 4
+    do_ab_initio = False  # 2
+    next_ab_initio = False  # 4
+    do_update_cell = False  # 8
     do_comparison = False  # print the error table
     do_update_model = False  # REFIT
-    use_pw_forces = False  # 8
+    use_qm_forces = False  # 16
 
     if md_iteration < state.num_initial_steps:
         # initial steps with ab-initio, we have no PP model to work with
         do_ab_initio = True
         next_ab_initio = True
+        use_qm_forces = True  # we don't have GAP forces yet
     elif md_iteration == state.num_initial_steps:
         # last initial ab-initio step, ask for model update now
         do_ab_initio = True
         do_update_model = True
+        use_qm_forces = True  # we don't have GAP forces yet
     elif (md_iteration - state.num_initial_steps) % state.check_interval == 0:
         # check steps during the run
         do_ab_initio = True
@@ -126,7 +128,7 @@ def pre_step(seed, md_iteration):
         (2, do_ab_initio),
         (4, next_ab_initio),
         (8, do_update_cell),
-        (16, use_pw_forces),
+        (16, use_qm_forces),
     ]:
         return_value += num * int(val)
 
@@ -136,7 +138,7 @@ def pre_step(seed, md_iteration):
             do_ab_initio,
             next_ab_initio,
             do_update_cell,
-            use_pw_forces,
+            use_qm_forces,
         )
 
     # pass the result back
