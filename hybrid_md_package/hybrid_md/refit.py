@@ -70,31 +70,34 @@ def refit_turbo_h_c(state: HybridMD):
 def refit_fe_h(state: HybridMD):
     # Hydrogen and Iron
 
-    frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
-    delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train])
+    # frames_train = ase.io.read(state.xyz_filename, ":") + state.get_previous_data()
+    # delta = np.std([at.info["QM_energy"] / len(at) for at in frames_train])
+
+    delta_2b = 2.0
+    delta_soap = 0.5
 
     # soap
-    soap_n_sparse = 300
+    soap_n_sparse = 400
 
     # there is no H-H interaction YET
     desc_str_2b = (
         "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
         "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
-        f"f0=0.0 add_species=F delta={delta} "
+        f"f0=0.0 add_species=F delta={delta_2b} "
         "Z={{1 1}} : "
         "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
         "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
-        f"f0=0.0 add_species=F delta={delta} "
+        f"f0=0.0 add_species=F delta={delta_2b} "
         "Z={{1 26}} : "
         "distance_Nb order=2 n_sparse=20 cutoff=4.5 cutoff_transition_width=1.0 "
         "compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform "
-        f"f0=0.0 add_species=F delta={delta} "
+        f"f0=0.0 add_species=F delta={delta_2b} "
         "Z={{26 26}} "
     )
 
     # turbo SOAP
     soap_common = (
-        f"soap n_sparse={soap_n_sparse} n_max=8 l_max=4 delta={delta * 10} covariance_type=dot_product "
+        f"soap n_sparse={soap_n_sparse} n_max=8 l_max=4 delta={delta_soap} covariance_type=dot_product "
         f"zeta=4 sparse_method=cur_points n_species=2 add_species=F "
     )
     desc_str_soap = (
@@ -205,7 +208,9 @@ def refit_generic(
         os.remove("train.xyz.idx")
 
     # assemble the fitting string
-    e0_method = "e0_method=average"
+    # e0_method = fc"e0={state.e0}"
+    e0_method = f"e0_method=isolated"
+    # e0_method = f"e0_method=average"
 
     fit_str = (
         f"gap_fit at_file=train.xyz gp_file={gp_name} "
