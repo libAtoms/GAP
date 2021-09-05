@@ -1,0 +1,58 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021.
+
+# general parameters
+CUT_OFF_ENERGY: 400
+XC_FUNCTIONAL: pbe
+ELEC_ENERGY_TOL: 1e-08
+
+# dispersion correction
+sedc_apply: true
+
+# finite basis correction
+#FINITE_BASIS_CORR: 2
+#FINITE_BASIS_SPACING: 10
+
+# other settings
+SPIN_POLARIZED: TRUE
+PERC_EXTRA_BANDS: 300.0
+MAX_SCF_CYCLES: 200
+FIX_OCCUPANCY: FALSE
+SMEARING_WIDTH: 0.2
+NUM_DUMP_CYCLES: 0
+
+#############################
+# MD & Hybrid settings
+#############################
+comment = MD with Hybrid method - H2 in C60
+task = molecular dynamics
+md_ensemble = NVT
+md_thermostat = Langevin
+md_sample_iter = 1
+
+# dt & T
+md_delta_t = 1 fs          # There is H in the system
+md_temperature = 600 K
+md_num_iter = 100
+
+# Hybrid-MD stuff
+%BLOCK DEVEL_CODE
+
+  ! generally turns on PP, this is needed together with "MD_PP_HYBRID=T"
+  PP=T
+  MD: PP=T :ENDMD
+
+  ! settings of model called through QUIP
+  pp:
+      QUIP=T
+      QUIP_PARAM_FILE=GAP.xml
+      quip_init_args:IP GAP:endquip_init_args
+  :endpp
+
+  ! settings of PP Hybrid MD
+  MD_PP_HYBRID=T
+  md_pp_hybrid_exec:
+    hybrid-md
+  :endmd_pp_hybrid_exec
+%ENDBLOCK DEVEL_CODE
