@@ -5,9 +5,22 @@
 Objects representing the state of a calculation
 """
 
+from enum import Enum, auto, unique
+
 import ase.io
 import numpy as np
 import yaml
+
+
+@unique
+class StepKinds(Enum):
+    """The kinds of steps we can have while the MD
+    """
+
+    INITIAL = auto()
+    LAST_INITIAL = auto()
+    CHECK = auto()
+    GENERIC = auto()
 
 
 class HybridMD:

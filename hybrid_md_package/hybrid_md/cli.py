@@ -12,6 +12,7 @@ import sys
 import click
 from hybrid_md.refit import refit
 from hybrid_md.state_objects import HybridMD
+from hybrid_md.decision_making import SimpleDecisionMaker, PreStepReturnNumber
 
 VERBOSE = True
 
@@ -79,66 +80,21 @@ def pre_step(seed, md_iteration):
             "Hybrid MD steps called in the wrong order, expected post-step"
         )
 
-    # mimicking the Fortran solution
-    do_ab_initio = False  # 2
-    next_ab_initio = False  # 4
-    do_update_cell = False  # 8
-    do_comparison = False  # print the error table
-    do_update_model = False  # REFIT
-    use_qm_forces = False  # 16
-
-    if md_iteration < state.num_initial_steps:
-        # initial steps with ab-initio, we have no PP model to work with
-        do_ab_initio = True
-        next_ab_initio = True
-        use_qm_forces = True  # we don't have GAP forces yet
-    elif md_iteration == state.num_initial_steps:
-        # last initial ab-initio step, ask for model update now
-        do_ab_initio = True
-        do_update_model = True
-        use_qm_forces = True  # we don't have GAP forces yet
-    elif (md_iteration - state.num_initial_steps) % state.check_interval == 0:
-        # check steps during the run
-        do_ab_initio = True
-        # this is the only case when the previous electronic state needs changing
-        do_update_cell = True
-        do_comparison = True
-    else:
-        # this is a generic step with PP
-        pass
-
-    # save values into state
-    state.next_ab_initio = next_ab_initio
-    state.next_is_pre_step = False
-    state.do_comparison = do_comparison
-
-    if do_update_model:
-        if state.can_update:
-            state.do_update_model = do_update_model
-        else:
-            raise RuntimeError(
-                "Tried to update model, but input settings do not allow it!"
-            )
+    # decision making & update of state object
+    decision = SimpleDecisionMaker(state).get_step_kind(md_iteration)
+    converter = PreStepReturnNumber(state)
+    return_value = converter.push_state(decision)
 
     # dump state
     state.dump()
 
-    return_value = 0  # log reading off for this one
-    for num, val in [
-        (2, do_ab_initio),
-        (4, next_ab_initio),
-        (8, do_update_cell),
-        (16, use_qm_forces),
-    ]:
-        return_value += num * int(val)
-
     if VERBOSE:
         print(
             f"Hybrid-MD:  PRE Step, exit:{return_value:4}, md_iteration:{md_iteration:3}  -->",
-            do_ab_initio,
-            next_ab_initio,
-            do_update_cell,
-            use_qm_forces,
+            converter.do_ab_initio,
+            converter.next_ab_initio,
+            converter.do_update_cell,
+            converter.use_qm_forces,
         )
 
     # pass the result back
