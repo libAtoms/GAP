@@ -33,3 +33,8 @@ jobs:
         working-directory: ${{env.root-directory}}
         run: |
           pytest -v --cov=hybrid_md --cov-report term --cov-report term-missing
+
+      - uses: codecov/codecov-action@v1
+        with:
+          name: hybrid-md unittests
+          fail_ci_if_error: true
