@@ -88,7 +88,7 @@ program gap_fit_program
   call system_timer('GP sparsify')
 
   call gp_covariance_sparse(main_gap_fit%my_gp)
-  call initialise(main_gap_fit%gp_sp,main_gap_fit%my_gp)
+  call initialise(main_gap_fit%gp_sp,main_gap_fit%my_gp, main_gap_fit%condition_number_norm)
   call gap_fit_print_xml(main_gap_fit,main_gap_fit%gp_file,main_gap_fit%sparseX_separate_file)
 
   call system_timer('GP sparsify')

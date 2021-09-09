@@ -701,15 +701,19 @@ module gp_predict_module
 
    endsubroutine gpSparse_setPermutations
 
-   subroutine gpSparse_initialise(this, from, error)
+   subroutine gpSparse_initialise(this, from, condition_number_norm, error)
       type(gpSparse), intent(inout) :: this
-      type(gpFull), intent(in)  :: from
+      type(gpFull), intent(in) :: from
+      character(len=*), optional, intent(in) :: condition_number_norm
       integer, optional, intent(out) :: error
+
+      character(len=STRING_LENGTH) :: condition_number_norm_opt
 
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, i_yPrime, &
       i_globalY, i_global_yPrime
 #ifdef HAVE_QR      
-      real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
+      real(qp) :: rcond
+      real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a, acopy
       real(qp), dimension(:), allocatable :: globalY, alpha
       type(LA_Matrix) :: LA_c_subYsubY, LA_q_subYsubY
 #else
@@ -724,6 +728,8 @@ module gp_predict_module
       if( .not. from%initialised ) then
          RAISE_ERROR('gpSparse_initialise: gpFull object not initialised',error)
       endif
+
+      condition_number_norm_opt = optional_default(' ', condition_number_norm)
 
       if(this%initialised) call finalise(this,error)
 
@@ -776,6 +782,14 @@ module gp_predict_module
 
       a(1:n_globalY,:) = transpose(c_subYY_sqrtInverseLambda)
       a(n_globalY+1:,:) = factor_c_subYsubY
+
+      if (condition_number_norm_opt(1:1) /= ' ') then
+         allocate(acopy(size(a, 1),size(a, 2)))
+         acopy = a
+         call matrix_condition_number(acopy, rcond, condition_number_norm_opt(1:1))
+         call print("Condition number (log10) of matrix A (norm "//condition_number_norm_opt(1:1)//"): "//-log10(rcond))
+         deallocate(acopy)
+      end if
 
       globalY = 0.0_qp
       do i_y = 1, from%n_y

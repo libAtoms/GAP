@@ -67,7 +67,8 @@ module gap_fit_module
      character(len=STRING_LENGTH) :: at_file='', core_ip_args = '', e0_str, local_property0_str, &
      energy_parameter_name, local_property_parameter_name, force_parameter_name, virial_parameter_name, &
      stress_parameter_name, hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
-     config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name
+     config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name, &
+     condition_number_norm
 
      character(len=10240) :: command_line = ''
      real(dp), dimension(total_elements) :: e0, local_property0
@@ -134,7 +135,7 @@ contains
           energy_parameter_name, local_property_parameter_name, force_parameter_name, &
           virial_parameter_name, stress_parameter_name, hessian_parameter_name, &
           config_type_parameter_name, sigma_parameter_name, config_type_sigma_string, &
-          gp_file, template_file, force_mask_parameter_name
+          gp_file, template_file, force_mask_parameter_name, condition_number_norm
 
      character(len=STRING_LENGTH) ::  gap_str, verbosity, sparse_method_str, covariance_type_str, e0_method, &
         parameter_name_prefix
@@ -176,6 +177,7 @@ contains
      gp_file => this%gp_file
      template_file => this%template_file
      sparsify_only_no_fit => this%sparsify_only_no_fit
+     condition_number_norm => this%condition_number_norm
      
      call initialise(params)
      
@@ -285,6 +287,9 @@ contains
      call param_register(params, 'sparsify_only_no_fit', 'F', sparsify_only_no_fit, &
           help_string="If true, sparsification is done, but no fitting. print the sparse index by adding print_sparse_index=file.dat to the descriptor string.")
      
+     call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
+          help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
+
      if (.not. param_read_args(params, command_line=this%command_line)) then
         call print("gap_fit")
         call system_abort('Exit: Mandatory argument(s) missing...')
