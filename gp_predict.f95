@@ -65,6 +65,8 @@ module gp_predict_module
    use FoX_sax, only: xml_t, dictionary_t, haskey, getvalue, parse, &
    open_xml_string, close_xml_t
    use CInOutput_module, only : quip_md5sum
+   use task_manager_module
+   use matrix_module
 
    implicit none
 
@@ -701,15 +703,20 @@ module gp_predict_module
 
    endsubroutine gpSparse_setPermutations
 
-   subroutine gpSparse_initialise(this, from, error)
+   subroutine gpSparse_initialise(this, from, task_manager, condition_number_norm, error)
       type(gpSparse), intent(inout) :: this
-      type(gpFull), intent(in)  :: from
+      type(gpFull), intent(in) :: from
+      type(task_manager_type), intent(in) :: task_manager
+      character(len=*), optional, intent(in) :: condition_number_norm
       integer, optional, intent(out) :: error
+
+      character(len=STRING_LENGTH) :: condition_number_norm_opt
 
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, i_yPrime, &
       i_globalY, i_global_yPrime
 #ifdef HAVE_QR      
-      real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
+      real(qp) :: rcond
+      real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a, acopy
       real(qp), dimension(:), allocatable :: globalY, alpha
       type(LA_Matrix) :: LA_c_subYsubY, LA_q_subYsubY
 #else
@@ -724,6 +731,8 @@ module gp_predict_module
       if( .not. from%initialised ) then
          RAISE_ERROR('gpSparse_initialise: gpFull object not initialised',error)
       endif
+
+      condition_number_norm_opt = optional_default(' ', condition_number_norm)
 
       if(this%initialised) call finalise(this,error)
 
@@ -760,8 +769,20 @@ module gp_predict_module
       n_globalY = from%n_y + from%n_yPrime
 
 #ifdef HAVE_QR
-      allocate( c_subYY_sqrtInverseLambda(n_globalSparseX,n_globalY), factor_c_subYsubY(n_globalSparseX,n_globalSparseX), &
-      a(n_globalY+n_globalSparseX,n_globalSparseX), globalY(n_globalY+n_globalSparseX), alpha(n_globalSparseX) )
+      allocate(c_subYY_sqrtInverseLambda(n_globalSparseX,n_globalY))
+      allocate(factor_c_subYsubY(n_globalSparseX,n_globalSparseX))
+      allocate(alpha(n_globalSparseX))
+
+      if (task_manager%active) then
+         allocate(globalY(task_manager%unified_workload))
+         allocate(a(task_manager%unified_workload,n_globalSparseX))
+         alpha = 0.0_qp
+         globalY = 0.0_qp
+         a = 0.0_qp
+      else
+         allocate(globalY(n_globalY+n_globalSparseX))
+         allocate(a(n_globalY+n_globalSparseX,n_globalSparseX))
+      end if
 
       call matrix_product_vect_asdiagonal_sub(c_subYY_sqrtInverseLambda,from%covariance_subY_y,sqrt(1.0_qp/from%lambda)) ! O(NM)
       call initialise(LA_c_subYsubY,from%covariance_subY_subY)
@@ -775,7 +796,21 @@ module gp_predict_module
       end do
 
       a(1:n_globalY,:) = transpose(c_subYY_sqrtInverseLambda)
-      a(n_globalY+1:,:) = factor_c_subYsubY
+      if (task_manager%active) then
+         if (task_manager%my_worker_id == task_manager%n_workers) then
+           a(n_globalY+1:n_globalY+n_globalSparseX,:) = factor_c_subYsubY
+         end if
+      else
+         a(n_globalY+1:,:) = factor_c_subYsubY
+      end if
+
+      if (condition_number_norm_opt(1:1) /= ' ') then
+         allocate(acopy(size(a, 1),size(a, 2)))
+         acopy = a
+         call matrix_condition_number(acopy, rcond, condition_number_norm_opt(1:1))
+         call print("Condition number (log10) of matrix A (norm "//condition_number_norm_opt(1:1)//"): "//-log10(rcond))
+         deallocate(acopy)
+      end if
 
       globalY = 0.0_qp
       do i_y = 1, from%n_y
@@ -796,9 +831,15 @@ module gp_predict_module
          globalY(i_global_yPrime) = from%yPrime(i_yPrime)*sqrt(1.0_qp/from%lambda(i_global_yPrime))
       enddo
 
-      call initialise(LA_q_subYsubY,a)
-      call LA_Matrix_QR_Solve_Vector(LA_q_subYsubY,globalY,alpha)
-      call finalise(LA_q_subYsubY)
+      if (task_manager%active) then
+         call print("Using ScaLAPACK to solve QR")
+         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%n_workers, task_manager%ScaLAPACK_obj)
+      else
+         call print("Using LAPACK to solve QR")
+         call initialise(LA_q_subYsubY, a)
+         call LA_Matrix_QR_Solve_Vector(LA_q_subYsubY, globalY, alpha)
+         call finalise(LA_q_subYsubY)
+      end if
 
       do i_coordinate = 1, from%n_coordinate
          do i_sparseX = 1, from%coordinate(i_coordinate)%n_sparseX
