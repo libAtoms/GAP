@@ -44,6 +44,8 @@ module gap_fit_module
   use gp_fit_module
   use fox_wxml
   use potential_module
+  use ScaLAPACK_module
+  use task_manager_module
 
   implicit none
 
@@ -86,6 +88,10 @@ module gap_fit_module
      type(gpFull) :: my_gp
      type(gpSparse) :: gp_sp
 
+     type(MPI_Context) :: mpi_obj
+     type(ScaLAPACK) :: ScaLAPACK_obj
+     type(task_manager_type) :: task_manager
+
      type(descriptor), dimension(:), allocatable :: my_descriptor
      character(len=STRING_LENGTH), dimension(200) :: gap_str
 
@@ -122,6 +128,12 @@ module gap_fit_module
   public :: add_template_string
   public :: gap_fit_parse_command_line
   public :: gap_fit_parse_gap_str
+
+  public :: gap_fit_init_mpi_scalapack
+  public :: gap_fit_init_task_manager
+  public :: gap_fit_distribute_tasks
+
+  public :: gap_fit_is_root
 
 contains
 
@@ -657,6 +669,8 @@ contains
 
     type(gap_fit), intent(inout) :: this
 
+    logical :: do_collect_tasks, do_filter_tasks
+
     type(Atoms) :: at
 
     integer :: n_con
@@ -668,7 +682,13 @@ contains
     logical, pointer, dimension(:) :: force_mask
     integer :: i, j, k
     integer :: n_descriptors, n_cross, n_hessian
+    integer :: n_current, n_last
 
+    do_collect_tasks = (this%task_manager%active .and. .not. this%task_manager%distributed)
+    do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
+
+    if (allocated(this%n_cross)) deallocate(this%n_cross)
+    if (allocated(this%n_descriptors)) deallocate(this%n_descriptors)
     allocate(this%n_cross(this%n_coordinate))
     allocate(this%n_descriptors(this%n_coordinate))
 
@@ -678,8 +698,13 @@ contains
     this%n_force = 0
     this%n_virial = 0
     this%n_hessian = 0
+    this%n_local_property = 0
+    n_last = 0
 
     do n_con = 1, this%n_frame
+       if (do_filter_tasks) then
+          if (this%task_manager%tasks(n_con)%worker_id /= this%task_manager%my_worker_id) cycle
+       end if
 
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
@@ -763,6 +788,12 @@ contains
           endif
        enddo
 
+       if (do_collect_tasks) then
+         n_current = this%n_ener + this%n_local_property + this%n_force + this%n_virial + this%n_hessian
+         call task_manager_add_task(this%task_manager, n_current - n_last)
+         n_last = n_current
+       end if
+
        call finalise(at)
     enddo
 
@@ -782,6 +813,8 @@ contains
 
     type(gap_fit), intent(inout) :: this
     integer, optional, intent(out) :: error
+
+    logical :: do_filter_tasks
 
     type(inoutput) :: theta_inout
     type(descriptor_data) :: my_descriptor_data
@@ -815,6 +848,8 @@ contains
     character(len=STRING_LENGTH), dimension(:), allocatable :: theta_string_array
 
     INIT_ERROR(error)
+
+    do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
 
     my_cutoff = 0.0_dp
     call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian,this%sparse_jitter)
@@ -853,6 +888,9 @@ contains
     n_local_property_sigma = 0
 
     do n_con = 1, this%n_frame
+       if (do_filter_tasks) then
+          if (this%task_manager%tasks(n_con)%worker_id /= this%task_manager%my_worker_id) cycle
+       end if
 
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
@@ -2000,5 +2038,39 @@ contains
     endif
     
   end subroutine add_template_string
+
+  subroutine gap_fit_init_mpi_scalapack(this)
+    type(gap_fit), intent(inout) :: this
+
+    call initialise(this%mpi_obj)
+    call initialise(this%ScaLAPACK_obj, this%mpi_obj, np_r=this%mpi_obj%n_procs, np_c=1)
+  end subroutine gap_fit_init_mpi_scalapack
+
+  subroutine gap_fit_init_task_manager(this)
+    type(gap_fit), intent(inout) :: this
+
+    this%task_manager%active = this%ScaLAPACK_obj%active
+    this%task_manager%MPI_obj = this%MPI_obj
+    this%task_manager%ScaLAPACK_obj = this%ScaLAPACK_obj
+
+    call task_manager_init_workers(this%task_manager, this%ScaLAPACK_obj%n_proc_rows)
+    call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
+    this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
+  end subroutine gap_fit_init_task_manager
+
+  subroutine gap_fit_distribute_tasks(this)
+    type(gap_fit), intent(inout) :: this
+
+    ! add special task for Cholesky matrix addon to last worker
+    call task_manager_add_task(this%task_manager, sum(this%n_sparseX(:)), worker_id=this%task_manager%n_workers)
+
+    call task_manager_distribute_tasks(this%task_manager)
+  end subroutine gap_fit_distribute_tasks
+
+  function gap_fit_is_root(this) result(is_root)
+    type(gap_fit), intent(in) :: this
+    logical :: is_root
+    is_root = (.not. this%MPI_obj%active .or. this%MPI_obj%my_proc == 0)
+  end function gap_fit_is_root
 
 end module gap_fit_module
