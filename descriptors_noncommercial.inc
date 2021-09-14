@@ -105,8 +105,9 @@
 
       type(atoms) :: at_copy
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: n_descriptors, n_cross, i_desc, i, j, n, k, m, m_index, l, &
+      integer :: n_descriptors, i_desc, i, j, n, k, m, m_index, l, &
          ij_neighbours, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_j, shift_k
       real(dp) :: r_ij, r_ijk
       real(dp) :: atom_i(3), atom_j(3), atom_k(3), bond(3), bond_len
@@ -517,7 +518,8 @@
    subroutine bond_real_space_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(bond_real_space), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -532,7 +534,7 @@
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          n_descriptors = n_descriptors + n_neighbours(at, i, max_dist=this%bond_cutoff)
@@ -1360,7 +1362,8 @@
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, i_desc, i, j, k, n, m, n_index
+      integer :: d, n_descriptors, i_desc, i, j, k, n, m, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij, shift_ik
       real(dp) :: r_ij, r_ik, r_jk
       real(dp), dimension(3) :: d_ij, d_ik, d_jk, u_ij, u_jk
@@ -1516,8 +1519,9 @@
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, monomer_size, i, &
+      integer :: d, n_descriptors, monomer_size, i, &
          i_atomic, j_atomic, k, start, finish, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: temp_shift
       real(dp), dimension(:), allocatable :: dist_vec
       real(dp), dimension(:,:), allocatable :: interatomic_distances
@@ -2042,8 +2046,9 @@
 
       real(dp) :: com_dist, cutoff_grad
       logical :: my_do_descriptor, my_do_grad_descriptor, monomers_identical, use_smooth_cutoff, compound_cutoff
-      integer :: d, n_descriptors, n_cross, dimer_size, i, j, k, n, m, &
+      integer :: d, n_descriptors, dimer_size, i, j, k, n, m, &
          i_atomic, j_atomic, start, finish, i_desc, cutoff_pos, n_index
+      integer(int8) :: n_cross
       integer :: monomer_one_size, monomer_two_size, n_monomer_one, n_monomer_two, n_products, this_pair, this_shift,diff_loc
       integer, dimension(1) :: unit_array
       real(dp), dimension(3) :: diff_one_two, temp_diff, mean_pos_one, mean_pos_two, transdirvec
@@ -2567,9 +2572,10 @@
      logical :: my_do_descriptor, my_do_grad_descriptor, one_two_identical, one_three_identical, two_three_identical, &
           use_smooth_cutoff, done_this_monomer, done_this_dimer
 
-     integer :: d, n_descriptors, n_cross, dimer_size, trimer_size, &
+     integer :: d, n_descriptors, dimer_size, trimer_size, &
         i, j, k, n, m, i_atomic, j_atomic, start, finish, i_desc,this_diff,triplet_pos, &
         n_index
+     integer(int8) :: n_cross
      integer :: monomer_one_size, monomer_two_size, monomer_three_size, n_monomer_one, n_monomer_two, n_monomer_three, n_products, contributor_loc
      integer, dimension(1) :: unit_array
      real(dp) :: temp_dist
@@ -3071,8 +3077,9 @@
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, i, j, i_atomic, j_atomic, k, &
+      integer :: d, n_descriptors, i, j, i_atomic, j_atomic, k, &
          start, finish, molecule_size, i_component, i_desc, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: temp_shift
       real(dp), dimension(:), allocatable :: dist_vec
       real(dp), dimension(:,:), allocatable :: interatomic_distances
@@ -3511,7 +3518,8 @@
    subroutine AN_monomer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(AN_monomer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -3525,7 +3533,7 @@
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          n_descriptors = n_descriptors + 1
@@ -3544,7 +3552,8 @@
    subroutine general_monomer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(general_monomer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -3586,7 +3595,8 @@
 
       type(com_dimer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -3656,7 +3666,8 @@
 
       type(general_dimer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -3722,7 +3733,8 @@
  
       type(general_trimer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -3805,7 +3817,8 @@
       subroutine molecule_lo_d_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(molecule_lo_d), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -4323,7 +4336,8 @@
   subroutine soap_express_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(soap_express), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -4337,7 +4351,7 @@
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if(present(mask)) then
@@ -4397,7 +4411,8 @@
 
       logical :: my_do_descriptor, my_do_grad_descriptor
       integer :: a, b, d, i, j, k, l, m, n, i_n, l_n_neighbours, &
-         i_desc, n_descriptors, n_cross, n_index, i_pow
+         i_desc, n_descriptors, n_index, i_pow
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       real(dp) :: r_ij, phi, atom_sigma_angular, atom_sigma_radial, r_ij_sigma_angular_scaled, &
          amplitude, multiplicity, atom_sigma_radial_scaled

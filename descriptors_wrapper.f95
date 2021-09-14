@@ -285,7 +285,8 @@ contains
       integer :: descriptors_wrapper_size
 
       type(atoms), save           :: at
-      integer :: n_descriptors,n_cross
+      integer :: n_descriptors
+      integer(int8) :: n_cross
 
       call copy_data_to_atoms(at,N,lattice,symbol,coord,fractional)
       call descriptor_sizes(desc,at,n_descriptors,n_cross)
@@ -326,10 +327,11 @@ contains
       real(dp), dimension(3,N), intent(in) :: coord
       logical, intent(in) :: fractional
 
-      integer :: descriptors_wrapper_gradient_size
+      integer(int8) :: descriptors_wrapper_gradient_size
 
       type(atoms), save           :: at
-      integer :: n_descriptors,n_cross
+      integer :: n_descriptors
+      integer(int8) :: n_cross
 
       call copy_data_to_atoms(at,N,lattice,symbol,coord,fractional)
       call descriptor_sizes(desc,at,n_descriptors,n_cross)
@@ -369,7 +371,8 @@ contains
       character(len=3), dimension(N), intent(in) :: symbol
       real(dp), dimension(3,N), intent(in) :: coord
       logical, intent(in) :: fractional
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
 
       type(atoms), save           :: at
 
@@ -388,6 +391,7 @@ contains
       real(kind=c_double), dimension(3,N), intent(in) :: coord
       logical(kind=c_bool), intent(in) :: fractional
       integer(kind=c_int), intent(out) :: n_descriptors, n_cross
+      integer(int8) :: n_cross_int8
 
       character(len=3), dimension(N) :: my_symbol
       integer :: i
@@ -398,7 +402,8 @@ contains
       enddo
 
       my_fractional = logical(fractional,kind=kind(my_fractional))
-      call descriptors_wrapper_both_sizes(N,lattice,my_symbol,coord,my_fractional,n_descriptors,n_cross)
+      call descriptors_wrapper_both_sizes(N,lattice,my_symbol,coord,my_fractional,n_descriptors,n_cross_int8)
+      n_cross = n_cross_int8
 
    endsubroutine descriptors_wrapper_both_sizes_C
 
@@ -455,7 +460,8 @@ contains
       character(len=3), dimension(N), intent(in) :: symbol
       real(dp), dimension(3,N), intent(in) :: coord
       logical, intent(in) :: fractional
-      integer, intent(in) :: d_descriptor, n_cross
+      integer, intent(in) :: d_descriptor
+      integer(int8), intent(in) :: n_cross
       real(dp), dimension(d_descriptor,3,n_cross), intent(out):: grad_descriptor_array
       integer, dimension(2,n_cross), intent(out):: grad_descriptor_index
       real(dp), dimension(3,n_cross), intent(out):: grad_descriptor_pos
@@ -484,6 +490,7 @@ contains
       real(kind=c_double), dimension(d_descriptor,3,n_cross), intent(out):: grad_descriptor_array
       integer(kind=c_int), dimension(2,n_cross), intent(out):: grad_descriptor_index
       real(kind=c_double), dimension(3,n_cross), intent(out):: grad_descriptor_pos
+      integer(int8) :: n_cross_int8
 
       character(len=3), dimension(N) :: my_symbol
       integer :: i
@@ -493,8 +500,10 @@ contains
          my_symbol(i) = a2s(symbol(:,i))
       enddo
 
+      n_cross_int8 = n_cross
+
       my_fractional = logical(fractional,kind=kind(my_fractional))
-      call descriptors_wrapper_gradient_array(N,lattice,my_symbol,coord,my_fractional,grad_descriptor_array,grad_descriptor_index,grad_descriptor_pos,d_descriptor,n_cross)
+      call descriptors_wrapper_gradient_array(N,lattice,my_symbol,coord,my_fractional,grad_descriptor_array,grad_descriptor_index,grad_descriptor_pos,d_descriptor,n_cross_int8)
 
    endsubroutine descriptors_wrapper_gradient_array_C
 
@@ -505,7 +514,8 @@ contains
       character(len=3), dimension(N), intent(in) :: symbol
       real(dp), dimension(3,N), intent(in) :: coord
       logical, intent(in) :: fractional
-      integer, intent(in) :: d_descriptor, n_descriptor, n_cross
+      integer, intent(in) :: d_descriptor, n_descriptor
+      integer(int8), intent(in) :: n_cross
       real(dp), dimension(d_descriptor,n_descriptor), intent(out):: descriptor_array
       real(dp), dimension(d_descriptor,3,n_cross), intent(out):: grad_descriptor_array
       integer, dimension(2,n_cross), intent(out):: grad_descriptor_index
@@ -536,6 +546,7 @@ contains
       real(kind=c_double), dimension(d_descriptor,3,n_cross), intent(out):: grad_descriptor_array
       integer(kind=c_int), dimension(2,n_cross), intent(out):: grad_descriptor_index
       real(kind=c_double), dimension(3,n_cross), intent(out):: grad_descriptor_pos
+      integer(int8) :: n_cross_int8
 
       character(len=3), dimension(N) :: my_symbol
       integer :: i
@@ -545,8 +556,10 @@ contains
          my_symbol(i) = a2s(symbol(:,i))
       enddo
 
+      n_cross_int8 = n_cross
+
       my_fractional = logical(fractional,kind=kind(my_fractional))
-      call descriptors_wrapper_both_arrays(N,lattice,my_symbol,coord,my_fractional,descriptor_array,grad_descriptor_array,grad_descriptor_index,grad_descriptor_pos,d_descriptor,n_descriptor,n_cross)
+      call descriptors_wrapper_both_arrays(N,lattice,my_symbol,coord,my_fractional,descriptor_array,grad_descriptor_array,grad_descriptor_index,grad_descriptor_pos,d_descriptor,n_descriptor,n_cross_int8)
 
    endsubroutine descriptors_wrapper_both_arrays_C
 

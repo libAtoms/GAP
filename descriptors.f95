@@ -3188,7 +3188,8 @@ module descriptors_module
    subroutine soap_turbo_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(soap_turbo), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -3202,7 +3203,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if( at%Z(i) /= this%species_Z(this%central_index) ) cycle
@@ -3457,7 +3458,8 @@ module descriptors_module
       integer, optional, intent(out) :: error
 
       type(descriptor_data) :: my_descriptor_data
-      integer :: i, n, i_d, n_descriptors, n_cross, n_index
+      integer :: i, n, n_descriptors, n_index
+      integer(int8) :: n_cross, i_d
       logical :: do_grad_descriptor, do_descriptor
 
       INIT_ERROR(error)
@@ -3479,16 +3481,16 @@ module descriptors_module
          call check_size('descriptor_index',descriptor_index,(/n_index,n_descriptors/),'descriptor_calc_array',error)
 
       if(present(grad_descriptor_out)) &
-         call check_size('grad_descriptor_out',grad_descriptor_out,(/descriptor_dimensions(this),3,n_cross/),'descriptor_calc_array',error)
+         call check_size('grad_descriptor_out',grad_descriptor_out,(/descriptor_dimensions(this)+0_int8,3_int8,n_cross/),'descriptor_calc_array',error)
 
       if(present(grad_descriptor_index)) &
-         call check_size('grad_descriptor_index',grad_descriptor_index,(/2,n_cross/),'descriptor_calc_array',error)
+         call check_size('grad_descriptor_index',grad_descriptor_index,(/2_int8,n_cross/),'descriptor_calc_array',error)
 
       if(present(grad_descriptor_pos)) &
-         call check_size('grad_descriptor_pos',grad_descriptor_pos,(/3,n_cross/),'descriptor_calc_array',error)
+         call check_size('grad_descriptor_pos',grad_descriptor_pos,(/3_int8,n_cross/),'descriptor_calc_array',error)
 
       if(present(grad_covariance_cutoff)) &
-         call check_size('grad_covariance_cutoff',grad_covariance_cutoff,(/3,n_cross/),'descriptor_calc_array',error)
+         call check_size('grad_covariance_cutoff',grad_covariance_cutoff,(/3_int8,n_cross/),'descriptor_calc_array',error)
 
       if(do_descriptor) then
          do i = 1, n_descriptors
@@ -3499,7 +3501,7 @@ module descriptors_module
       endif
 
       if(do_grad_descriptor) then
-         i_d = 0
+         i_d = 0_int8
          do i = 1, n_descriptors
             do n = lbound(my_descriptor_data%x(i)%ii,1),ubound(my_descriptor_data%x(i)%ii,1)
                i_d = i_d + 1
@@ -3536,7 +3538,8 @@ module descriptors_module
       real(dp), dimension(3) :: diff, u_ij
       real(dp) :: r, tmp_cg
       integer :: i, n, n_i, ji, jn, j, m1, m2, j1, j2, m11, m12, m21, m22, &
-         i_desc, i_bisp, d, n_descriptors, n_cross, l_n_neighbours, n_index
+         i_desc, i_bisp, d, n_descriptors, l_n_neighbours, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       integer, dimension(total_elements) :: species_map
       logical :: my_do_descriptor, my_do_grad_descriptor
@@ -3827,7 +3830,8 @@ module descriptors_module
 
       logical :: my_do_descriptor, my_do_grad_descriptor
       integer :: d, i, j, n, a, l, m, l1, l2, m1, i_desc, i_pow, l_n_neighbours, &
-         n_i, n_descriptors, n_cross, n_index
+         n_i, n_descriptors, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij
       real(dp) :: r_ij
       real(dp), dimension(3) :: u_ij, d_ij
@@ -4133,7 +4137,8 @@ module descriptors_module
 
       logical :: my_do_descriptor, my_do_grad_descriptor
       integer :: d, i, j, k, n, m, a, b, i_desc_i, l_n_neighbours, &
-         n_i, m_i, n_descriptors, n_cross, n_index
+         n_i, m_i, n_descriptors, n_index
+      integer(int8) :: n_cross
       integer, dimension(:), allocatable :: i_desc
       integer, dimension(3) :: shift_ij
       real(dp) :: r_ij, r_ik, r_jk, cos_ijk, Ang, dAng, Rad, dRad_ij, dRad_ik, dRad_jk, f_cut_ij, f_cut_ik, f_cut_jk, df_cut_ij, df_cut_ik, df_cut_jk, g2, dg2
@@ -4377,7 +4382,8 @@ module descriptors_module
       integer, dimension(:), pointer :: resid_pointer 
 
       logical :: my_do_descriptor, my_do_grad_descriptor, Zi1, Zi2, Zj1, Zj2
-      integer :: d, n_descriptors, n_cross, i_desc, i, j, n, n_index
+      integer :: d, n_descriptors, i_desc, i, j, n, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       real(dp) :: r_ij, covariance_cutoff, dcovariance_cutoff, tail, dtail
       real(dp), dimension(3) :: u_ij
@@ -4545,7 +4551,8 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, i, j, n, i_n, l_n_neighbours, i_desc, n_descriptors, n_cross, n_index
+      integer :: d, i, j, n, i_n, l_n_neighbours, i_desc, n_descriptors, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       real(dp) :: r_ij
       real(dp), dimension(3) :: u_ij, df_cut
@@ -4692,7 +4699,8 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor, Zk1, Zk2, Zj1, Zj2
-      integer :: d, n_descriptors, n_cross, i_desc, i, j, k, n, m, n_index
+      integer :: d, n_descriptors, i_desc, i, j, k, n, m, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij, shift_ik
       real(dp) :: r_ij, r_ik, r_jk, cos_ijk, fc_j, fc_k, dfc_j, dfc_k
       real(dp), dimension(3) :: u_ij, u_ik, u_jk, d_ij, d_ik, d_jk, dcosijk_ij, dcosijk_ik
@@ -4877,8 +4885,9 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor, Zk1, Zk2, Zj1, Zj2
-      integer :: d, n_descriptors, n_cross, i_desc, i, j, k, n, m, &
+      integer :: d, n_descriptors, i_desc, i, j, k, n, m, &
          l_n_neighbours_coordination, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij, shift_ik
       real(dp) :: r_ij, r_ik, r_jk, cos_ijk, fc_j, fc_k, dfc_j, dfc_k
       real(dp), dimension(3) :: u_ij, u_ik, u_jk, d_ij, d_ik, d_jk, dcosijk_ij, dcosijk_ik
@@ -5099,8 +5108,9 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor, Zi1, Zi2, Zj1, Zj2
-      integer :: d, n_descriptors, n_cross, i_desc, i, j, n, &
+      integer :: d, n_descriptors, i_desc, i, j, n, &
          n_neighbours_coordination_i, n_neighbours_coordination_ij, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       real(dp) :: r_ij
       real(dp), dimension(3) :: u_ij
@@ -5288,7 +5298,8 @@ module descriptors_module
 
       logical :: my_do_descriptor, my_do_grad_descriptor
       integer :: d, i, j, k, n, m, a, b, i_desc, i_cosnx, l_n_neighbours, n_i, &
-         n_descriptors, n_cross, n_index
+         n_descriptors, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij
       real(dp) :: r_ij, r_ik, r_jk, cos_ijk, T_0_cos_ijk, T_1_cos_ijk, T_n_cos_ijk, U_0_cos_ijk, U_1_cos_ijk, U_n_cos_ijk, Ang
       real(dp), dimension(3) :: u_ij, u_ik, d_ij, d_ik, d_jk, dcosijk_ij, dcosijk_ik, dAng_ij, dAng_ik
@@ -5693,7 +5704,8 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, i, iO, iH1, iH2, n_index
+      integer :: d, n_descriptors, i, iO, iH1, iH2, n_index
+      integer(int8) :: n_cross
       integer :: i_desc, mpi_n_procs, mpi_my_proc
       integer, dimension(3) :: shift_1, shift_2
       integer, dimension(:,:), allocatable :: water_monomer_index
@@ -5840,8 +5852,9 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, n_monomers, i_desc, i, j, n, &
+      integer :: d, n_descriptors, n_monomers, i_desc, i, j, n, &
          iAO, iAH1, iAH2, iBO, iBH1, iBH2, i_distance, n_index
+      integer(int8) :: n_cross
       integer :: mpi_n_procs, mpi_my_proc
       integer, dimension(3) :: shift_AO_BO, shift_AO_AH1, shift_AO_AH2, shift_AO_BH1, shift_AO_BH2, &
          shift_BO_AH1, shift_BO_AH2, shift_BO_BH1, shift_BO_BH2, &
@@ -6096,8 +6109,9 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, n_monomers, i_desc, i, j, &
+      integer :: d, n_descriptors, n_monomers, i_desc, i, j, &
          iA1, iA2, iB1, iB2, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_A1_A2, shift_A1_B1, shift_A1_B2, shift_A2_B1, shift_A2_B2, shift_B1_B2
       integer, dimension(at%N) :: A2_monomer_index
       real(dp) :: r_A1_A2, r_A1_B1, r_A1_B2, r_A2_B1, r_A2_B2, r_B1_B2
@@ -6240,8 +6254,9 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, n_monomers, i_desc, i, j, &
+      integer :: d, n_descriptors, n_monomers, i_desc, i, j, &
          iA1, iA2, iB1, iB2, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_A1_A2, shift_A1_B1, shift_A1_B2, shift_A2_B1, shift_A2_B2, shift_B1_B2
       integer, dimension(:,:), allocatable :: AB_monomer_index
       real(dp) :: r_A1_A2, r_A1_B1, r_A1_B2, r_A2_B1, r_A2_B2, r_B1_B2
@@ -6392,8 +6407,9 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, grad_d, n_descriptors, n_cross, descriptor_mould_size, &
+      integer :: d, grad_d, n_descriptors, descriptor_mould_size, &
          i_desc, i_data, i, j, k, n, l, m, l_n_neighbours, i_n, n_index
+      integer(int8) :: n_cross
 
       real(dp) :: r
       real(dp), dimension(3) :: diff
@@ -6572,7 +6588,8 @@ module descriptors_module
 
       logical :: my_do_descriptor, my_do_grad_descriptor
       integer :: d, i, j, n, a, l, m, i_desc, i_pow, l_n_neighbours, n_i, &
-         n_descriptors, n_cross, n_index
+         n_descriptors, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij
       real(dp) :: r_ij
       real(dp), dimension(3) :: u_ij, d_ij
@@ -6848,7 +6865,8 @@ module descriptors_module
       real(dp), dimension(3) :: diff, u_ij
       real(dp) :: r
       integer :: i, n, n_i, ji, jn, k, j, i_desc, i_bisp, d, &
-         n_descriptors, n_cross, l_n_neighbours, n_index
+         n_descriptors, l_n_neighbours, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       integer, dimension(total_elements) :: species_map
       logical :: my_do_descriptor, my_do_grad_descriptor
@@ -7050,8 +7068,9 @@ module descriptors_module
 
       logical :: my_do_descriptor, my_do_grad_descriptor, do_two_l_plus_one
       integer :: d, i, j, n, a, b, k, l, m, i_pow, i_coeff, l_n_neighbours, n_i, &
-         n_descriptors, n_cross, i_species, j_species, ia, jb, i_desc_i, &
+         n_descriptors, i_species, j_species, ia, jb, i_desc_i, &
          xml_version, sum_l_n_neighbours, i_pair, i_pair_i, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij
       integer, dimension(:), allocatable :: i_desc
       integer, dimension(:,:), allocatable :: rs_index
@@ -7978,7 +7997,8 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, i, j, n, i_n, l_n_neighbours, i_desc, n_descriptors, n_cross, n_index
+      integer :: d, i, j, n, i_n, l_n_neighbours, i_desc, n_descriptors, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       real(dp) :: r_ij, f_cut, df_cut
       real(dp), dimension(3) :: u_ij
@@ -8135,8 +8155,9 @@ module descriptors_module
       logical, dimension(:), pointer :: atom_mask_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor, Zi1, Zi2, Zj1, Zj2
-      integer :: d, n_descriptors, n_cross, i_desc, i, j, k, n, m, &
+      integer :: d, n_descriptors, i_desc, i, j, k, n, m, &
          n_neighbours_coordination_i, n_neighbours_coordination_ij, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift
       real(dp) :: r_ij, r_ik, r_jk, cos_ijk, cos_jik, f_cut_i, f_cut_j, f_cut_ij, f_cut_ik, f_cut_jk, f_cut_as_i, f_cut_as_j, rho_i, rho_j
       real(dp), dimension(3) :: u_ij, u_ik, u_jk
@@ -8386,7 +8407,8 @@ module descriptors_module
       logical :: my_do_descriptor, my_do_grad_descriptor
 
       integer :: i, j, n, d, p, q, r, a, b, c, n_i, n_radial, pp, i_desc, &
-         l_n_neighbours, desc_index, n_cross, n_descriptors, n_index
+         l_n_neighbours, desc_index, n_descriptors, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: shift_ij
       real(dp) :: r_ij
       real(dp), dimension(3) :: d_ij
@@ -8678,8 +8700,9 @@ module descriptors_module
       logical :: has_atom_mask_name
 
       logical :: my_do_descriptor, my_do_grad_descriptor
-      integer :: d, n_descriptors, n_cross, i_desc, i_data, i, j, ii, jj, kk, ll, &
+      integer :: d, n_descriptors, i_desc, i_data, i, j, ii, jj, kk, ll, &
          iConnectivity, n_index
+      integer(int8) :: n_cross
       integer, dimension(3) :: s_i, s_j
       real(dp) :: r_ij, fcut_connectivity
       real(dp), dimension(3) :: dfcut_connectivity
@@ -8930,7 +8953,8 @@ module descriptors_module
 
       logical :: my_do_descriptor, my_do_grad_descriptor, do_timing
       integer :: d, i, j, k, n, i_n, l_n_neighbours, &
-         i_desc, n_descriptors, n_cross, n_index, n_atom_pairs
+         i_desc, n_descriptors, n_index, n_atom_pairs
+      integer(int8) :: n_cross
       real(dp) :: r_ij
       real(dp), dimension(3) :: d_ij, u_ij
       real(dp), dimension(:), allocatable :: rjs, thetas, phis, rcut_hard, rcut_soft, nf, global_scaling
@@ -10273,7 +10297,8 @@ module descriptors_module
    subroutine descriptor_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(descriptor), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10385,7 +10410,8 @@ module descriptors_module
    subroutine bispectrum_SO4_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(bispectrum_SO4), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10399,7 +10425,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
@@ -10417,7 +10443,8 @@ module descriptors_module
    subroutine bispectrum_SO3_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(bispectrum_SO3), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10430,7 +10457,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
@@ -10448,7 +10475,8 @@ module descriptors_module
    subroutine behler_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(behler), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10462,7 +10490,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
       do i = 1, at%N
          if(present(mask)) then
             if(.not. mask(i)) cycle
@@ -10480,7 +10508,8 @@ module descriptors_module
    subroutine distance_2b_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(distance_2b), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10508,7 +10537,7 @@ module descriptors_module
       end if   
    
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if(present(mask)) then
@@ -10544,7 +10573,8 @@ module descriptors_module
    subroutine coordination_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(coordination), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10558,7 +10588,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
          if(present(mask)) then
@@ -10575,7 +10605,8 @@ module descriptors_module
    subroutine angle_3b_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(angle_3b), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10591,7 +10622,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if( (this%Z /=0) .and. (at%Z(i) /= this%Z) ) cycle
@@ -10629,7 +10660,8 @@ module descriptors_module
    subroutine co_angle_3b_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(co_angle_3b), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10645,7 +10677,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if( (this%Z /=0) .and. (at%Z(i) /= this%Z) ) cycle
@@ -10684,7 +10716,8 @@ module descriptors_module
    subroutine co_distance_2b_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(co_distance_2b), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10700,7 +10733,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if(present(mask)) then
@@ -10730,7 +10763,8 @@ module descriptors_module
    subroutine cosnx_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(cosnx), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10744,7 +10778,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
@@ -10762,7 +10796,8 @@ module descriptors_module
    subroutine trihis_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(trihis), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10777,7 +10812,7 @@ module descriptors_module
 
       n_descriptors = at%N
 
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if(present(mask)) then
@@ -10793,7 +10828,8 @@ module descriptors_module
    subroutine water_monomer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(water_monomer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10807,7 +10843,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if(at%Z(i) == 8) then
@@ -10826,7 +10862,8 @@ module descriptors_module
    subroutine water_dimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(water_dimer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10841,7 +10878,7 @@ module descriptors_module
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 call print("mask present ? "//present(mask))   
       do i = 1, at%N
          if(at%Z(i) == 8) then
@@ -10865,7 +10902,8 @@ call print("mask present ? "//present(mask))
    subroutine A2_dimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(A2_dimer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10883,7 +10921,7 @@ call print("mask present ? "//present(mask))
       call find_A2_monomer(at,this%atomic_number, this%monomer_cutoff, A2_monomer_index)
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          iA1 = i
@@ -10915,7 +10953,8 @@ call print("mask present ? "//present(mask))
    subroutine AB_dimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(AB_dimer), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -10940,7 +10979,7 @@ call print("mask present ? "//present(mask))
       call find_AB_monomer(at,(/this%atomic_number1,this%atomic_number2/), this%monomer_cutoff, AB_monomer_index)
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, n_monomers
          iA1 = AB_monomer_index(1,i)
@@ -10975,7 +11014,8 @@ call print("mask present ? "//present(mask))
    subroutine atom_real_space_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(atom_real_space), intent(in) :: this
       type(atoms), intent(in) :: at  
-      integer, intent(out) :: n_descriptors, n_cross  
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross 
       logical, dimension(:), intent(in), optional :: mask  
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error  
@@ -10989,8 +11029,8 @@ call print("mask present ? "//present(mask))
       endif  
   
       n_descriptors = at%N
-      n_cross = 0
-  
+      n_cross = 0_int8
+
       do i = 1, at%N
          if(present(mask)) then
             if(.not. mask(i)) cycle
@@ -11005,7 +11045,8 @@ call print("mask present ? "//present(mask))
    subroutine power_so3_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(power_so3), intent(in) :: this
       type(atoms), intent(in) :: at  
-      integer, intent(out) :: n_descriptors, n_cross  
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross  
       logical, dimension(:), intent(in), optional :: mask  
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error  
@@ -11019,8 +11060,8 @@ call print("mask present ? "//present(mask))
       endif 
   
       n_descriptors = 0
-      n_cross = 0
-  
+      n_cross = 0_int8
+
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
          if(present(mask)) then
@@ -11037,7 +11078,8 @@ call print("mask present ? "//present(mask))
    subroutine power_SO4_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(power_SO4), intent(in) :: this
       type(atoms), intent(in) :: at 
-      integer, intent(out) :: n_descriptors, n_cross 
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask 
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error 
@@ -11051,8 +11093,8 @@ call print("mask present ? "//present(mask))
       endif  
   
       n_descriptors = 0
-      n_cross = 0
-  
+      n_cross = 0_int8
+
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
          if(present(mask)) then
@@ -11069,7 +11111,8 @@ call print("mask present ? "//present(mask))
    subroutine soap_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(soap), intent(in) :: this
       type(atoms), intent(in) :: at  
-      integer, intent(out) :: n_descriptors, n_cross  
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross  
       logical, dimension(:), intent(in), optional :: mask  
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error  
@@ -11083,8 +11126,8 @@ call print("mask present ? "//present(mask))
       endif  
   
       n_descriptors = 0
-      n_cross = 0
-  
+      n_cross = 0_int8
+
       do i = 1, at%N
          if( .not. any( at%Z(i) == this%Z ) .and. .not. any(this%Z == 0) ) cycle
          if(present(mask)) then
@@ -11112,7 +11155,8 @@ call print("mask present ? "//present(mask))
    subroutine rdf_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(rdf), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -11126,7 +11170,7 @@ call print("mask present ? "//present(mask))
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
          if(present(mask)) then
@@ -11143,7 +11187,8 @@ call print("mask present ? "//present(mask))
    subroutine as_distance_2b_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(as_distance_2b), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -11159,7 +11204,7 @@ call print("mask present ? "//present(mask))
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          Zi1 = (this%Z1 == 0) .or. (at%Z(i) == this%Z1)
@@ -11185,7 +11230,8 @@ call print("mask present ? "//present(mask))
    subroutine alex_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(alex), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error
@@ -11199,7 +11245,7 @@ call print("mask present ? "//present(mask))
       endif
 
       n_descriptors = 0
-      n_cross = 0
+      n_cross = 0_int8
 
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
@@ -11217,7 +11263,8 @@ call print("mask present ? "//present(mask))
    subroutine distance_Nb_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(distance_Nb), intent(in) :: this
       type(atoms), intent(in) :: at
-      integer, intent(out) :: n_descriptors, n_cross
+      integer, intent(out) :: n_descriptors
+      integer(int8), intent(out) :: n_cross
       logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
       integer, optional, intent(out) :: error

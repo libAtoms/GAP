@@ -90,7 +90,8 @@ module gap_fit_module
 
      real(dp), dimension(:), allocatable :: delta, f0, theta_uniform, zeta, unique_hash_tolerance, unique_descriptor_tolerance !, theta
      real(dp), dimension(:,:), allocatable :: sigma
-     integer, dimension(:), allocatable :: n_sparseX, sparse_method, target_type, n_cross, n_descriptors, species_Z, covariance_type
+     integer, dimension(:), allocatable :: n_sparseX, sparse_method, target_type, n_descriptors, species_Z, covariance_type
+     integer(int8), dimension(:), allocatable :: n_cross
      integer, dimension(:,:), allocatable :: config_type_n_sparseX
      character(len=STRING_LENGTH), dimension(:), allocatable :: theta_file, sparse_file, theta_fac_string, config_type, config_type_n_sparseX_string, print_sparse_index
      logical, dimension(:), allocatable :: mark_sparse_atoms, add_species, has_theta_fac, has_theta_uniform, has_theta_file, has_zeta
@@ -662,12 +663,14 @@ contains
     real(dp), pointer, dimension(:) :: local_property
     logical, pointer, dimension(:) :: force_mask
     integer :: i, j, k
-    integer :: n_descriptors, n_cross, n_hessian
+    integer :: n_descriptors, n_hessian
+    integer(int8) :: n_cross
+    character*1024 :: n_cross_char
 
     allocate(this%n_cross(this%n_coordinate))
     allocate(this%n_descriptors(this%n_coordinate))
 
-    this%n_cross = 0
+    this%n_cross = 0_int8
     this%n_descriptors = 0
     this%n_ener = 0
     this%n_force = 0
@@ -766,7 +769,9 @@ contains
        call print("---------------------------------------------------------------------")
        call print("Descriptor: "//this%gap_str(i))
        call print("Number of descriptors:                        "//this%n_descriptors(i))
-       call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
+       write(n_cross_char, *) this%n_cross(i)
+!       call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
+       call print("Number of partial derivatives of descriptors: "//trim(n_cross_char))
     enddo
     call print_title("")
 
@@ -798,11 +803,13 @@ contains
     real(dp), dimension(:), pointer :: local_property
     logical, dimension(:), pointer :: force_mask
     real(dp), dimension(:,:), allocatable :: f_core
-    integer, dimension(:,:), allocatable :: force_loc, permutations
+    integer, dimension(:,:), allocatable :: permutations
+    integer(int8), dimension(:,:), allocatable :: force_loc
     integer :: ie, i, j, n, k, l, i_coordinate, n_hessian, n_energy_sigma, n_force_sigma, n_force_atom_sigma, &
     n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors
-    integer, dimension(:), allocatable :: xloc, hessian_loc, local_property_loc
-    integer, dimension(3,3) :: virial_loc
+    integer, dimension(:), allocatable :: xloc, local_property_loc
+    integer(int8), dimension(:), allocatable :: hessian_loc
+    integer(int8), dimension(3,3) :: virial_loc
 
     integer :: i_config_type, n_config_type, n_theta_fac
     character(len=STRING_LENGTH) :: config_type

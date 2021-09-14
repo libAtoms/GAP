@@ -147,6 +147,8 @@ module gp_predict_module
 
    integer, public :: openmp_chunk_size = 1
 
+   integer, parameter, private:: int8 = 8
+
    type gpCovariance_bond_real_space
 
       integer :: n
@@ -176,17 +178,20 @@ module gp_predict_module
 
    type gpCoordinates
 
-      integer :: d = 0, n_x, n_xPrime, n_sparseX, n_permutations
+      integer :: d = 0, n_x, n_sparseX, n_permutations
+      integer(int8) :: n_xPrime
       ! dimension of descriptors, number of descriptors, number of derivatives of descriptors
 
-      integer :: current_x, current_xPrime
+      integer :: current_x
+      integer(int8) :: current_xPrime
       ! pointers to the last added values
 
       real(dp), dimension(:,:), allocatable :: x, xPrime
       ! descriptors (d,n_x), derivatives of descriptors (d, n_xPrime)
       ! for real space covariance descriptors (max(x_size),n_x), derivatives of descriptors (max(x_size),n_xPrime)
       real(dp), dimension(:), allocatable :: cutoff, cutoffPrime
-      integer, dimension(:), allocatable :: x_size, xPrime_size
+      integer, dimension(:), allocatable :: x_size
+      integer(int8), dimension(:), allocatable :: xPrime_size
       real(dp), dimension(:), allocatable :: covarianceDiag_x_x, covarianceDiag_xPrime_xPrime
 
       real(dp), dimension(:,:), allocatable :: sparseX, covarianceDiag_x_xPrime
@@ -209,7 +214,8 @@ module gp_predict_module
       real(dp) ::  delta, f0 = 0.0_dp, variance_estimate_regularisation = 0.0_dp  
       ! range of GP (function value) and baseline of function
 
-      integer, dimension(:), allocatable :: map_x_y, map_xPrime_yPrime, map_xPrime_x, config_type
+      integer, dimension(:), allocatable :: map_x_y, config_type
+      integer(int8), dimension(:), allocatable :: map_xPrime_yPrime, map_xPrime_x
       ! which descriptor is used for a given function value, which derivative descriptor is used for a given derivative function, which descriptor is differentiated
 
       integer, dimension(:), allocatable :: map_sparseX_globalSparseX
@@ -241,7 +247,8 @@ module gp_predict_module
 
    type gpFull
 
-      integer :: n_y, n_yPrime
+      integer :: n_y
+      integer(int8) :: n_yPrime
       ! number of function values, number of derivative function values
       
       integer :: n_globalSparseX
@@ -250,7 +257,8 @@ module gp_predict_module
       integer :: n_coordinate
       ! number of different descriptors
 
-      integer :: current_y, current_yPrime
+      integer :: current_y
+      integer(int8) :: current_yPrime
 
       real(dp) :: sparse_jitter = 1.0e-5_dp
 
@@ -266,7 +274,8 @@ module gp_predict_module
       real(dp), dimension(:), allocatable :: covarianceDiag_y_y, lambda, alpha
       ! covariance matrix
 
-      integer, dimension(:), allocatable :: map_y_globalY, map_yPrime_globalY
+      integer, dimension(:), allocatable :: map_y_globalY
+      integer(int8), dimension(:), allocatable :: map_yPrime_globalY
 
       type(gpCoordinates), dimension(:), allocatable :: coordinate
 
@@ -301,7 +310,8 @@ module gp_predict_module
    endtype neighbour_descriptor
 
    logical, save :: parse_matched_label, parse_in_gpCoordinates, parse_in_gpFull, parse_in_gpSparse, parse_in_sparseX, parse_sliced, parse_sparseX_separate_file
-   integer, save :: parse_i_sparseX, parse_i_x, parse_i_xPrime, parse_i_permutation, parse_slice_start, parse_slice_end
+   integer, save :: parse_i_sparseX, parse_i_x, parse_i_permutation, parse_slice_start, parse_slice_end
+   integer(int8), save :: parse_i_xPrime
    type(gpCoordinates), pointer :: parse_gpCoordinates
    type(gpFull), pointer :: parse_gpFull
    type(gpSparse), pointer :: parse_gpSparse
@@ -333,7 +343,7 @@ module gp_predict_module
 
    interface gp_setParameters
       module procedure gpFull_setParameters, gpFull_gpCoordinates_setParameters, gpCoordinates_setParameters, &
-      gpCoordinates_setParameters_sparse, gpSparse_setParameters
+      gpCoordinates_setParameters_sparse, gpSparse_setParameters, gpFull_setParameters_int8
    endinterface gp_setParameters
    public :: gp_setParameters
 
@@ -358,7 +368,8 @@ module gp_predict_module
    public :: gp_addCoordinates
 
    interface gp_addCoordinateDerivatives
-      module procedure gpFull_addCoordinateDerivatives_1Darray, gpFull_addCoordinateDerivatives_2Darray
+      module procedure gpFull_addCoordinateDerivatives_1Darray, gpFull_addCoordinateDerivatives_2Darray, &
+      gpFull_addCoordinateDerivatives_1Darray_int8, gpFull_addCoordinateDerivatives_2Darray_int8
    endinterface gp_addCoordinateDerivatives
    public :: gp_addCoordinateDerivatives
 
@@ -431,13 +442,43 @@ module gp_predict_module
 
    endsubroutine gpFull_setParameters
 
+   subroutine gpFull_setParameters_int8(this, n_coordinate, n_y, n_yPrime, sparse_jitter, error)
+
+      type(gpFull), intent(inout) :: this
+      integer, intent(in) :: n_coordinate, n_y
+      integer(int8), intent(in) :: n_yPrime
+      real(dp), intent(in) :: sparse_jitter
+      integer, optional, intent(out) :: error
+
+      INIT_ERROR(error)
+
+      if(this%initialised) call finalise(this,error)
+
+      this%n_coordinate = n_coordinate
+      this%n_y = n_y
+      this%n_yPrime = n_yPrime
+      this%current_y = 0
+      this%current_yPrime = 0
+      this%sparse_jitter = sparse_jitter
+
+      allocate( this%coordinate(n_coordinate) )
+      allocate( this%y(n_y), this%yPrime(n_yPrime) )
+      allocate( this%map_y_globalY(n_y), this%map_yPrime_globalY(n_yPrime) )
+      allocate( this%sigma_y(n_y), this%sigma_yPrime(n_yPrime) )
+
+      this%initialised = .true.
+
+   endsubroutine gpFull_setParameters_int8
+
    subroutine gpFull_gpCoordinates_setParameters(this, i, d, n_x, n_xPrime, delta, f0, covariance_type, x_size_max, xPrime_size_max, error)
 
       type(gpFull), intent(inout) :: this
-      integer, intent(in) :: i, d, n_x, n_xPrime
+      integer, intent(in) :: i, d, n_x
+      integer(int8), intent(in) :: n_xPrime
       real(dp), intent(in) :: delta, f0
       integer, optional, intent(in) :: covariance_type
-      integer, optional, intent(in) :: x_size_max, xPrime_size_max
+      integer, optional, intent(in) :: x_size_max
+      integer(int8), optional, intent(in) :: xPrime_size_max
       integer, optional, intent(out) :: error
 
       INIT_ERROR(error)
@@ -457,13 +498,16 @@ module gp_predict_module
    subroutine gpCoordinates_setParameters(this, d, n_x, n_xPrime, delta, f0, covariance_type, x_size_max, xPrime_size_max, error)
 
       type(gpCoordinates), intent(inout) :: this
-      integer, intent(in) :: d, n_x, n_xPrime
+      integer, intent(in) :: d, n_x
+      integer(int8), intent(in) :: n_xPrime
       real(dp), intent(in) :: delta, f0
       integer, optional, intent(in) :: covariance_type
-      integer, optional, intent(in) :: x_size_max, xPrime_size_max
+      integer, optional, intent(in) :: x_size_max
+      integer(int8), optional, intent(in) :: xPrime_size_max
       integer, optional, intent(out) :: error
 
       integer :: i
+      character*1024 :: n_xPrime_char
 
       INIT_ERROR(error)
 
@@ -482,7 +526,9 @@ module gp_predict_module
       endif
 
       if( n_xPrime < 0 ) then
-         RAISE_ERROR("gpCoordinates_setParameters: negative value of n_xPrime = "//n_xPrime,error)
+         write(n_xPrime_char, *) n_xPrime
+!         RAISE_ERROR("gpCoordinates_setParameters: negative value of n_xPrime = "//n_xPrime,error)
+         RAISE_ERROR("gpCoordinates_setParameters: negative value of n_xPrime = "//trim(n_xPrime_char),error)
       else
          this%n_xPrime = n_xPrime
       endif
@@ -706,8 +752,9 @@ module gp_predict_module
       type(gpFull), intent(in)  :: from
       integer, optional, intent(out) :: error
 
-      integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, i_yPrime, &
-      i_globalY, i_global_yPrime
+      integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, &
+      i_globalY
+      integer(int8) :: i_yPrime, i_global_yPrime
 #ifdef HAVE_QR      
       real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
       real(qp), dimension(:), allocatable :: globalY, alpha
@@ -1044,7 +1091,7 @@ module gp_predict_module
    function gpFull_addFunctionDerivative(this, yPrime, sigma_yPrime, error)
       type(gpFull), intent(inout) :: this
       real(dp), intent(in) :: yPrime, sigma_yPrime ! Function value
-      integer :: gpFull_addFunctionDerivative  ! Which function value we added
+      integer(int8) :: gpFull_addFunctionDerivative  ! Which function value we added
       integer, optional, intent(out) :: error
 
       INIT_ERROR(error)
@@ -1227,6 +1274,75 @@ module gp_predict_module
 
    endsubroutine gpFull_addCoordinateDerivatives_2Darray
 
+   subroutine gpFull_addCoordinateDerivatives_2Darray_int8(this,xPrime,i_coordinate,current_yPrime, xLocation, dcutoff_in, error)
+      type(gpFull), intent(inout) :: this
+      real(dp), dimension(:,:), intent(in) :: xPrime
+      integer, intent(in) :: i_coordinate
+      integer(int8), intent(in) :: current_yPrime
+      integer, dimension(:), intent(in) :: xLocation
+      real(dp), dimension(:), optional, intent(in) :: dcutoff_in
+      integer, optional, intent(out) :: error
+
+      integer(int8) :: previous_xPrime
+      real(dp), dimension(:,:), allocatable :: new_xPrime
+
+      INIT_ERROR(error)
+
+      if( .not. this%initialised ) then
+         RAISE_ERROR('gpFull_addCoordinateDerivatives: object not initialised',error)
+      endif
+
+      if( i_coordinate > this%n_coordinate ) then
+         RAISE_ERROR( 'gpFull_addCoordinateDerivatives: access to descriptor '//i_coordinate//' is not possible as number of descriptors is set '//this%n_coordinate,error )
+      endif
+
+      if( .not. this%coordinate(i_coordinate)%initialised ) then
+         RAISE_ERROR('gpFull_addCoordinateDerivatives: '//i_coordinate//'th coordinate object is not initialised',error)
+      endif
+
+      if( this%coordinate(i_coordinate)%covariance_type == COVARIANCE_BOND_REAL_SPACE ) then
+         if( size(xPrime,1) > size(this%coordinate(i_coordinate)%xPrime,1) ) then
+            allocate( new_xPrime(size(xPrime,1),this%coordinate(i_coordinate)%n_xPrime) )
+            new_xPrime = 0.0_dp
+            new_xPrime(1:size(this%coordinate(i_coordinate)%xPrime,1),:) = this%coordinate(i_coordinate)%xPrime
+            deallocate( this%coordinate(i_coordinate)%xPrime )
+            allocate( this%coordinate(i_coordinate)%xPrime(size(xPrime,1),this%coordinate(i_coordinate)%n_xPrime) )
+            this%coordinate(i_coordinate)%xPrime = new_xPrime
+            deallocate( new_xPrime )
+         end if
+      else
+         if( size(xPrime,1) /= this%coordinate(i_coordinate)%d ) then
+            RAISE_ERROR('gpFull_addCoordinateDerivatives: dimensionality of descriptors '//size(xPrime,1)//' does not match what is given in the object '//this%coordinate(i_coordinate)%d,error)
+         endif
+      endif
+
+      if( size(xPrime,2) /= size(xLocation) ) then
+         RAISE_ERROR('gpFull_addCoordinateDerivatives: number of descriptors '//size(xPrime,2)//' has to match the dimensionality of the mapping array '//size(xLocation),error)
+      endif
+
+      previous_xPrime = this%coordinate(i_coordinate)%current_xPrime
+      this%coordinate(i_coordinate)%current_xPrime = previous_xPrime + size(xPrime,2)
+
+      if( this%coordinate(i_coordinate)%current_xPrime > this%coordinate(i_coordinate)%n_xPrime ) then
+         RAISE_ERROR('gpFull_addCoordinateDerivatives: object full, no more descriptors can be added',error)
+      endif
+
+      if( this%coordinate(i_coordinate)%covariance_type == COVARIANCE_BOND_REAL_SPACE ) then
+         this%coordinate(i_coordinate)%xPrime(1:size(xPrime,1),previous_xPrime+1:this%coordinate(i_coordinate)%current_xPrime) = xPrime
+         this%coordinate(i_coordinate)%xPrime_size(previous_xPrime+1:this%coordinate(i_coordinate)%current_xPrime) = size(xPrime,1)
+      else
+         this%coordinate(i_coordinate)%xPrime(:,previous_xPrime+1:this%coordinate(i_coordinate)%current_xPrime) = xPrime
+      endif
+
+      if(present(dcutoff_in)) then
+         this%coordinate(i_coordinate)%cutoffPrime(previous_xPrime+1:this%coordinate(i_coordinate)%current_xPrime) = dcutoff_in
+      endif
+
+      this%coordinate(i_coordinate)%map_xPrime_yPrime(previous_xPrime+1:this%coordinate(i_coordinate)%current_xPrime) = current_yPrime
+      this%coordinate(i_coordinate)%map_xPrime_x(previous_xPrime+1:this%coordinate(i_coordinate)%current_xPrime) = xLocation
+
+   endsubroutine gpFull_addCoordinateDerivatives_2Darray_int8
+
    subroutine gpFull_addCoordinateDerivatives_1Darray(this,xPrime,i_coordinate,current_yPrime, xLocation, dcutoff_in, error)
       type(gpFull), intent(inout) :: this
       real(dp), dimension(:), intent(in) :: xPrime
@@ -1240,6 +1356,21 @@ module gp_predict_module
       call gpFull_addCoordinateDerivatives_2Darray(this, reshape(xPrime,(/size(xPrime),1/)),i_coordinate,current_yPrime,(/xLocation/),(/dcutoff_in/),error)
 
    endsubroutine gpFull_addCoordinateDerivatives_1Darray
+
+   subroutine gpFull_addCoordinateDerivatives_1Darray_int8(this,xPrime,i_coordinate,current_yPrime, xLocation, dcutoff_in, error)
+      type(gpFull), intent(inout) :: this
+      real(dp), dimension(:), intent(in) :: xPrime
+      integer, intent(in) :: i_coordinate
+      integer(int8), intent(in) :: current_yPrime
+      integer, intent(in) :: xLocation
+      real(dp), optional, intent(in) :: dcutoff_in
+      integer, optional, intent(out) :: error
+
+      INIT_ERROR(error)
+
+      call gpFull_addCoordinateDerivatives_2Darray_int8(this, reshape(xPrime,(/size(xPrime),1/)),i_coordinate,current_yPrime,(/xLocation/),(/dcutoff_in/),error)
+
+   endsubroutine gpFull_addCoordinateDerivatives_1Darray_int8
 
    subroutine gpFull_addDescriptor(this,i_coordinate,descriptor_str,error)
 
@@ -1471,14 +1602,16 @@ module gp_predict_module
       type(gpFull), intent(inout), target :: this
       integer, optional, intent(out) :: error
       integer :: i_coordinate, i_global_sparseX, j_global_sparseX, i_sparseX, j_sparseX, &
-      n_globalY, i_globalY, i_global_yPrime, i_y, i_yPrime, i_x, j_x, n_x, i_xPrime, j_xPrime, n_xPrime, n, i
+      n_globalY, i_globalY, i_y, i_x, j_x, n_x, n, i
+      integer(int8) :: i_global_yPrime, i_yPrime, i_xPrime, j_xPrime, n_xPrime
       real(dp) :: covariance_xPrime_sparseX, covariance_x_x_single, covariance_xPrime_xPrime, fc_i, fc_j, dfc_i, dfc_j
       real(dp), dimension(:,:,:,:), allocatable :: grad2_Covariance
       real(dp), dimension(:,:,:), allocatable :: grad_Covariance_j
       real(dp), dimension(:,:), allocatable :: grad_Covariance_i, covariance_x_x
       real(dp), dimension(:), allocatable :: covariance_x_sparseX, covariance_subY_currentX_y, covariance_subY_currentX_suby
       real(dp), dimension(:), pointer :: xPrime_i, xPrime_j
-      integer, dimension(:), allocatable :: xIndex, xPrime_Index, xPrime_x_Index
+      integer, dimension(:), allocatable :: xIndex
+      integer(int8), dimension(:), allocatable :: xPrime_Index, xPrime_x_Index
       type(LA_matrix) :: LA_covariance_subY_subY
       logical :: found_i_x
       real(dp) :: start_time, cpu_time, wall_time
@@ -1829,7 +1962,8 @@ module gp_predict_module
       type(gpFull), intent(inout) :: this
       integer, optional, intent(out) :: error
 
-      integer :: i_coordinate, n_globalY, i_globalY, j_globalY, i_global_yPrime, j_global_yPrime, i_y, j_y, i_yPrime, j_yPrime, i_x, j_x, i_xPrime, j_xPrime
+      integer :: i_coordinate, n_globalY, i_globalY, j_globalY, i_y, j_y, i_x, j_x
+      integer(int8) :: i_global_yPrime, j_global_yPrime, i_yPrime, j_yPrime, i_xPrime, j_xPrime
       real(dp) :: covariance_x_x
       real(dp), dimension(:), allocatable :: globalY
       real(dp), dimension(:,:), allocatable :: grad_Covariance_i
@@ -4124,6 +4258,7 @@ module gp_predict_module
       type(extendable_str) :: sparseX_filename
       character(len=32) :: sparseX_md5sum
       logical :: have_sparseX_base_filename
+      character*1024 :: prime_char
 
       INIT_ERROR(error)
 
@@ -4172,9 +4307,13 @@ module gp_predict_module
 	 endif
       else
          call xml_AddAttribute(xf,"n_x",""//this%n_x)
-         call xml_AddAttribute(xf,"n_xPrime",""//this%n_xPrime)
+!         call xml_AddAttribute(xf,"n_xPrime",""//this%n_xPrime)
+         write(prime_char, *) this%n_xPrime
+         call xml_AddAttribute(xf,"n_xPrime",trim(prime_char))
          if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"x_size_max", ""//maxval(this%x_size))
-         if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"xPrime_size_max", ""//maxval(this%xPrime_size))
+!         if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"xPrime_size_max", ""//maxval(this%xPrime_size))
+         write(prime_char, *) maxval(this%xPrime_size)
+         if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"xPrime_size_max", trim(prime_char))
       endif
 
       if( this%covariance_type == COVARIANCE_ARD_SE .or. this%covariance_type == COVARIANCE_PP ) then
@@ -4237,10 +4376,16 @@ module gp_predict_module
          do i = 1, this%n_xPrime
             call xml_NewElement(xf,"xPrime")
             call xml_AddAttribute(xf,"i", ""//i)
-            call xml_AddAttribute(xf,"map_xPrime_yPrime", ""//this%map_xPrime_yPrime(i))
-            call xml_AddAttribute(xf,"map_xPrime_x", ""//this%map_xPrime_x(i))
+!            call xml_AddAttribute(xf,"map_xPrime_yPrime", ""//this%map_xPrime_yPrime(i))
+            write(prime_char, *) this%map_xPrime_yPrime(i)
+            call xml_AddAttribute(xf,"map_xPrime_yPrime", trim(prime_char))            
+!            call xml_AddAttribute(xf,"map_xPrime_x", ""//this%map_xPrime_x(i))
+            write(prime_char, *) this%map_xPrime_x(i)
+            call xml_AddAttribute(xf,"map_xPrime_x", trim(prime_char))
             call xml_AddAttribute(xf,"cutoffPrime", ""//this%cutoffPrime(i))
-            if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"xPrime_size", ""//this%xPrime_size(i))
+!            if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"xPrime_size", ""//this%xPrime_size(i))
+            write(prime_char, *) this%xPrime_size(i)
+            if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"xPrime_size", trim(prime_char))
             if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) call xml_AddAttribute(xf,"covariance_xPrime_xPrime", ""//this%covarianceDiag_xPrime_xPrime(i))
             call xml_AddCharacters(xf, ""//this%xPrime(:,i)//" ")
             call xml_EndElement(xf,"xPrime")
@@ -4258,6 +4403,7 @@ module gp_predict_module
       integer, intent(out), optional :: error
 
       integer :: i
+      character*1024 :: prime_char
 
       INIT_ERROR(error)
 
@@ -4270,7 +4416,10 @@ module gp_predict_module
       if(present(label)) call xml_AddAttribute(xf,"label", trim(label))
 
       call xml_AddAttribute(xf,"n_y", ""//this%n_y)
-      call xml_AddAttribute(xf,"n_yPrime", ""//this%n_yPrime)
+!      call xml_AddAttribute(xf,"n_yPrime", ""//this%n_yPrime)
+      write(prime_char, *) this%n_yPrime
+      write(prime_char, *) this%n_yPrime
+      call xml_AddAttribute(xf,"n_yPrime", prime_char)
       call xml_AddAttribute(xf,"n_globalSparseX", ""//this%n_globalSparseX)
       call xml_AddAttribute(xf,"n_coordinate", ""//this%n_coordinate)
       call xml_AddAttribute(xf,"sparse_jitter", ""//this%sparse_jitter)
@@ -4286,7 +4435,9 @@ module gp_predict_module
       do i = 1, this%n_yPrime
          call xml_NewElement(xf,"yPrime")
          call xml_AddAttribute(xf,"i", ""//i)
-         call xml_AddAttribute(xf,"map_yPrime_globalY", ""//this%map_yPrime_globalY(i))
+!         call xml_AddAttribute(xf,"map_yPrime_globalY", ""//this%map_yPrime_globalY(i))
+         write(prime_char, *) this%map_yPrime_globalY(i)
+         call xml_AddAttribute(xf,"map_yPrime_globalY", trim(prime_char))
          call xml_AddAttribute(xf,"alpha", ""//this%alpha(this%map_yPrime_globalY(i)) )
          call xml_EndElement(xf,"yPrime")
       enddo
@@ -4485,7 +4636,8 @@ module gp_predict_module
       type(dictionary_t), intent(in) :: attributes
 
       real(dp) :: delta, f0
-      integer :: status, d, n_sparseX, n_x, n_xPrime, n_permutations, i, x_size_max, xPrime_size_max, sparseX_size_max, covariance_type
+      integer :: status, d, n_sparseX, n_x, n_permutations, i, x_size_max, sparseX_size_max, covariance_type
+      integer(int8) :: n_xPrime, xPrime_size_max
       logical :: sparsified, exist_sparseX_filename
       character(len=32) :: sparseX_md5sum
       character(len=1024) :: value
@@ -4857,6 +5009,8 @@ module gp_predict_module
       character(len=*), intent(in)   :: localname
       character(len=*), intent(in)   :: name
 
+      character*1024 :: prime_char
+
       if(parse_in_gpCoordinates) then
          if(name == 'gpCoordinates') then
             call gpCoordinates_setPermutations(parse_gpCoordinates,parse_in_permutations)
@@ -4934,7 +5088,9 @@ module gp_predict_module
             endif
             
             if( parse_i_xPrime > parse_gpCoordinates%n_xPrime ) then
-               call system_abort("gpCoordinates_endElement_handler: parse_i_xPrime ("//parse_i_xPrime//") greater than n_xPrime ("//parse_gpCoordinates%n_xPrime//")")
+!               call system_abort("gpCoordinates_endElement_handler: parse_i_xPrime ("//parse_i_xPrime//") greater than n_xPrime ("//parse_gpCoordinates%n_xPrime//")")
+               write(prime_char,*) "gpCoordinates_endElement_handler: parse_i_xPrime (", parse_i_xPrime, ") greater than n_xPrime (", parse_gpCoordinates%n_xPrime, ")"
+               call system_abort(trim(prime_char))
             endif
 
             !val = string(parse_cur_data)
@@ -4959,7 +5115,8 @@ module gp_predict_module
       character(len=*), intent(in)   :: name
       type(dictionary_t), intent(in) :: attributes
 
-      integer :: status, n_y, n_yPrime, n_coordinate, i
+      integer :: status, n_y, n_coordinate, i
+      integer(int8) :: n_yPrime
       real(dp) :: sparse_jitter
       character(len=1024) :: value
 
@@ -5015,7 +5172,7 @@ module gp_predict_module
                call print_warning("gpFull_startElement_handler did not find the sparse_jitter attribute, using default value 1.0e-5.")
                sparse_jitter = 1.0e-5_dp
             endif
-            call gpFull_setParameters(parse_gpFull,n_coordinate, n_y, n_yPrime, sparse_jitter)
+            call gpFull_setParameters_int8(parse_gpFull,n_coordinate, n_y, n_yPrime, sparse_jitter)
 
          endif
 
