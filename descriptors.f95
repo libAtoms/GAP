@@ -3457,7 +3457,11 @@ module descriptors_module
       integer, optional, intent(out) :: error
 
       type(descriptor_data) :: my_descriptor_data
+      type(Dictionary) :: params
       integer :: i, n, i_d, n_descriptors, n_cross, n_index
+      character(STRING_LENGTH) :: atom_mask_name
+      logical :: has_atom_mask_name
+      logical, dimension(:), pointer :: atom_mask_pointer
       logical :: do_grad_descriptor, do_descriptor
 
       INIT_ERROR(error)
@@ -3465,7 +3469,35 @@ module descriptors_module
       do_descriptor = present(descriptor_out)
       do_grad_descriptor = present(grad_descriptor_out) .or. present(grad_descriptor_index) .or. present(grad_descriptor_pos)
 
-      call descriptor_sizes(this,at,n_descriptors,n_cross,n_index=n_index,error=error)
+      atom_mask_pointer => null()
+      if(present(args_str)) then
+         call initialise(params)
+         
+         call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
+         help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
+         "calculated.")
+
+         if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='descriptor_calc_array args_str')) then
+            RAISE_ERROR("descriptor_calc_array failed to parse args_str='"//trim(args_str)//"'", error)
+         endif
+         
+         call finalise(params)
+
+         if( has_atom_mask_name ) then
+            if (.not. assign_pointer(at, trim(atom_mask_name), atom_mask_pointer)) then
+               RAISE_ERROR("descriptor_calc_array did not find "//trim(atom_mask_name)//" property in the atoms object.", error)
+            endif
+         else
+            atom_mask_pointer => null()
+         endif
+
+      endif
+
+      if (associated(atom_mask_pointer)) then
+         call descriptor_sizes(this,at,n_descriptors,n_cross,mask=atom_mask_pointer,n_index=n_index,error=error)
+      else
+         call descriptor_sizes(this,at,n_descriptors,n_cross,n_index=n_index,error=error)
+      endif
 
       call calc(this,at,my_descriptor_data,do_descriptor=do_descriptor,do_grad_descriptor=do_grad_descriptor,args_str=args_str,error=error)
 
