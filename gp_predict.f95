@@ -54,7 +54,8 @@ module gp_predict_module
    use omp_lib  
 #endif  
    use system_module, only : dp, qp, optional_default, reallocate, NUMERICAL_ZERO, & 
-       system_timer, string_to_numerical, print_warning, progress, progress_timer, current_times
+       system_timer, string_to_numerical, print_warning, progress, progress_timer, &
+       current_times, InOutput, OUTPUT
    use units_module  
    use linearalgebra_module  
    use extendable_str_module  
@@ -312,6 +313,7 @@ module gp_predict_module
    character(len=1024), save :: parse_gpCoordinates_label, parse_gpFull_label, parse_gpSparse_label
 
    public :: gpFull, gpSparse
+   public :: gpFull_print_covariances_lambda
 
    interface initialise
       module procedure gpSparse_initialise
@@ -4153,6 +4155,31 @@ module gp_predict_module
       call fwrite_array_d(size(this%sparseX), this%sparseX(1,1), trim(sparseX_filename)//C_NULL_CHAR)
 
    end subroutine gpCoordinates_print_sparseX_file
+
+   ! print covariance and lambda to files in row-column-value format (RCV)
+   ! lambda uses the same format for uniformity
+   subroutine gpFull_print_covariances_lambda(this, file_prefix, my_proc)
+      type(gpFull), intent(in) :: this
+      character(*), intent(in) :: file_prefix
+      integer, intent(in), optional :: my_proc
+
+      integer :: my_proc_opt
+      type(InOutput) :: file
+
+      my_proc_opt = optional_default(0, opt_val=my_proc)
+
+      call initialise(file, trim(file_prefix)//'_Kmm', OUTPUT)
+      call print(this%covariance_subY_subY, file=file, always=.true.) ! matrix
+      call finalise(file)
+
+      call initialise(file, trim(file_prefix)//'_Kmn.'//my_proc_opt, OUTPUT, master_only=.false.)
+      call print(this%covariance_subY_y, file=file, always=.true.) ! matrix
+      call finalise(file)
+
+      call initialise(file, trim(file_prefix)//'_lambda.'//my_proc_opt, OUTPUT, master_only=.false.)
+      call print(reshape(this%lambda, [size(this%lambda), 1]), file=file, always=.true.) ! vector -> matrix
+      call finalise(file)
+   end subroutine gpFull_print_covariances_lambda
 
    subroutine gpCoordinates_printXML(this,xf,label,sparseX_base_filename,error)
       type(gpCoordinates), intent(in) :: this

@@ -70,7 +70,7 @@ module gap_fit_module
      energy_parameter_name, local_property_parameter_name, force_parameter_name, virial_parameter_name, &
      stress_parameter_name, hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
      config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name, &
-     condition_number_norm
+     condition_number_norm, linear_system_dump_file
 
      character(len=10240) :: command_line = ''
      real(dp), dimension(total_elements) :: e0, local_property0
@@ -104,7 +104,7 @@ module gap_fit_module
 
      logical :: sparseX_separate_file
      logical :: sparse_use_actual_gpcov
-     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset
+     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset, has_linear_system_dump_file
 
   endtype gap_fit
      
@@ -135,6 +135,8 @@ module gap_fit_module
 
   public :: gap_fit_is_root
 
+  public :: gap_fit_print_linear_system_dump_file
+
 contains
 
   subroutine gap_fit_parse_command_line(this)
@@ -147,7 +149,8 @@ contains
           energy_parameter_name, local_property_parameter_name, force_parameter_name, &
           virial_parameter_name, stress_parameter_name, hessian_parameter_name, &
           config_type_parameter_name, sigma_parameter_name, config_type_sigma_string, &
-          gp_file, template_file, force_mask_parameter_name, condition_number_norm
+          gp_file, template_file, force_mask_parameter_name, condition_number_norm, &
+          linear_system_dump_file
 
      character(len=STRING_LENGTH) ::  gap_str, verbosity, sparse_method_str, covariance_type_str, e0_method, &
         parameter_name_prefix
@@ -190,6 +193,7 @@ contains
      template_file => this%template_file
      sparsify_only_no_fit => this%sparsify_only_no_fit
      condition_number_norm => this%condition_number_norm
+     linear_system_dump_file => this%linear_system_dump_file
      
      call initialise(params)
      
@@ -301,6 +305,9 @@ contains
      
      call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
           help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
+
+      call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
+          help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
 
      if (.not. param_read_args(params, command_line=this%command_line)) then
         call print("gap_fit")
@@ -2072,5 +2079,12 @@ contains
     logical :: is_root
     is_root = (.not. this%MPI_obj%active .or. this%MPI_obj%my_proc == 0)
   end function gap_fit_is_root
+  
+  subroutine gap_fit_print_linear_system_dump_file(this)
+    type(gap_fit), intent(in) :: this
+    if (this%has_linear_system_dump_file) then
+      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, this%mpi_obj%my_proc)
+    end if
+  end subroutine gap_fit_print_linear_system_dump_file
 
 end module gap_fit_module
