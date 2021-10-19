@@ -4,7 +4,7 @@
 ! HND X   
 ! HND X
 ! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi, 
-! HND X   Copyright 2006-2021.
+! HND X   and Sascha Klawohn. Copyright 2006-2021.
 ! HND X
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
 ! HND X   his employment for the U.S. Government, and are not subject
