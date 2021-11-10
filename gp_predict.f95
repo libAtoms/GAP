@@ -712,13 +712,13 @@ module gp_predict_module
       character(len=*), optional, intent(in) :: condition_number_norm
       integer, optional, intent(out) :: error
 
-      character(len=STRING_LENGTH) :: condition_number_norm_opt
+      character(len=STRING_LENGTH) :: my_condition_number_norm
 
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, i_yPrime, &
       i_globalY, i_global_yPrime
 #ifdef HAVE_QR      
       real(qp) :: rcond
-      real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a, acopy
+      real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
       real(qp), dimension(:), allocatable :: globalY, alpha
       type(LA_Matrix) :: LA_c_subYsubY, LA_q_subYsubY
 #else
@@ -734,7 +734,7 @@ module gp_predict_module
          RAISE_ERROR('gpSparse_initialise: gpFull object not initialised',error)
       endif
 
-      condition_number_norm_opt = optional_default(' ', condition_number_norm)
+      my_condition_number_norm = optional_default(' ', condition_number_norm)
 
       if(this%initialised) call finalise(this,error)
 
@@ -806,12 +806,9 @@ module gp_predict_module
          a(n_globalY+1:,:) = factor_c_subYsubY
       end if
 
-      if (condition_number_norm_opt(1:1) /= ' ') then
-         allocate(acopy(size(a, 1),size(a, 2)))
-         acopy = a
-         call matrix_condition_number(acopy, rcond, condition_number_norm_opt(1:1))
-         call print("Condition number (log10) of matrix A (norm "//condition_number_norm_opt(1:1)//"): "//-log10(rcond))
-         deallocate(acopy)
+      if (my_condition_number_norm(1:1) /= ' ') then
+         rcond = matrix_condition_number(a, my_condition_number_norm(1:1))
+         call print("Condition number (log10) of matrix A (norm "//my_condition_number_norm(1:1)//"): "//-log10(rcond))
       end if
 
       globalY = 0.0_qp
