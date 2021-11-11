@@ -4153,29 +4153,21 @@ module gp_predict_module
 
    end subroutine gpCoordinates_print_sparseX_file
 
-   ! print covariance and lambda to files in row-column-value format (RCV)
-   ! lambda uses the same format for uniformity
+   ! print covariances and lambda to process-dependent files, one value per line
    subroutine gpFull_print_covariances_lambda(this, file_prefix, my_proc)
       type(gpFull), intent(in) :: this
       character(*), intent(in) :: file_prefix
       integer, intent(in), optional :: my_proc
 
       integer :: my_proc_opt
-      type(InOutput) :: file
 
       my_proc_opt = optional_default(0, opt_val=my_proc)
-
-      call initialise(file, trim(file_prefix)//'_Kmm', OUTPUT)
-      call print(this%covariance_subY_subY, file=file, always=.true.) ! matrix
-      call finalise(file)
-
-      call initialise(file, trim(file_prefix)//'_Kmn.'//my_proc_opt, OUTPUT, master_only=.false.)
-      call print(this%covariance_subY_y, file=file, always=.true.) ! matrix
-      call finalise(file)
-
-      call initialise(file, trim(file_prefix)//'_lambda.'//my_proc_opt, OUTPUT, master_only=.false.)
-      call print(reshape(this%lambda, [size(this%lambda), 1]), file=file, always=.true.) ! vector -> matrix
-      call finalise(file)
+      
+      if (my_proc_opt == 0) then
+         call fwrite_array_d(size(this%covariance_subY_subY), this%covariance_subY_subY, trim(file_prefix)//'_Kmm'//C_NULL_CHAR)
+      end if
+      call fwrite_array_d(size(this%covariance_subY_y), this%covariance_subY_y, trim(file_prefix)//'_Kmn.'//my_proc_opt//C_NULL_CHAR)
+      call fwrite_array_d(size(this%lambda), this%lambda, trim(file_prefix)//'_lambda.'//my_proc_opt//C_NULL_CHAR)
    end subroutine gpFull_print_covariances_lambda
 
    subroutine gpCoordinates_printXML(this,xf,label,sparseX_base_filename,error)
