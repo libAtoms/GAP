@@ -807,8 +807,12 @@ module gp_predict_module
       end if
 
       if (my_condition_number_norm(1:1) /= ' ') then
-         rcond = matrix_condition_number(a, my_condition_number_norm(1:1))
-         call print("Condition number (log10) of matrix A (norm "//my_condition_number_norm(1:1)//"): "//-log10(rcond))
+         if (task_manager%active) then
+            call print_warning("Condition number of distributed matrix is not implemented.")
+         else
+            rcond = matrix_condition_number(a, my_condition_number_norm(1:1))
+            call print("Condition number (log10) of matrix A (norm "//my_condition_number_norm(1:1)//"): "//-log10(rcond))
+         end if
       end if
 
       globalY = 0.0_qp
