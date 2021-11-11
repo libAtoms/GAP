@@ -208,9 +208,7 @@ def refit_generic(
         os.remove("train.xyz.idx")
 
     # assemble the fitting string
-    # e0_method = fc"e0={state.e0}"
-    e0_method = f"e0_method=isolated"
-    # e0_method = f"e0_method=average"
+    e0_method = f"e0={state.e0}"
 
     fit_str = (
         f"gap_fit at_file=train.xyz gp_file={gp_name} "

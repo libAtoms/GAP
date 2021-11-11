@@ -8,6 +8,7 @@ can_update: true # if updates are to be performed
 check_interval: 5
 num_initial_steps: 5
 # refit_function_name: "hybrid_md.refit.refit_turbo_si_c"    # use this for custom refit function
+e0: "average"
 tolerances:
   ediff: 0.01  # eV
   fmax: null    # eV/A
