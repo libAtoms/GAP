@@ -3,14 +3,11 @@
 #  Copyright (c) Tamas K. Stenczel 2021.
 
 # this is an input file for PP-Hybrid MD
-
 can_update: true # if updates are to be performed
 check_interval: 5
 num_initial_steps: 5
-# refit_function_name: "hybrid_md.refit.refit_turbo_si_c"    # use this for custom refit function
-e0: "average"
 tolerances:
-  ediff: 0.01  # eV
-  fmax: null    # eV/A
-  frmse: null   # eV/A
+  ediff: 0.01   # eV
+  fmax:  0.250  # eV/A
+  frmse: 0.200  # eV/A
   vmax: null    # eV (virial)
