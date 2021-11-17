@@ -804,15 +804,16 @@ contains
        call finalise(at)
     enddo
 
-    call print_title("Report on number of descriptors found")
-    do i = 1, this%n_coordinate
-       call print("---------------------------------------------------------------------")
-       call print("Descriptor: "//this%gap_str(i))
-       call print("Number of descriptors:                        "//this%n_descriptors(i))
-       call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
-    enddo
-    call print_title("")
-
+    if (.not. do_filter_tasks) then
+      call print_title("Report on number of descriptors found")
+      do i = 1, this%n_coordinate
+         call print("---------------------------------------------------------------------")
+         call print("Descriptor: "//this%gap_str(i))
+         call print("Number of descriptors:                        "//this%n_descriptors(i))
+         call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
+      enddo
+      call print_title("")
+    end if
 
   end subroutine fit_n_from_xyz
 
@@ -877,11 +878,11 @@ contains
     enddo
 
     call print_title("Report on number of target properties found in training XYZ:")
-    call print("Number of target energies (property name: "//trim(this%energy_parameter_name)//") found: "//this%n_ener)
-    call print("Number of target local_properties (property name: "//trim(this%local_property_parameter_name)//") found: "//this%n_local_property)
-    call print("Number of target forces (property name: "//trim(this%force_parameter_name)//") found: "//this%n_force)
-    call print("Number of target virials (property name: "//trim(this%virial_parameter_name)//") found: "//this%n_virial)
-    call print("Number of target Hessian eigenvalues (property name: "//trim(this%hessian_parameter_name)//") found: "//this%n_hessian)
+    call print("Number of target energies (property name: "//trim(this%energy_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_ener))
+    call print("Number of target local_properties (property name: "//trim(this%local_property_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_local_property))
+    call print("Number of target forces (property name: "//trim(this%force_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_force))
+    call print("Number of target virials (property name: "//trim(this%virial_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_virial))
+    call print("Number of target Hessian eigenvalues (property name: "//trim(this%hessian_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_hessian))
     call print_title("End of report")
 
     if( this%do_core ) call Initialise(this%core_pot, args_str=this%core_ip_args, param_str=string(this%quip_string))
@@ -1287,13 +1288,13 @@ contains
     enddo !n_frame
 
     call print_title("Report on per-configuration/per-atom sigma (error parameter) settings")
-    call print("Number of per-configuration setting of energy_"//trim(this%sigma_parameter_name)//" found:     "//n_energy_sigma)
-    call print("Number of per-configuration setting of force_"//trim(this%sigma_parameter_name)//" found:      "//n_force_sigma)
-    call print("Number of per-configuration setting of virial_"//trim(this%sigma_parameter_name)//" found:     "//n_virial_sigma)
-    call print("Number of per-configuration setting of hessian_"//trim(this%sigma_parameter_name)//" found:    "//n_hessian_sigma)
-    call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//n_local_property_sigma)
-    call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//n_force_atom_sigma)
-    call print("Number of per-component setting of force_component_"//trim(this%sigma_parameter_name)//" found:          "//n_force_component_sigma)
+    call print("Number of per-configuration setting of energy_"//trim(this%sigma_parameter_name)//" found:     "//sum(this%task_manager%MPI_obj, n_energy_sigma))
+    call print("Number of per-configuration setting of force_"//trim(this%sigma_parameter_name)//" found:      "//sum(this%task_manager%MPI_obj, n_force_sigma))
+    call print("Number of per-configuration setting of virial_"//trim(this%sigma_parameter_name)//" found:     "//sum(this%task_manager%MPI_obj, n_virial_sigma))
+    call print("Number of per-configuration setting of hessian_"//trim(this%sigma_parameter_name)//" found:    "//sum(this%task_manager%MPI_obj, n_hessian_sigma))
+    call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//sum(this%task_manager%MPI_obj, n_local_property_sigma))
+    call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_atom_sigma))
+    call print("Number of per-component setting of force_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_component_sigma))
     call print_title("End of report")
 
     do i_coordinate = 1, this%n_coordinate
