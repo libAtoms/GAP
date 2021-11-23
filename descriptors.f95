@@ -7078,7 +7078,7 @@ module descriptors_module
 
    endsubroutine power_SO4_calc
 
-   !jpd47 replacement for rs_index in order to handle all 9 cases 
+   !jpd47 replacement for rs_index in order to handle all 9 cases
    subroutine form_gs_index(this, gs_index, error)
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
@@ -7100,11 +7100,11 @@ module descriptors_module
       gk_inds(2,:) = (/ 1, 1, 0, 0 /)
       gk_inds(3,:) = (/ 1, 0, 1, 0 /)
 
-     
+
       allocate(gs_index(2))
       done = 0
       do i = 1,4
-         xtemp = gk_inds(1,i)     
+         xtemp = gk_inds(1,i)
          do while (xtemp > 0)
             smin = gk_inds(2,i)
             smax = smin*this%n_species
@@ -7191,26 +7191,22 @@ module descriptors_module
          RAISE_ERROR("soap_calc: descriptor object not initialised", error)
       endif
 
-      !jpd47 print intial state
-      !print *,"desc=", my_do_descriptor, "grad_desc=", my_do_grad_descriptor
-      !print *, "nu is", this%nu, this%nu_hat, this%mu, this%mu_hat
+      !jpd47 check for general kernel
       if ( this%nu + this%nu_hat + this%mu + this%mu_hat /= 2) then
          RAISE_ERROR("soap:calc: nu+mu+nu_hat+mu_hat /= 2", error)
       endif
 
-      
-      !jpd47 setup the alternative to rs_index + sym_desc 
+
+      !jpd47 setup the alternative to rs_index + sym_desc
       call form_gs_index(this, gs_index, error)
       if (MAXVAL((/ this%nu, this%nu_hat, this%mu, this%mu_hat /)) == 2) then
          sym_desc = .true.
       else
-         sym_desc = .false. 
+         sym_desc = .false.
       endif
-      
-      
-      !jpd47 start of book-keeping setup
+
+
       !jpd47 species_map is a 110 element list. Maps the chosen Zs onto 1,2,3.... If an element is not listed species_map[Z]=0
-      !print *, "this%species_Z", this%species_Z
       species_map = 0
       do i_species = 1, this%n_species
          !jpd47 default for n_species = 1. set the map for all elements to be 1
@@ -7221,8 +7217,6 @@ module descriptors_module
             species_map(this%species_Z(i_species)) = i_species
          endif
       enddo
-      !jpd47
-      !print *, "species_map is", species_map
 
       my_do_descriptor = optional_default(.false., do_descriptor)
       my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
@@ -7282,16 +7276,10 @@ module descriptors_module
          enddo
       enddo
 
-      !jpd47 setup gs1_index and gs2_index for the generalized kernels
-       
-
-
       call finalise(descriptor_out)
 
       !jpd47 set the dimension of the final descriptor here
-      !jpd47 Lots of allocating arrays
-      d = soap_dimensions(this,error) 
-      !print *, "soap dimension is", d
+      d = soap_dimensions(this,error)
 
       if(associated(atom_mask_pointer)) then
          call descriptor_sizes(this,at,n_descriptors,n_cross, &
@@ -7431,7 +7419,7 @@ module descriptors_module
          if(my_do_grad_descriptor) then
             sum_l_n_neighbours = 0
             do i = 1, at%N
-               
+
                if(i_desc(i) == 0) then
                   cycle
                else
@@ -7515,7 +7503,7 @@ module descriptors_module
 
 
          !jpd47 include/don't include central atom in density expansion
-         do i_species = 0, this%n_species 
+         do i_species = 0, this%n_species
             do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
 
@@ -7535,7 +7523,7 @@ module descriptors_module
                   fourier_so3_i(0,a,i_species)%m(0) = 0.0_dp
                   fourier_so3_r(0,a,i_species)%m(0) = 0.0_dp
                endif
-               
+
                !jpd47 always zero the m/=0 components
                do l = 1, this%l_max
                   !SPEED fourier_so3(l,a,i_species)%m(:) = CPLX_ZERO
@@ -7544,8 +7532,8 @@ module descriptors_module
                enddo
             enddo
          enddo
-   
-       
+
+
 
 ! soap_calc 20 takes 0.0052 s
          !jpd47 start of big-neighbour-loop, loop over all neighbouring atoms in the structure
@@ -7567,7 +7555,7 @@ module descriptors_module
             endif
 
 
-            !jpd47 some setup todo with cutoff function. Can't find coordination function defined anywhere... mysterious!!
+            !jpd47 some setup todo with cutoff function
             f_cut = coordination_function(r_ij, this%cutoff, this%cutoff_transition_width)
             radial_decay = ( 1.0_dp + this%cutoff_rate ) / ( this%cutoff_rate + ( r_ij / this%cutoff_scale )**this%cutoff_dexp )
             radial_decay = norm_radial_decay * radial_decay
@@ -7628,12 +7616,12 @@ module descriptors_module
             enddo !jpd47 n-loop end
 
 
-            !jpd47 setup the radial expansion coefficents "radial_coefficient", somehow related to setting radial_fun in the previous loop
+            !jpd47 radial expansion
             radial_coefficient = matmul( radial_fun, this%transform_basis )
             if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut     !jpd47 chain rule for radial derivatives. Adapt for sphere.
             radial_coefficient = radial_coefficient * f_cut
 
-            !jpd47 looks like the angular expansion coefficients "SphericalY_ij" are set here
+            !jpd47 angular expansion done here
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
             if(my_do_grad_descriptor) gradsphericalycartesian_all_t = GradSphericalYCartesian_all(this%l_max, d_ij)
             do l = 0, this%l_max
@@ -7653,7 +7641,7 @@ module descriptors_module
                      !SPEED    grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
 
                      !jpd47 project onto the unit sphere. Still multiply by f_cut so that atoms enter and leave the cutoff smoothly
-                     if (a==0) then 
+                     if (a==0) then
                         c_tmp(1) = f_cut * SphericalY_ij(l)%m(m)
                      !jpd47 normal, not projecting
                      else
@@ -7672,10 +7660,7 @@ module descriptors_module
                      if(my_do_grad_descriptor) then
                         !jpd47 replace grad of radial coefficient with grad of cutoff alone
                         if (a==0) then
-                           !jpd47 TODO PROBABLY WRONG ...moving on for now + asked ABP about u_ij
-                           !jpd47 if u_ij really is cosines then projection would change angles, need to adjust...?
-
-                           c_tmp(:) = df_cut * SphericalY_ij(l)%m(m) * u_ij(:) + & 
+                           c_tmp(:) = df_cut * SphericalY_ij(l)%m(m) * u_ij(:) + &
                                        f_cut * grad_SphericalY_ij(l)%mm(:,m)
 
                         else
@@ -7694,7 +7679,7 @@ module descriptors_module
 
          enddo ! n   jpd47 end of big-neighbour-loop
 
-         !jpd47 store the gradients for later in global array, don't know why yet.
+         !jpd47 store structure-wise gradient, if required
          if(this%global .and. my_do_grad_descriptor) then
             global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r
             global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i
@@ -7729,7 +7714,7 @@ module descriptors_module
          do ia = 1, SIZE(gs_index(1)%mm(:,0))
             a = gs_index(1)%mm(ia,2)
             i_species = gs_index(1)%mm(ia,1)
-            
+
             !set upper bound for the second loop
             ub = SIZE(gs_index(2)%mm(:,0))
             if (sym_desc) then
@@ -7738,8 +7723,8 @@ module descriptors_module
             do jb = 1, ub
                b = gs_index(2)%mm(jb, 2)
                j_species = gs_index(2)%mm(jb, 1)
-               
-               !jpd47 leave in for backwards compatibility with default of nu=2 
+
+               !jpd47 leave in for backwards compatibility with default of nu=2
                if(this%diagonal_radial .and. a /= b) cycle
 
                do l = 0, this%l_max
@@ -7777,7 +7762,7 @@ module descriptors_module
 
 
 
-   
+
          !jpd47 compute gradients
          if(my_do_grad_descriptor) then
 ! soap_calc 33 takes 0.047 s
@@ -7797,7 +7782,7 @@ module descriptors_module
 
                i_pow = 0
                grad_descriptor_i = 0.0_dp
-               
+
                !jpd47 V1 ***********************
                !SPEED do ia = 1, this%n_species*this%n_max
                !SPEED    a = rs_index(1,ia)
@@ -7834,12 +7819,12 @@ module descriptors_module
                !    enddo !jb
                ! enddo !ia
 
-         
+
                !jpd47 V2 ***********************
               do ia = 1, SIZE(gs_index(1)%mm(:,0))
                 a = gs_index(1)%mm(ia,2)
                 i_species = gs_index(1)%mm(ia,1)
-                
+
                 !set upper bound for the second loop
                 ub = SIZE(gs_index(2)%mm(:,0))
                 if (sym_desc) then
@@ -7848,8 +7833,8 @@ module descriptors_module
                 do jb = 1, ub
                    b = gs_index(2)%mm(jb, 2)
                    j_species = gs_index(2)%mm(jb, 1)
-                   
-                   !jpd47 leave in for backwards compatibility with default of nu=2 
+
+                   !jpd47 leave diagonal_radial in for backwards compatibility - not tested
                    if(this%diagonal_radial .and. a /= b) cycle
                     do l = 0, this%l_max
                        i_pow = i_pow + 1
@@ -7859,7 +7844,7 @@ module descriptors_module
                             matmul(grad_fourier_so3_r(l,a,n_i)%mm,fourier_so3_r(l,b,j_species)%m) + matmul(grad_fourier_so3_i(l,a,n_i)%mm,fourier_so3_i(l,b,j_species)%m)
                        endif
                        !jpd47 if a) neighbour is j_species b) neighbour has Z=0, single element case c) total density channel
-                       if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0 .or. j_species==0) then 
+                       if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0 .or. j_species==0) then
                             grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
                             matmul(grad_fourier_so3_r(l,b,n_i)%mm,fourier_so3_r(l,a,i_species)%m) + matmul(grad_fourier_so3_i(l,b,n_i)%mm,fourier_so3_i(l,a,i_species)%m)
                        endif
@@ -7869,7 +7854,7 @@ module descriptors_module
                     enddo !l
                  enddo !jb
               enddo !ia
-               
+
                !jpd47 V3 ****************** save
                !do l=0, this%l_max
                !   !jpd47 flatten grad_fourier_so3 across a and ignore n_i
@@ -7916,8 +7901,8 @@ module descriptors_module
                !      enddo
                !   enddo
                !end do !l
-   
-                           
+
+
                         !jpd47 NOTE this section used to be in the l-loop, moved purely for convienience while testing
                         !jpd47 OLD, already commented out
                         !do a = 1, this%n_max
@@ -7948,7 +7933,7 @@ module descriptors_module
 	    deallocate(t_f_r, t_f_i)
 	    deallocate(t_g_r, t_g_i)
 	    deallocate(t_g_f_rr, t_g_f_ii)
-         
+
 
          endif !jpd47 end of huge gradient loop
 
@@ -8031,7 +8016,6 @@ module descriptors_module
 !$omp end parallel
 
       !jpd47 if creating a structure-wise average soap_sizes
-      !jpd47 looks similar to before... storing in global_fourier_so3_r, instead of global_fourier_so3_r_array...
       if(this%global) then
          allocate(global_fourier_so3_r(0:this%l_max,this%n_max,this%n_species), global_fourier_so3_i(0:this%l_max,this%n_max,this%n_species), &
             descriptor_i(d) )
@@ -8051,7 +8035,7 @@ module descriptors_module
 
 
 
-         !jpd47 Very very similar to before!! summing "global_fourier_so3_r" to create structure-wise average SOAP
+         !jpd47 structure-wise sum
          i_pow = 0
          do ia = 1, this%n_species*this%n_max
             a = rs_index(1,ia)
@@ -10058,23 +10042,23 @@ module descriptors_module
       integer, optional, intent(out) :: error
       integer :: i, NS1, NS2
       logical :: sym_desc
-      type(int_2d), dimension(:), allocatable :: gs_index 
+      type(int_2d), dimension(:), allocatable :: gs_index
 
       INIT_ERROR(error)
 
       if(.not. this%initialised) then
          RAISE_ERROR("soap_dimensions: descriptor object not initialised", error)
       endif
-      
+
       !jpd47 diagonal radial, only couple n==n'
       if(this%diagonal_radial) then
          i = (this%l_max+1) * this%n_max * this%n_species * (this%n_species+1) / 2 + 1
       else
          call form_gs_index(this,gs_index, error)
-         
+
          NS1 = SIZE(gs_index(1)%mm(:,0))
          NS2 = SIZE(gs_index(2)%mm(:,0))
-         
+
          !jpd47 check if symmetric or not
          if (MAXVAL((/ this%nu, this%nu_hat, this%mu, this%mu_hat /)) == 2) then
             i = NS1 * (NS1+1) * (this%l_max +1) /2 +1
