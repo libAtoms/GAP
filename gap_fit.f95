@@ -50,7 +50,7 @@ program gap_fit_program
   call gap_fit_init_mpi_scalapack(main_gap_fit)
   call gap_fit_parse_gap_str(main_gap_fit)
 
-  if(main_gap_fit%do_core) call read(main_gap_fit%quip_string, trim(main_gap_fit%core_param_file), keep_lf=.true.)
+  call gap_fit_read_core_param_file(main_gap_fit)
 
   call add_template_string(main_gap_fit) ! if descriptor requires a template xyz file and this is provided, write to a string and add to descriptor_str
 

@@ -128,6 +128,7 @@ module gap_fit_module
   public :: add_template_string
   public :: gap_fit_parse_command_line
   public :: gap_fit_parse_gap_str
+  public :: gap_fit_read_core_param_file
 
   public :: gap_fit_init_mpi_scalapack
   public :: gap_fit_init_task_manager
@@ -2053,6 +2054,13 @@ contains
     endif
     
   end subroutine add_template_string
+
+  subroutine gap_fit_read_core_param_file(this)
+   type(gap_fit), intent(inout) :: this
+   if (this%do_core) then
+     call read(this%quip_string, file=trim(this%core_param_file), mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc, keep_lf=.true.)
+   end if
+ end subroutine gap_fit_read_core_param_file
 
   subroutine gap_fit_init_mpi_scalapack(this)
     type(gap_fit), intent(inout) :: this
