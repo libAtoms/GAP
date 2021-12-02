@@ -715,7 +715,7 @@ module gp_predict_module
       character(len=STRING_LENGTH) :: my_condition_number_norm
 
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, i_yPrime, &
-      i_globalY, i_global_yPrime
+      i_globalY, i_global_yPrime, nlrows
 #ifdef HAVE_QR      
       real(qp) :: rcond
       real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
@@ -776,8 +776,10 @@ module gp_predict_module
       allocate(alpha(n_globalSparseX))
 
       if (task_manager%active) then
-         allocate(globalY(task_manager%unified_workload))
-         allocate(a(task_manager%unified_workload,n_globalSparseX))
+         nlrows = (task_manager%unified_workload / n_globalSparseX) * n_globalSparseX
+         if (nlrows < task_manager%unified_workload) nlrows = nlrows + n_globalSparseX
+         allocate(globalY(nlrows))
+         allocate(a(nlrows,n_globalSparseX))
          alpha = 0.0_qp
          globalY = 0.0_qp
          a = 0.0_qp
