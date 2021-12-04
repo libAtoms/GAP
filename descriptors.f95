@@ -7268,7 +7268,7 @@ module descriptors_module
 
       !jpd47 combined alpha and nmax
       !jpd47 AVERAGE changed rs_index to include 0-N and 0-S
-      allocate(rs_index(2,(this%n_max+1)*(this%n_species+1))
+      allocate(rs_index(2,(this%n_max+1)*(this%n_species+1)))
       i = 0
       do i_species = 0, this%n_species
          do a = 0, this%n_max
