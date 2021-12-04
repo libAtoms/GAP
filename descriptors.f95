@@ -7267,10 +7267,11 @@ module descriptors_module
       do_two_l_plus_one = (xml_version >= 1423143769)
 
       !jpd47 combined alpha and nmax
-      allocate(rs_index(2,this%n_max*this%n_species))
+      !jpd47 AVERAGE changed rs_index to include 0-N and 0-S
+      allocate(rs_index(2,(this%n_max+1)*(this%n_species+1))
       i = 0
-      do i_species = 1, this%n_species
-         do a = 1, this%n_max
+      do i_species = 0, this%n_species
+         do a = 0, this%n_max
             i = i + 1
             rs_index(:,i) = (/a,i_species/)
          enddo
@@ -7395,10 +7396,11 @@ module descriptors_module
             endif
          endif
       enddo
-
+      
+      !jpd47 AVERAGE, n=0-N (0 is projection) alpha=0-S (0 is total density)
       allocate( &
-         global_fourier_so3_r_array((this%l_max+1)**2 * this%n_max * this%n_species), &
-         global_fourier_so3_i_array((this%l_max+1)**2 * this%n_max * this%n_species), &
+         global_fourier_so3_r_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
+         global_fourier_so3_i_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
          global_grad_fourier_so3_r_array( count(i_desc/=0) ), &
          global_grad_fourier_so3_i_array( count(i_desc/=0) ) )
 
@@ -7694,9 +7696,10 @@ module descriptors_module
          endif
 
          !jpd47 stored the expansions coefficents in global array, flattening them. Used if computing an average descriptor, one per atoms object
+         !jpd47 AVERAGE change limits on sum
          if(this%global) then
             i_coeff = 0
-            do ia = 1, this%n_species*this%n_max
+            do ia = 1, (this%n_species+1)*(this%n_max+1)
                a = rs_index(1,ia)
                i_species = rs_index(2,ia)
                do l = 0, this%l_max
@@ -8016,12 +8019,14 @@ module descriptors_module
 !$omp end parallel
 
       !jpd47 if creating a structure-wise average soap_sizes
+      !jpd47 AVERAGE changes limits to 0-N and 0-S on coefficients
       if(this%global) then
-         allocate(global_fourier_so3_r(0:this%l_max,this%n_max,this%n_species), global_fourier_so3_i(0:this%l_max,this%n_max,this%n_species), &
+         allocate(global_fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), global_fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), &
             descriptor_i(d) )
 
+         !jpd47 AVERAGE changed limits to account for 0-N and 0-S, rs_index already adjusted
          i_coeff = 0
-         do ia = 1, this%n_species*this%n_max
+         do ia = 1, (this%n_species+1)*(this%n_max+1)
             a = rs_index(1,ia)
             i_species = rs_index(2,ia)
             do l = 0, this%l_max
@@ -8035,30 +8040,60 @@ module descriptors_module
 
 
 
-         !jpd47 structure-wise sum
+         !jpd47 AVERAGE form up global power spectrum here - copied directly from above
          i_pow = 0
-         do ia = 1, this%n_species*this%n_max
-            a = rs_index(1,ia)
-            i_species = rs_index(2,ia)
-            do jb = 1, ia
-               b = rs_index(1,jb)
-               j_species = rs_index(2,jb)
+         do ia = 1, SIZE(gs_index(1)%mm(:,0))
+            a = gs_index(1)%mm(ia,2)
+            i_species = gs_index(1)%mm(ia,1)
 
+            !set upper bound for the second loop
+            ub = SIZE(gs_index(2)%mm(:,0))
+            if (sym_desc) then
+               ub = ia
+            endif
+            do jb = 1, ub
+               b = gs_index(2)%mm(jb, 2)
+               j_species = gs_index(2)%mm(jb, 1)
+
+               !jpd47 leave in for backwards compatibility with default of nu=2
                if(this%diagonal_radial .and. a /= b) cycle
 
                do l = 0, this%l_max
                   i_pow = i_pow + 1
-                  descriptor_i(i_pow) = &
-                     dot_product(global_fourier_so3_r(l,a,i_species)%m, global_fourier_so3_r(l,b,j_species)%m) + &
-                     dot_product(global_fourier_so3_i(l,a,i_species)%m, global_fourier_so3_i(l,b,j_species)%m)
-
-                  !if( ia /= jb ) descriptor_out%global_data(i_pow) = descriptor_out%global_data(i_pow) * SQRT_TWO
+                  !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
+                  descriptor_i(i_pow) = dot_product(global_fourier_so3_r(l,a,i_species)%m, global_fourier_so3_r(l,b,j_species)%m) + dot_product(global_fourier_so3_i(l,a,i_species)%m, global_fourier_so3_i(l,b,j_species)%m)
                   if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
-                  if( ia /= jb ) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  if( ia /= jb .and. sym_desc) then
+                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  endif
                enddo !l
-
             enddo !jb
          enddo !ia
+
+
+         !i_pow = 0
+         !do ia = 1, this%n_species*this%n_max
+         !   a = rs_index(1,ia)
+         !   i_species = rs_index(2,ia)
+         !   do jb = 1, ia
+         !      b = rs_index(1,jb)
+         !      j_species = rs_index(2,jb)
+
+         !      if(this%diagonal_radial .and. a /= b) cycle
+
+         !      do l = 0, this%l_max
+         !         i_pow = i_pow + 1
+         !         descriptor_i(i_pow) = &
+         !            dot_product(global_fourier_so3_r(l,a,i_species)%m, global_fourier_so3_r(l,b,j_species)%m) + &
+         !            dot_product(global_fourier_so3_i(l,a,i_species)%m, global_fourier_so3_i(l,b,j_species)%m)
+
+         !         !if( ia /= jb ) descriptor_out%global_data(i_pow) = descriptor_out%global_data(i_pow) * SQRT_TWO
+         !         if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
+         !         if( ia /= jb ) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+         !      enddo !l
+
+         !   enddo !jb
+         !enddo !ia
 
          !jpd47
          descriptor_i(d) = 0.0_dp
