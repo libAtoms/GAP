@@ -4,7 +4,7 @@
 ! HND X   
 ! HND X
 ! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi, 
-! HND X   Copyright 2006-2021.
+! HND X   and Sascha Klawohn. Copyright 2006-2021.
 ! HND X
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
 ! HND X   his employment for the U.S. Government, and are not subject
@@ -54,7 +54,8 @@ module gp_predict_module
    use omp_lib  
 #endif  
    use system_module, only : dp, qp, optional_default, reallocate, NUMERICAL_ZERO, & 
-       system_timer, string_to_numerical, print_warning, progress, progress_timer, current_times
+       system_timer, string_to_numerical, print_warning, progress, progress_timer, &
+       current_times, InOutput, OUTPUT
    use units_module  
    use linearalgebra_module  
    use extendable_str_module  
@@ -65,6 +66,8 @@ module gp_predict_module
    use FoX_sax, only: xml_t, dictionary_t, haskey, getvalue, parse, &
    open_xml_string, close_xml_t
    use CInOutput_module, only : quip_md5sum
+   use task_manager_module
+   use matrix_module
 
    implicit none
 
@@ -310,6 +313,7 @@ module gp_predict_module
    character(len=1024), save :: parse_gpCoordinates_label, parse_gpFull_label, parse_gpSparse_label
 
    public :: gpFull, gpSparse
+   public :: gpFull_print_covariances_lambda
 
    interface initialise
       module procedure gpSparse_initialise
@@ -701,14 +705,19 @@ module gp_predict_module
 
    endsubroutine gpSparse_setPermutations
 
-   subroutine gpSparse_initialise(this, from, error)
+   subroutine gpSparse_initialise(this, from, task_manager, condition_number_norm, error)
       type(gpSparse), intent(inout) :: this
-      type(gpFull), intent(in)  :: from
+      type(gpFull), intent(in) :: from
+      type(task_manager_type), intent(in) :: task_manager
+      character(len=*), optional, intent(in) :: condition_number_norm
       integer, optional, intent(out) :: error
 
+      character(len=STRING_LENGTH) :: my_condition_number_norm
+
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, i_yPrime, &
-      i_globalY, i_global_yPrime
+      i_globalY, i_global_yPrime, nlrows
 #ifdef HAVE_QR      
+      real(qp) :: rcond
       real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
       real(qp), dimension(:), allocatable :: globalY, alpha
       type(LA_Matrix) :: LA_c_subYsubY, LA_q_subYsubY
@@ -724,6 +733,8 @@ module gp_predict_module
       if( .not. from%initialised ) then
          RAISE_ERROR('gpSparse_initialise: gpFull object not initialised',error)
       endif
+
+      my_condition_number_norm = optional_default(' ', condition_number_norm)
 
       if(this%initialised) call finalise(this,error)
 
@@ -760,8 +771,22 @@ module gp_predict_module
       n_globalY = from%n_y + from%n_yPrime
 
 #ifdef HAVE_QR
-      allocate( c_subYY_sqrtInverseLambda(n_globalSparseX,n_globalY), factor_c_subYsubY(n_globalSparseX,n_globalSparseX), &
-      a(n_globalY+n_globalSparseX,n_globalSparseX), globalY(n_globalY+n_globalSparseX), alpha(n_globalSparseX) )
+      allocate(c_subYY_sqrtInverseLambda(n_globalSparseX,n_globalY))
+      allocate(factor_c_subYsubY(n_globalSparseX,n_globalSparseX))
+      allocate(alpha(n_globalSparseX))
+
+      if (task_manager%active) then
+         nlrows = (task_manager%unified_workload / n_globalSparseX) * n_globalSparseX
+         if (nlrows < task_manager%unified_workload) nlrows = nlrows + n_globalSparseX
+         allocate(globalY(nlrows))
+         allocate(a(nlrows,n_globalSparseX))
+         alpha = 0.0_qp
+         globalY = 0.0_qp
+         a = 0.0_qp
+      else
+         allocate(globalY(n_globalY+n_globalSparseX))
+         allocate(a(n_globalY+n_globalSparseX,n_globalSparseX))
+      end if
 
       call matrix_product_vect_asdiagonal_sub(c_subYY_sqrtInverseLambda,from%covariance_subY_y,sqrt(1.0_qp/from%lambda)) ! O(NM)
       call initialise(LA_c_subYsubY,from%covariance_subY_subY)
@@ -775,7 +800,22 @@ module gp_predict_module
       end do
 
       a(1:n_globalY,:) = transpose(c_subYY_sqrtInverseLambda)
-      a(n_globalY+1:,:) = factor_c_subYsubY
+      if (task_manager%active) then
+         if (task_manager%my_worker_id == task_manager%n_workers) then
+           a(n_globalY+1:n_globalY+n_globalSparseX,:) = factor_c_subYsubY
+         end if
+      else
+         a(n_globalY+1:,:) = factor_c_subYsubY
+      end if
+
+      if (my_condition_number_norm(1:1) /= ' ') then
+         if (task_manager%active) then
+            call print_warning("Condition number of distributed matrix is not implemented.")
+         else
+            rcond = matrix_condition_number(a, my_condition_number_norm(1:1))
+            call print("Condition number (log10) of matrix A (norm "//my_condition_number_norm(1:1)//"): "//-log10(rcond))
+         end if
+      end if
 
       globalY = 0.0_qp
       do i_y = 1, from%n_y
@@ -796,9 +836,15 @@ module gp_predict_module
          globalY(i_global_yPrime) = from%yPrime(i_yPrime)*sqrt(1.0_qp/from%lambda(i_global_yPrime))
       enddo
 
-      call initialise(LA_q_subYsubY,a)
-      call LA_Matrix_QR_Solve_Vector(LA_q_subYsubY,globalY,alpha)
-      call finalise(LA_q_subYsubY)
+      if (task_manager%active) then
+         call print("Using ScaLAPACK to solve QR")
+         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%n_workers, task_manager%ScaLAPACK_obj)
+      else
+         call print("Using LAPACK to solve QR")
+         call initialise(LA_q_subYsubY, a)
+         call LA_Matrix_QR_Solve_Vector(LA_q_subYsubY, globalY, alpha)
+         call finalise(LA_q_subYsubY)
+      end if
 
       do i_coordinate = 1, from%n_coordinate
          do i_sparseX = 1, from%coordinate(i_coordinate)%n_sparseX
@@ -4112,6 +4158,23 @@ module gp_predict_module
       call fwrite_array_d(size(this%sparseX), this%sparseX(1,1), trim(sparseX_filename)//C_NULL_CHAR)
 
    end subroutine gpCoordinates_print_sparseX_file
+
+   ! print covariances and lambda to process-dependent files, one value per line
+   subroutine gpFull_print_covariances_lambda(this, file_prefix, my_proc)
+      type(gpFull), intent(in) :: this
+      character(*), intent(in) :: file_prefix
+      integer, intent(in), optional :: my_proc
+
+      integer :: my_proc_opt
+
+      my_proc_opt = optional_default(0, opt_val=my_proc)
+      
+      if (my_proc_opt == 0) then
+         call fwrite_array_d(size(this%covariance_subY_subY), this%covariance_subY_subY, trim(file_prefix)//'_Kmm'//C_NULL_CHAR)
+      end if
+      call fwrite_array_d(size(this%covariance_subY_y), this%covariance_subY_y, trim(file_prefix)//'_Kmn.'//my_proc_opt//C_NULL_CHAR)
+      call fwrite_array_d(size(this%lambda), this%lambda, trim(file_prefix)//'_lambda.'//my_proc_opt//C_NULL_CHAR)
+   end subroutine gpFull_print_covariances_lambda
 
    subroutine gpCoordinates_printXML(this,xf,label,sparseX_base_filename,error)
       type(gpCoordinates), intent(in) :: this
