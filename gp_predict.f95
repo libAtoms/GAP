@@ -1550,6 +1550,14 @@ module gp_predict_module
             RAISE_ERROR('gpFull_covarianceMatrix: '//i_coordinate//'th coordinate object not sparsified',error)
          endif
 
+         if( .not. allocated(this%coordinate(i_coordinate)%x) ) then
+            RAISE_ERROR('gpFull_covarianceMatrix: '//i_coordinate//"th coordinate's x not allocated",error)
+         endif
+
+         if( .not. allocated(this%coordinate(i_coordinate)%xPrime) ) then
+            RAISE_ERROR('gpFull_covarianceMatrix: '//i_coordinate//"th coordinate's xPrime not allocated",error)
+         endif
+
          if(this%coordinate(i_coordinate)%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
             if(.not. this%coordinate(i_coordinate)%bond_real_space_cov%initialised) then  
                call gpCoordinates_gpCovariance_bond_real_space_Initialise(this%coordinate(i_coordinate))
@@ -1822,6 +1830,8 @@ module gp_predict_module
             this%covarianceDiag_y_y = 0.0_dp
          endselect
 
+         if (allocated(this%coordinate(i_coordinate)%x)) deallocate(this%coordinate(i_coordinate)%x)
+         if (allocated(this%coordinate(i_coordinate)%xPrime)) deallocate(this%coordinate(i_coordinate)%xPrime)
          call system_timer('gpFull_covarianceMatrix_sparse_Coordinate'//i_coordinate)
       enddo
 
