@@ -145,6 +145,7 @@ module gap_fit_module
   public :: gap_fit_is_root
 
   public :: gap_fit_print_linear_system_dump_file
+  public :: gap_fit_estimate_memory
 
 contains
 
@@ -817,7 +818,7 @@ contains
       call print_title("Report on number of descriptors found")
       do i = 1, this%n_coordinate
          call print("---------------------------------------------------------------------")
-         call print("Descriptor: "//this%gap_str(i))
+         call print("Descriptor "//i//": "//this%gap_str(i))
          call print("Number of descriptors:                        "//this%n_descriptors(i))
          call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
       enddo
@@ -2111,5 +2112,80 @@ contains
       call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, this%mpi_obj%my_proc)
     end if
   end subroutine gap_fit_print_linear_system_dump_file
+
+  subroutine gap_fit_estimate_memory(this)
+    type(gap_fit), intent(in) :: this
+
+    integer(idp), parameter :: mega = 10**6
+    integer(idp), parameter :: rmem = storage_size(1.0_dp, idp) / 8_idp
+
+    integer :: i
+    integer(idp) :: s1, s2, entries
+    integer(idp) :: mem, memt, memp1  ! scratch, total, peak
+    integer(idp) :: sys_total_mem, sys_free_mem
+
+    call print_title("Memory Estimate (per process)")
+    
+    call print("Descriptors")
+    memt = 0
+    do i = 1, this%n_coordinate
+      s1 = descriptor_dimensions(this%my_descriptor(i))
+
+      entries = s1 * this%n_descriptors(i)
+      mem = entries * rmem
+      memt = memt + mem
+      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//mem/mega//" MB")
+
+      entries = s1 * this%n_cross(i)
+      mem = entries * rmem
+      memt = memt + mem
+      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//mem/mega//" MB")
+    end do
+    call print("Subtotal "//memt/mega//" MB")
+    call print("")
+    memp1 = memt
+
+
+    call print("Covariances")
+    memt = 0
+    s1 = sum(this%config_type_n_sparseX)
+    s2 = (this%n_ener + this%n_local_property) + (this%n_force + this%n_virial + this%n_hessian)
+
+    entries = s1 * s2
+    mem = entries * rmem
+    memt = memt + mem * 2
+    call print("yY "//s1//" "//s2//" memory "//mem/mega//" MB * 2")
+    memp1 = memp1 + mem
+
+    entries = s1 * s1
+    mem = entries * rmem
+    memt = memt + mem
+    call print("yy "//s1//" "//s1//" memory "//mem/mega//" MB")
+
+    entries = s1 * (s1 + s2)
+    mem = entries * rmem
+    memt = memt + mem * 2
+    call print("A "//s1//" "//s1+s2//" memory "//mem/mega//" MB * 2")
+    call print("Subtotal "//memt/mega//" MB")
+    call print("")
+
+    
+    mem = max(memp1, memt)
+    call print("Peak1 "//memp1/mega//" MB")
+    call print("Peak2 "//memt/mega//" MB")
+    call print("PEAK  "//mem/mega//" MB")
+    call print("")
+
+    call mem_info(sys_total_mem, sys_free_mem)
+    call print("Free system memory  "//sys_free_mem/mega//" MB")
+    call print("Total system memory "//sys_total_mem/mega//" MB")
+
+    mem = sys_free_mem - mem
+    if (mem < 0) then
+      call print_warning("Memory estimate exceeds free system memory by "//-mem/mega//" MB.")
+    end if
+
+    call print_title("")
+  end subroutine gap_fit_estimate_memory
 
 end module gap_fit_module
