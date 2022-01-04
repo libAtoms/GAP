@@ -707,7 +707,7 @@ module gp_predict_module
 
    subroutine gpSparse_initialise(this, from, task_manager, condition_number_norm, error)
       type(gpSparse), intent(inout) :: this
-      type(gpFull), intent(in) :: from
+      type(gpFull), intent(inout) :: from  ! actually input; intent(inout) to free memory early
       type(task_manager_type), intent(in) :: task_manager
       character(len=*), optional, intent(in) :: condition_number_norm
       integer, optional, intent(out) :: error
@@ -772,9 +772,22 @@ module gp_predict_module
 
 #ifdef HAVE_QR
       allocate(c_subYY_sqrtInverseLambda(n_globalSparseX,n_globalY))
+      call matrix_product_vect_asdiagonal_sub(c_subYY_sqrtInverseLambda,from%covariance_subY_y,sqrt(1.0_qp/from%lambda)) ! O(NM)
+      if (allocated(from%covariance_subY_y)) deallocate(from%covariance_subY_y)  ! free input component to save memory
+      
       allocate(factor_c_subYsubY(n_globalSparseX,n_globalSparseX))
-      allocate(alpha(n_globalSparseX))
+      call initialise(LA_c_subYsubY,from%covariance_subY_subY)
+      call LA_Matrix_Factorise(LA_c_subYsubY,factor_c_subYsubY,error=error)
+      call finalise(LA_c_subYsubY)
+      if (allocated(from%covariance_subY_subY)) deallocate(from%covariance_subY_subY)  ! free input component to save memory
 
+      do i = 1, n_globalSparseX-1
+         do j = i+1, n_globalSparseX
+            factor_c_subYsubY(j,i) = 0.0_qp
+         end do
+      end do
+
+      allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
          nlrows = (task_manager%unified_workload / n_globalSparseX) * n_globalSparseX
          if (nlrows < task_manager%unified_workload) nlrows = nlrows + n_globalSparseX
@@ -788,18 +801,9 @@ module gp_predict_module
          allocate(a(n_globalY+n_globalSparseX,n_globalSparseX))
       end if
 
-      call matrix_product_vect_asdiagonal_sub(c_subYY_sqrtInverseLambda,from%covariance_subY_y,sqrt(1.0_qp/from%lambda)) ! O(NM)
-      call initialise(LA_c_subYsubY,from%covariance_subY_subY)
-      call LA_Matrix_Factorise(LA_c_subYsubY,factor_c_subYsubY,error=error)
-      call finalise(LA_c_subYsubY)
-
-      do i = 1, n_globalSparseX-1
-         do j = i+1, n_globalSparseX
-            factor_c_subYsubY(j,i) = 0.0_qp
-         end do
-      end do
-
       a(1:n_globalY,:) = transpose(c_subYY_sqrtInverseLambda)
+      if (allocated(c_subYY_sqrtInverseLambda)) deallocate(c_subYY_sqrtInverseLambda)
+
       if (task_manager%active) then
          if (task_manager%my_worker_id == task_manager%n_workers) then
            a(n_globalY+1:n_globalY+n_globalSparseX,:) = factor_c_subYsubY
@@ -807,6 +811,7 @@ module gp_predict_module
       else
          a(n_globalY+1:,:) = factor_c_subYsubY
       end if
+      if (allocated(factor_c_subYsubY)) deallocate(factor_c_subYsubY)
 
       if (my_condition_number_norm(1:1) /= ' ') then
          if (task_manager%active) then
@@ -853,8 +858,6 @@ module gp_predict_module
          enddo
       enddo
 
-      if(allocated(c_subYY_sqrtInverseLambda)) deallocate(c_subYY_sqrtInverseLambda)
-      if(allocated(factor_c_subYsubY)) deallocate(factor_c_subYsubY)
       if(allocated(a)) deallocate(a)
       if(allocated(globalY)) deallocate(globalY)
       if(allocated(alpha)) deallocate(alpha)
