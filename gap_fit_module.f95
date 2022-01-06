@@ -81,7 +81,15 @@ module gap_fit_module
      integer :: e0_method = E0_ISOLATED
      logical :: do_core = .false., do_copy_at_file, has_config_type_sigma, sigma_per_atom = .true.
      logical :: sparsify_only_no_fit = .false.
-     integer :: n_frame, n_coordinate, n_ener, n_force, n_virial, n_hessian, n_local_property, min_save, n_species
+     integer :: n_frame = 0
+     integer :: n_coordinate = 0
+     integer :: n_ener = 0
+     integer :: n_force = 0
+     integer :: n_virial = 0
+     integer :: n_hessian = 0
+     integer :: n_local_property = 0
+     integer :: n_species = 0
+     integer :: min_save
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
