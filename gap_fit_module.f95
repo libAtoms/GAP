@@ -1542,7 +1542,7 @@ contains
 
      if(this%do_copy_at_file) then
         ! Print the fitting configurations used for this potential.
-        if(len(trim(this%at_file)) > 0 ) call file_print_xml(this%at_file,xf)
+        if(len(trim(this%at_file)) > 0 ) call file_print_xml(this%at_file,xf,ws_significant=.false.)
      endif
 
      call xml_EndElement(xf,"GAP_params")
@@ -1596,9 +1596,10 @@ contains
 
   endsubroutine gap_fit_print_xml
 
-  subroutine file_print_xml(this,xf)
+  subroutine file_print_xml(this,xf,ws_significant)
      character(len=*), intent(in) :: this
      type(xmlf_t), intent(inout) :: xf
+     logical, intent(in), optional :: ws_significant
 
      type(inoutput) :: atfile
      character(len=10240) :: line
@@ -1615,7 +1616,7 @@ contains
         elseif(iostat > 0) then
            call system_abort('file_print_xml: unkown error ('//iostat//') while reading '//trim(this))
         endif
-        call xml_AddCharacters(xf,trim(line),parsed=.false.)
+        call xml_AddCharacters(xf,trim(line),parsed=.false.,ws_significant=ws_significant)
         call xml_AddNewLine(xf)
      enddo
      call xml_EndElement(xf,"XYZ_data")
