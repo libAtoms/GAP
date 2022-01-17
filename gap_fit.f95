@@ -82,6 +82,10 @@ program gap_fit_program
   call print('Cartesian coordinates transformed to descriptors')
 
   if(main_gap_fit%sparsify_only_no_fit) then
+     if (gap_fit_is_root(main_gap_fit)) then
+        call initialise(main_gap_fit%gp_sp, main_gap_fit%my_gp)
+        call gap_fit_print_xml(main_gap_fit, main_gap_fit%gp_file, main_gap_fit%sparseX_separate_file)
+     end if
      call system_finalise()
      stop
   end if
