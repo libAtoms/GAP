@@ -841,7 +841,7 @@ module gp_predict_module
          call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%n_workers, task_manager%ScaLAPACK_obj)
       else
          call print("Using LAPACK to solve QR")
-         call initialise(LA_q_subYsubY, a)
+         call initialise(LA_q_subYsubY, a, use_allocate=.false.)
          call LA_Matrix_QR_Solve_Vector(LA_q_subYsubY, globalY, alpha)
          call finalise(LA_q_subYsubY)
       end if
