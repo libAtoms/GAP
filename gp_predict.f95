@@ -5222,8 +5222,14 @@ module gp_predict_module
             else
                call system_abort("gpSparse_startElement_handler did not find the n_coordinate attribute.")
             endif
-
             call gpSparse_setParameters(parse_gpSparse,n_coordinate)
+
+            call GP_FoX_get_value(attributes, 'fitted', value, status)
+            if (status == 0) then
+               read (value,*) parse_gpSparse%fitted
+            else
+               parse_gpSparse%fitted = .true.  ! for backward compatibility
+            endif
 
          endif
 
