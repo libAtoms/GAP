@@ -279,14 +279,10 @@ module gp_predict_module
    endtype gpFull
 
    type gpSparse
-
-      integer :: n_coordinate
-      ! number of different descriptors
-
+      integer :: n_coordinate ! number of different descriptors
       type(gpCoordinates), dimension(:), allocatable :: coordinate
-
       logical :: initialised = .false.
-
+      logical :: fitted = .false.
    endtype gpSparse
 
    type cplx_1d_array
@@ -314,6 +310,7 @@ module gp_predict_module
 
    public :: gpFull, gpSparse
    public :: gpFull_print_covariances_lambda
+   public :: gpSparse_fit
 
    interface initialise
       module procedure gpSparse_initialise
@@ -705,7 +702,52 @@ module gp_predict_module
 
    endsubroutine gpSparse_setPermutations
 
-   subroutine gpSparse_initialise(this, from, task_manager, condition_number_norm, error)
+   subroutine gpSparse_initialise(this, from, error)
+      type(gpSparse), intent(inout) :: this
+      type(gpFull), intent(in) :: from
+      integer, optional, intent(out) :: error
+
+      integer :: i
+
+      if( .not. from%initialised ) then
+         RAISE_ERROR('gpSparse_initialise: gpFull object not initialised',error)
+      endif
+
+      if(this%initialised) call finalise(this,error)
+
+      call gpSparse_setParameters(this, from%n_coordinate)
+
+      do i = 1, this%n_coordinate
+         if( from%coordinate(i)%covariance_type == COVARIANCE_BOND_REAL_SPACE ) then
+            call gpCoordinates_setParameters_sparse(this%coordinate(i), &
+                 from%coordinate(i)%d, from%coordinate(i)%n_sparseX, from%coordinate(i)%delta, from%coordinate(i)%f0, covariance_type = from%coordinate(i)%covariance_type, &
+                 sparseX_size_max=maxval(from%coordinate(i)%sparseX_size), error=error)
+         else
+            call gpCoordinates_setParameters_sparse(this%coordinate(i), &
+                 from%coordinate(i)%d, from%coordinate(i)%n_sparseX, from%coordinate(i)%delta, from%coordinate(i)%f0, covariance_type = from%coordinate(i)%covariance_type, &
+                 error=error)
+         endif
+
+         this%coordinate(i)%alpha = 0.0
+         this%coordinate(i)%sparseX = from%coordinate(i)%sparseX
+         this%coordinate(i)%covarianceDiag_sparseX_sparseX = from%coordinate(i)%covarianceDiag_sparseX_sparseX
+
+         if(from%coordinate(i)%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
+            this%coordinate(i)%sparseX_size = from%coordinate(i)%sparseX_size
+         endif
+
+         this%coordinate(i)%theta = from%coordinate(i)%theta
+         this%coordinate(i)%zeta = from%coordinate(i)%zeta
+         this%coordinate(i)%descriptor_str = from%coordinate(i)%descriptor_str
+         this%coordinate(i)%sparseCutoff = from%coordinate(i)%sparseCutoff
+
+         call gpSparse_setPermutations(this,i,from%coordinate(i)%permutations,error)
+      enddo
+
+      this%initialised = .true.
+   end subroutine gpSparse_initialise
+
+   subroutine gpSparse_fit(this, from, task_manager, condition_number_norm, error)
       type(gpSparse), intent(inout) :: this
       type(gpFull), intent(inout) :: from  ! actually input; intent(inout) to free memory early
       type(task_manager_type), intent(in) :: task_manager
@@ -730,43 +772,10 @@ module gp_predict_module
 
       INIT_ERROR(error)
 
-      if( .not. from%initialised ) then
-         RAISE_ERROR('gpSparse_initialise: gpFull object not initialised',error)
-      endif
-
       my_condition_number_norm = optional_default(' ', condition_number_norm)
-
-      if(this%initialised) call finalise(this,error)
-
-      call gpSparse_setParameters(this, from%n_coordinate)
-
-      do i_coordinate = 1, this%n_coordinate
-
-         if( from%coordinate(i_coordinate)%covariance_type == COVARIANCE_BOND_REAL_SPACE ) then
-            call gpCoordinates_setParameters_sparse(this%coordinate(i_coordinate), &
-                 from%coordinate(i_coordinate)%d, from%coordinate(i_coordinate)%n_sparseX, from%coordinate(i_coordinate)%delta, from%coordinate(i_coordinate)%f0, covariance_type = from%coordinate(i_coordinate)%covariance_type, &  
-                 sparseX_size_max=maxval(from%coordinate(i_coordinate)%sparseX_size), error=error)  
-         else
-            call gpCoordinates_setParameters_sparse(this%coordinate(i_coordinate), &
-                 from%coordinate(i_coordinate)%d, from%coordinate(i_coordinate)%n_sparseX, from%coordinate(i_coordinate)%delta, from%coordinate(i_coordinate)%f0, covariance_type = from%coordinate(i_coordinate)%covariance_type, &
-                 error=error)
-         endif
-
-         this%coordinate(i_coordinate)%sparseX = from%coordinate(i_coordinate)%sparseX
-         this%coordinate(i_coordinate)%covarianceDiag_sparseX_sparseX = from%coordinate(i_coordinate)%covarianceDiag_sparseX_sparseX
-
-         if(from%coordinate(i_coordinate)%covariance_type == COVARIANCE_BOND_REAL_SPACE) then 
-            this%coordinate(i_coordinate)%sparseX_size = from%coordinate(i_coordinate)%sparseX_size
-         endif
-         this%coordinate(i_coordinate)%theta = from%coordinate(i_coordinate)%theta
-         this%coordinate(i_coordinate)%zeta = from%coordinate(i_coordinate)%zeta
-         this%coordinate(i_coordinate)%descriptor_str = from%coordinate(i_coordinate)%descriptor_str
-         this%coordinate(i_coordinate)%sparseCutoff = from%coordinate(i_coordinate)%sparseCutoff
-
-         call gpSparse_setPermutations(this,i_coordinate,from%coordinate(i_coordinate)%permutations,error)
-
-      enddo
       
+      call gpSparse_initialise(this, from, error)
+
       n_globalSparseX = from%n_globalSparseX
       n_globalY = from%n_y + from%n_yPrime
 
@@ -907,10 +916,9 @@ module gp_predict_module
       if(allocated(alpha)) deallocate(alpha)
       if(allocated(globalY)) deallocate(globalY)
 #endif
+      this%fitted = .true.
 
-      this%initialised = .true.
-
-   endsubroutine gpSparse_initialise
+   endsubroutine gpSparse_fit
 
    subroutine gpSparse_finalise(this,error)
       type(gpSparse), intent(inout) :: this
@@ -920,12 +928,16 @@ module gp_predict_module
 
       INIT_ERROR(error)
 
-      do i_coordinate = 1, this%n_coordinate
-         call finalise(this%coordinate(i_coordinate), error)
-      enddo
-      deallocate(this%coordinate)
+      if (allocated(this%coordinate)) then
+         do i_coordinate = 1, this%n_coordinate
+            call finalise(this%coordinate(i_coordinate), error)
+         enddo
+         deallocate(this%coordinate)
+      end if
 
       this%n_coordinate = 0
+      this%initialised = .false.
+      this%fitted = .false.
 
    endsubroutine gpSparse_finalise
 
@@ -4395,6 +4407,7 @@ module gp_predict_module
       if(present(label)) call xml_AddAttribute(xf,"label", trim(label))
 
       call xml_AddAttribute(xf,"n_coordinate", ""//this%n_coordinate)
+      call xml_AddAttribute(xf,"fitted", ""//this%fitted)
 
       do i = 1, this%n_coordinate
          call gpCoordinates_printXML(this%coordinate(i),xf,label=trim(optional_default("",label))//i,&
@@ -5209,8 +5222,14 @@ module gp_predict_module
             else
                call system_abort("gpSparse_startElement_handler did not find the n_coordinate attribute.")
             endif
-
             call gpSparse_setParameters(parse_gpSparse,n_coordinate)
+
+            call GP_FoX_get_value(attributes, 'fitted', value, status)
+            if (status == 0) then
+               read (value,*) parse_gpSparse%fitted
+            else
+               parse_gpSparse%fitted = .true.  ! for backward compatibility
+            endif
 
          endif
 
