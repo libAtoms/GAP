@@ -3813,9 +3813,12 @@ module gp_predict_module
 !         end do  
          
          k(:) = this%delta**2 * fast_pow_1d(covariance_x_xStars(:), this%zeta)
+
+         k = k * this%sparseCutoff
          if(present(gradPredict)) then
             allocate(alpha_scaled(size(this%alpha)))
             alpha_scaled(:) = this%alpha(:) * this%delta**2 * this%zeta * fast_pow_1d(covariance_x_xStars, this%zeta-1.0_dp)
+            alpha_scaled = alpha_scaled * this%sparseCutoff
          endif
          deallocate(covariance_x_xStars)
 
@@ -4063,17 +4066,19 @@ module gp_predict_module
           k_mm = 0.0_dp
           do i = 1, this%n_sparseX
              x_i => this%sparseX(:,i)
+             fc_i => this%sparseCutoff(i)
              do j = i, this%n_sparseX
                 x_j => this%sparseX(:,j)
+                fc_j => this%sparseCutoff(j)
                 if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
                    if( .not. this%initialised ) then
                       RAISE_ERROR('gpCoordinates_initialise_variance_estimate: bond real space sparse score not implemented', error)
                    endif
                 elseif(this%covariance_type == COVARIANCE_DOT_PRODUCT) then
                    if( zeta_int .feq. this%zeta ) then
-                      k_mm(j,i) = sum( x_i * x_j )**zeta_int
+                      k_mm(j,i) = fc_i*fc_i * sum( x_i * x_j )**zeta_int
                    else
-                      k_mm(j,i) = sum( x_i * x_j )**this%zeta
+                      k_mm(j,i) = fc_i*fc_i * sum( x_i * x_j )**this%zeta
                    endif
                 elseif( this%covariance_type == COVARIANCE_ARD_SE ) then
                    do i_p = 1, this%n_permutations
