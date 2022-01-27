@@ -2104,8 +2104,7 @@ contains
     type(gap_fit), intent(inout) :: this
 
     ! add special task for Cholesky matrix addon to last worker
-    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), worker_id=this%task_manager%n_workers)
-
+    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
@@ -2174,7 +2173,7 @@ contains
     entries = s1 * (s1 + s2)
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("A "//s1//" "//s1+s2//" memory "//mem/mega//" MB * 2")
+    call print("A "//s1//" "//(s1+s2)//" memory "//mem/mega//" MB * 2")
     call print("Subtotal "//memt/mega//" MB")
     call print("")
 

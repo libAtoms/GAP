@@ -756,7 +756,8 @@ module gp_predict_module
 
       character(len=STRING_LENGTH) :: my_condition_number_norm
 
-      integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i, j, i_y, i_yPrime, &
+      integer :: i, j, n, o, t, w
+      integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i_y, i_yPrime, &
       i_globalY, i_global_yPrime, nlrows
 #ifdef HAVE_QR      
       real(qp) :: rcond
@@ -814,9 +815,13 @@ module gp_predict_module
       if (allocated(c_subYY_sqrtInverseLambda)) deallocate(c_subYY_sqrtInverseLambda)
 
       if (task_manager%active) then
-         if (task_manager%my_worker_id == task_manager%n_workers) then
-           a(n_globalY+1:n_globalY+n_globalSparseX,:) = factor_c_subYsubY
-         end if
+         ! put L part at the end of local A (take info from last task of each worker)
+         w = task_manager%my_worker_id
+         t = task_manager%workers(w)%n_tasks
+         n = task_manager%workers(w)%tasks(t)%idata(1)
+         o = task_manager%workers(w)%tasks(t)%idata(2)
+         n = min(o+n, n_globalSparseX) - o ! secure against sparseX reduction since distribution
+         a(n_globalY+1:n_globalY+n,:) = factor_c_subYsubY(o+1:o+n,:)
       else
          a(n_globalY+1:,:) = factor_c_subYsubY
       end if
