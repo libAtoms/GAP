@@ -335,10 +335,19 @@ contains
         force_parameter_name = trim(parameter_name_prefix) // trim(force_parameter_name)
         virial_parameter_name = trim(parameter_name_prefix) // trim(virial_parameter_name)
         hessian_parameter_name = trim(parameter_name_prefix) // trim(hessian_parameter_name)
+        stress_parameter_name = trim(parameter_name_prefix) // trim(stress_parameter_name)
         config_type_parameter_name = trim(parameter_name_prefix) // trim(config_type_parameter_name)
         sigma_parameter_name = trim(parameter_name_prefix) // trim(sigma_parameter_name)
         force_mask_parameter_name = trim(parameter_name_prefix) // trim(force_mask_parameter_name)
      endif
+
+     if (sparsify_only_no_fit) then
+        force_parameter_name = '//IGNORE//'
+        virial_parameter_name = '//IGNORE//'
+        hessian_parameter_name = '//IGNORE//'
+        stress_parameter_name = '//IGNORE//'
+        call print_warning("sparsify_only_no_fit == T: force, virial, hessian, stress parameters are ignored.")
+     end if
    
      if( len_trim(this%gp_file) > 216 ) then    ! The filename's length is limited to 255 char.s in some filesystem. 
                                         ! Without this check, the fit would run but produce a core file and only a temporary xml file. 
