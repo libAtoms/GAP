@@ -2104,6 +2104,11 @@ contains
     call task_manager_init_workers(this%task_manager, this%ScaLAPACK_obj%n_proc_rows)
     call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
     this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
+
+    if (this%task_manager%active) then
+      call task_manager_init_idata(this%task_manager, 1)
+      this%task_manager%idata(1) = this%mpi_blocksize
+    end if
   end subroutine gap_fit_init_task_manager
 
   subroutine gap_fit_distribute_tasks(this)

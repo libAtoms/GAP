@@ -55,7 +55,7 @@ module gp_predict_module
 #endif  
    use system_module, only : dp, qp, optional_default, reallocate, NUMERICAL_ZERO, & 
        system_timer, string_to_numerical, print_warning, progress, progress_timer, &
-       current_times, InOutput, OUTPUT
+       current_times, InOutput, OUTPUT, increase_to_multiple, PRINT_VERBOSE
    use units_module  
    use linearalgebra_module  
    use extendable_str_module  
@@ -756,7 +756,7 @@ module gp_predict_module
 
       character(len=STRING_LENGTH) :: my_condition_number_norm
 
-      integer :: i, j, n, o, t, w
+      integer :: i, j, n, o, t, w, blocksize
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i_y, i_yPrime, &
       i_globalY, i_global_yPrime, nlrows
 #ifdef HAVE_QR      
@@ -799,8 +799,10 @@ module gp_predict_module
 
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
-         nlrows = (task_manager%unified_workload / n_globalSparseX) * n_globalSparseX
-         if (nlrows < task_manager%unified_workload) nlrows = nlrows + n_globalSparseX
+         blocksize = merge(task_manager%idata(1), n_globalSparseX, task_manager%idata(1) > 0)
+         nlrows = increase_to_multiple(task_manager%unified_workload, blocksize)
+         call print("distA extension: "// &
+            (nlrows - task_manager%unified_workload) * n_globalSparseX * 8 / 10**6//" MB", PRINT_VERBOSE)
          allocate(globalY(nlrows))
          allocate(a(nlrows,n_globalSparseX))
          alpha = 0.0_qp
@@ -857,7 +859,7 @@ module gp_predict_module
 
       if (task_manager%active) then
          call print("Using ScaLAPACK to solve QR")
-         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%n_workers, task_manager%ScaLAPACK_obj)
+         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%ScaLAPACK_obj, blocksize)
       else
          call print("Using LAPACK to solve QR")
          call initialise(LA_q_subYsubY, a, use_allocate=.false.)
