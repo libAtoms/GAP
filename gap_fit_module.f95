@@ -644,7 +644,7 @@ contains
        call system_abort("read_fit_xyz: at_file "//this%at_file//" could not be found")
     endif
 
-    call initialise(xyzfile,this%at_file)
+    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
     this%n_frame = xyzfile%n_frame
 
     allocate(this%at(this%n_frame))
@@ -1473,7 +1473,7 @@ contains
     type(cinoutput) :: xyzfile
     type(atoms) :: at
 
-    call initialise(xyzfile,this%at_file)
+    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
 
     call read(xyzfile,at,frame=0)
     !call get_weights(at,this%w_Z)
