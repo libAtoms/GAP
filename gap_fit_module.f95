@@ -90,6 +90,7 @@ module gap_fit_module
      integer :: n_local_property = 0
      integer :: n_species = 0
      integer :: min_save
+     integer :: mpi_blocksize
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
@@ -174,6 +175,7 @@ contains
      real(dp), pointer :: default_local_property_sigma
 
      integer :: rnd_seed
+     integer, pointer :: mpi_blocksize
 
      at_file => this%at_file
      e0_str => this%e0_str
@@ -204,6 +206,7 @@ contains
      sparsify_only_no_fit => this%sparsify_only_no_fit
      condition_number_norm => this%condition_number_norm
      linear_system_dump_file => this%linear_system_dump_file
+     mpi_blocksize => this%mpi_blocksize
      
      call initialise(params)
      
@@ -316,8 +319,11 @@ contains
      call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
           help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
 
-      call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
+     call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
           help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
+
+     call param_register(params, 'mpi_blocksize', '0', mpi_blocksize, &
+          help_string="Blocksize of MPI distributed matrices. Affects efficiency and memory usage. Max if 0 (default).")
 
      if (.not. param_read_args(params, command_line=this%command_line)) then
         call print("gap_fit")
