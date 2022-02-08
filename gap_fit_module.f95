@@ -666,6 +666,10 @@ contains
 
     call finalise(xyzfile)
 
+    if(this%n_frame <= 0) then
+      call system_abort("read_fit_xyz: "//this%n_frame//" frames read from "//this%at_file//".")
+   endif
+
   endsubroutine read_fit_xyz
 
   subroutine read_descriptors(this)
