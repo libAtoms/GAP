@@ -850,12 +850,12 @@ contains
     integer :: d
     integer :: n_con
     logical :: has_ener, has_force, has_virial, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
-       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_hessian_sigma, &
+       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_virial_component_sigma, has_hessian_sigma, &
        has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, exclude_atom
     real(dp) :: ener, ener_core, my_cutoff, energy_sigma, force_sigma, virial_sigma, hessian_sigma, local_property_sigma, &
        grad_covariance_cutoff, use_force_sigma
     real(dp), dimension(3) :: pos
-    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3
+    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3, virial_component_sigma
     real(dp), dimension(6) :: stress_voigt
     real(dp), dimension(:), allocatable :: theta, theta_fac, hessian, hessian_core, grad_data
     real(dp), dimension(:), pointer :: force_atom_sigma
@@ -922,6 +922,7 @@ contains
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
        has_virial = get_value(this%at(n_con)%params,this%virial_parameter_name,virial)
+       has_virial_component_sigma = get_value(this%at(n_con)%params,'virial_component_'//trim(this%sigma_parameter_name),virial_component_sigma)
        has_stress_voigt = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_voigt)
        has_stress_3_3 = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_3_3)
        has_hessian = get_value(this%at(n_con)%params,"n_"//this%hessian_parameter_name,n_hessian)
@@ -1087,6 +1088,9 @@ contains
        else
           n_virial_sigma = n_virial_sigma + 1
        endif
+       if ( .not. has_virial_component_sigma) then
+          virial_component_sigma = virial_sigma
+       endif
 
        if( .not. has_hessian_sigma ) then
           hessian_sigma = this%sigma(4,n_config_type)
@@ -1152,14 +1156,17 @@ contains
 
           ! Now symmetrise matrix
           virial = ( virial + transpose(virial) ) / 2.0_dp
-
+          virial_component_sigma = ( virial_component_sigma + transpose(virial_component_sigma) ) / 2.0_dp
           if( virial_sigma .feq. 0.0_dp ) then
              RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_sigma//"), should be greater than zero",error)
           endif
 
           do k = 1, 3
              do l = k, 3
-                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_sigma)
+                if( virial_component_sigma(l,k) .feq. 0.0_dp ) then
+                   RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_component_sigma(l,k)//"), should be greater than zero",error)
+                endif
+                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_component_sigma(l,k))
              enddo
           enddo
        endif
