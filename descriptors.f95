@@ -3094,6 +3094,53 @@ module descriptors_module
 
       call finalise(params)
 
+      allocate(this%atom_sigma_r(this%n_species))
+      allocate(this%atom_sigma_r_scaling(this%n_species))
+      allocate(this%atom_sigma_t(this%n_species))
+      allocate(this%atom_sigma_t_scaling(this%n_species))
+      allocate(this%amplitude_scaling(this%n_species))
+      allocate(this%central_weight(this%n_species))
+      allocate(this%alpha_max(this%n_species))
+      allocate(this%species_Z(this%n_species))
+
+      call initialise(params)
+      if(this%n_species == 1) then
+         call param_register(params, 'alpha_max', PARAM_MANDATORY, this%alpha_max(1), &
+            help_string="Radial basis resolution for each species")
+         call param_register(params, 'atom_sigma_r', PARAM_MANDATORY, this%atom_sigma_r(1), &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the radial direction")
+         call param_register(params, 'atom_sigma_r_scaling', PARAM_MANDATORY, this%atom_sigma_r_scaling(1), &
+            help_string="Scaling rate of radial sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'atom_sigma_t', PARAM_MANDATORY, this%atom_sigma_t(1), &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the angular direction")
+         call param_register(params, 'atom_sigma_t_scaling', PARAM_MANDATORY, this%atom_sigma_t_scaling(1), &
+            help_string="Scaling rate of angular sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'amplitude_scaling', PARAM_MANDATORY, this%amplitude_scaling(1), &
+            help_string="Scaling rate of amplitude: scaled as an inverse function of neighbour distance")
+         call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
+            help_string="Weight of central atom in environment")
+         call param_register(params, 'species_Z', PARAM_MANDATORY, this%species_Z(1), &
+            help_string="Atomic number of species, including the central atom")
+      else
+         call param_register(params, 'alpha_max', '//MANDATORY//', this%alpha_max, &
+            help_string="Radial basis resultion for each species")
+         call param_register(params, 'atom_sigma_r', '//MANDATORY//', this%atom_sigma_r, &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the radial direction")
+         call param_register(params, 'atom_sigma_r_scaling', '//MANDATORY//', this%atom_sigma_r_scaling, &
+            help_string="Scaling rate of radial sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'atom_sigma_t', '//MANDATORY//', this%atom_sigma_t, &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the angular direction")
+         call param_register(params, 'atom_sigma_t_scaling', '//MANDATORY//', this%atom_sigma_t_scaling, &
+            help_string="Scaling rate of angular sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'amplitude_scaling', '//MANDATORY//', this%amplitude_scaling, &
+                     help_string="Scaling rate of amplitude: scaled as an inverse function of neighbour distance")
+         call param_register(params, 'central_weight', '//MANDATORY//', this%central_weight, &
+            help_string="Weight of central atom in environment")
+         call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z, &
+            help_string="Atomic number of species, including the central atom")
+      endif
+
+
 !     Here we read in the compression information from a file (compress_file) or rely on a keyword provided
 !     by the user (compress_mode) which leads to a predefined recipe to compress the soap_turbo descriptor
 !     The file always takes precedence over the keyword.
@@ -3142,53 +3189,6 @@ module descriptors_module
         call get_compress_indices( this%compress_mode, this%alpha_max, this%l_max, n, this%compress_P_nonzero, &
                                    this%compress_P_i, this%compress_P_j, this%compress_P_el, "set_indices" )
       end if
-
-
-      allocate(this%atom_sigma_r(this%n_species))
-      allocate(this%atom_sigma_r_scaling(this%n_species))
-      allocate(this%atom_sigma_t(this%n_species))
-      allocate(this%atom_sigma_t_scaling(this%n_species))
-      allocate(this%amplitude_scaling(this%n_species))
-      allocate(this%central_weight(this%n_species))
-      allocate(this%alpha_max(this%n_species))
-      allocate(this%species_Z(this%n_species))
-
-      call initialise(params)
-      if(this%n_species == 1) then
-         call param_register(params, 'alpha_max', PARAM_MANDATORY, this%alpha_max(1), &
-            help_string="Radial basis resolution for each species")
-         call param_register(params, 'atom_sigma_r', PARAM_MANDATORY, this%atom_sigma_r(1), &
-            help_string="Width of atomic Gaussians for soap-type descriptors in the radial direction")
-         call param_register(params, 'atom_sigma_r_scaling', PARAM_MANDATORY, this%atom_sigma_r_scaling(1), &
-            help_string="Scaling rate of radial sigma: scaled as a function of neighbour distance")
-         call param_register(params, 'atom_sigma_t', PARAM_MANDATORY, this%atom_sigma_t(1), &
-            help_string="Width of atomic Gaussians for soap-type descriptors in the angular direction")
-         call param_register(params, 'atom_sigma_t_scaling', PARAM_MANDATORY, this%atom_sigma_t_scaling(1), &
-            help_string="Scaling rate of angular sigma: scaled as a function of neighbour distance")
-         call param_register(params, 'amplitude_scaling', PARAM_MANDATORY, this%amplitude_scaling(1), &
-            help_string="Scaling rate of amplitude: scaled as an inverse function of neighbour distance")
-         call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
-            help_string="Weight of central atom in environment")
-         call param_register(params, 'species_Z', PARAM_MANDATORY, this%species_Z(1), &
-            help_string="Atomic number of species, including the central atom")
-      else
-         call param_register(params, 'alpha_max', '//MANDATORY//', this%alpha_max, &
-            help_string="Radial basis resultion for each species")
-         call param_register(params, 'atom_sigma_r', '//MANDATORY//', this%atom_sigma_r, &
-            help_string="Width of atomic Gaussians for soap-type descriptors in the radial direction")
-         call param_register(params, 'atom_sigma_r_scaling', '//MANDATORY//', this%atom_sigma_r_scaling, &
-            help_string="Scaling rate of radial sigma: scaled as a function of neighbour distance")
-         call param_register(params, 'atom_sigma_t', '//MANDATORY//', this%atom_sigma_t, &
-            help_string="Width of atomic Gaussians for soap-type descriptors in the angular direction")
-         call param_register(params, 'atom_sigma_t_scaling', '//MANDATORY//', this%atom_sigma_t_scaling, &
-            help_string="Scaling rate of angular sigma: scaled as a function of neighbour distance")
-         call param_register(params, 'amplitude_scaling', '//MANDATORY//', this%amplitude_scaling, &
-                     help_string="Scaling rate of amplitude: scaled as an inverse function of neighbour distance")
-         call param_register(params, 'central_weight', '//MANDATORY//', this%central_weight, &
-            help_string="Weight of central atom in environment")
-         call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z, &
-            help_string="Atomic number of species, including the central atom")
-      endif
 
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
