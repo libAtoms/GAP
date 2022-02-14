@@ -3140,6 +3140,10 @@ module descriptors_module
             help_string="Atomic number of species, including the central atom")
       endif
 
+      if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
+         RAISE_ERROR("soap_turbo_initialise failed to parse args_str='"//trim(args_str)//"'", error)
+      endif
+      call finalise(params)
 
 !     Here we read in the compression information from a file (compress_file) or rely on a keyword provided
 !     by the user (compress_mode) which leads to a predefined recipe to compress the soap_turbo descriptor
@@ -3190,11 +3194,6 @@ module descriptors_module
                                    this%compress_P_i, this%compress_P_j, this%compress_P_el, "set_indices" )
       end if
 
-
-      if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
-         RAISE_ERROR("soap_turbo_initialise failed to parse args_str='"//trim(args_str)//"'", error)
-      endif
-      call finalise(params)
 
       this%initialised = .true.
 
