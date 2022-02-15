@@ -799,7 +799,7 @@ module gp_predict_module
 
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
-         blocksize = merge(task_manager%idata(1), n_globalSparseX, task_manager%idata(1) > 0)
+         blocksize = get_blocksize(task_manager%idata(1), task_manager%unified_workload, n_globalSparseX)
          nlrows = increase_to_multiple(task_manager%unified_workload, blocksize)
          o = nlrows - task_manager%unified_workload
          call print("distA extension: "//o//" "//n_globalSparseX//" memory "//i2si(8_idp * o * n_globalSparseX)//"B", PRINT_VERBOSE)
@@ -926,6 +926,19 @@ module gp_predict_module
       this%fitted = .true.
 
    endsubroutine gpSparse_fit
+
+   function get_blocksize(arg, nrows, ncols) result(blocksize)
+      integer, intent(in) :: arg, nrows, ncols
+      integer :: blocksize
+
+      integer, parameter :: OVERHEAD_FACTOR = 2  ! worst case: +1/2=50% matrix size
+
+      if (arg > 0) then
+         blocksize = arg
+      else
+         blocksize = merge(nrows, ncols, (nrows < ncols * OVERHEAD_FACTOR))
+      end if
+   end function get_blocksize
 
    subroutine gpSparse_finalise(this,error)
       type(gpSparse), intent(inout) :: this
