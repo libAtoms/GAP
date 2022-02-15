@@ -53,9 +53,9 @@ module gp_predict_module
 #ifdef _OPENMP  
    use omp_lib  
 #endif  
-   use system_module, only : dp, qp, optional_default, reallocate, NUMERICAL_ZERO, & 
+   use system_module, only : idp, dp, qp, optional_default, reallocate, NUMERICAL_ZERO, & 
        system_timer, string_to_numerical, print_warning, progress, progress_timer, &
-       current_times, InOutput, OUTPUT, increase_to_multiple, PRINT_VERBOSE
+       current_times, InOutput, OUTPUT, increase_to_multiple, i2si, PRINT_VERBOSE
    use units_module  
    use linearalgebra_module  
    use extendable_str_module  
@@ -801,8 +801,8 @@ module gp_predict_module
       if (task_manager%active) then
          blocksize = merge(task_manager%idata(1), n_globalSparseX, task_manager%idata(1) > 0)
          nlrows = increase_to_multiple(task_manager%unified_workload, blocksize)
-         call print("distA extension: "// &
-            (nlrows - task_manager%unified_workload) * n_globalSparseX * 8 / 10**6//" MB", PRINT_VERBOSE)
+         o = nlrows - task_manager%unified_workload
+         call print("distA extension: "//o//" "//n_globalSparseX//" memory "//i2si(8_idp * o * n_globalSparseX)//"B", PRINT_VERBOSE)
          allocate(globalY(nlrows))
          allocate(a(nlrows,n_globalSparseX))
          alpha = 0.0_qp
