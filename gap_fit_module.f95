@@ -81,7 +81,15 @@ module gap_fit_module
      integer :: e0_method = E0_ISOLATED
      logical :: do_core = .false., do_copy_at_file, has_config_type_sigma, sigma_per_atom = .true.
      logical :: sparsify_only_no_fit = .false.
-     integer :: n_frame, n_coordinate, n_ener, n_force, n_virial, n_hessian, n_local_property, min_save, n_species
+     integer :: n_frame = 0
+     integer :: n_coordinate = 0
+     integer :: n_ener = 0
+     integer :: n_force = 0
+     integer :: n_virial = 0
+     integer :: n_hessian = 0
+     integer :: n_local_property = 0
+     integer :: n_species = 0
+     integer :: min_save
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
@@ -137,6 +145,7 @@ module gap_fit_module
   public :: gap_fit_is_root
 
   public :: gap_fit_print_linear_system_dump_file
+  public :: gap_fit_estimate_memory
 
 contains
 
@@ -326,10 +335,19 @@ contains
         force_parameter_name = trim(parameter_name_prefix) // trim(force_parameter_name)
         virial_parameter_name = trim(parameter_name_prefix) // trim(virial_parameter_name)
         hessian_parameter_name = trim(parameter_name_prefix) // trim(hessian_parameter_name)
+        stress_parameter_name = trim(parameter_name_prefix) // trim(stress_parameter_name)
         config_type_parameter_name = trim(parameter_name_prefix) // trim(config_type_parameter_name)
         sigma_parameter_name = trim(parameter_name_prefix) // trim(sigma_parameter_name)
         force_mask_parameter_name = trim(parameter_name_prefix) // trim(force_mask_parameter_name)
      endif
+
+     if (sparsify_only_no_fit) then
+        force_parameter_name = '//IGNORE//'
+        virial_parameter_name = '//IGNORE//'
+        hessian_parameter_name = '//IGNORE//'
+        stress_parameter_name = '//IGNORE//'
+        call print_warning("sparsify_only_no_fit == T: force, virial, hessian, stress parameters are ignored.")
+     end if
    
      if( len_trim(this%gp_file) > 216 ) then    ! The filename's length is limited to 255 char.s in some filesystem. 
                                         ! Without this check, the fit would run but produce a core file and only a temporary xml file. 
@@ -635,7 +653,7 @@ contains
        call system_abort("read_fit_xyz: at_file "//this%at_file//" could not be found")
     endif
 
-    call initialise(xyzfile,this%at_file)
+    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
     this%n_frame = xyzfile%n_frame
 
     allocate(this%at(this%n_frame))
@@ -809,7 +827,7 @@ contains
       call print_title("Report on number of descriptors found")
       do i = 1, this%n_coordinate
          call print("---------------------------------------------------------------------")
-         call print("Descriptor: "//this%gap_str(i))
+         call print("Descriptor "//i//": "//this%gap_str(i))
          call print("Number of descriptors:                        "//this%n_descriptors(i))
          call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
       enddo
@@ -1464,7 +1482,7 @@ contains
     type(cinoutput) :: xyzfile
     type(atoms) :: at
 
-    call initialise(xyzfile,this%at_file)
+    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
 
     call read(xyzfile,at,frame=0)
     !call get_weights(at,this%w_Z)
@@ -1534,7 +1552,7 @@ contains
 
      if(this%do_copy_at_file) then
         ! Print the fitting configurations used for this potential.
-        if(len(trim(this%at_file)) > 0 ) call file_print_xml(this%at_file,xf)
+        if(len(trim(this%at_file)) > 0 ) call file_print_xml(this%at_file,xf,ws_significant=.false.)
      endif
 
      call xml_EndElement(xf,"GAP_params")
@@ -1588,9 +1606,10 @@ contains
 
   endsubroutine gap_fit_print_xml
 
-  subroutine file_print_xml(this,xf)
+  subroutine file_print_xml(this,xf,ws_significant)
      character(len=*), intent(in) :: this
      type(xmlf_t), intent(inout) :: xf
+     logical, intent(in), optional :: ws_significant
 
      type(inoutput) :: atfile
      character(len=10240) :: line
@@ -1607,7 +1626,7 @@ contains
         elseif(iostat > 0) then
            call system_abort('file_print_xml: unkown error ('//iostat//') while reading '//trim(this))
         endif
-        call xml_AddCharacters(xf,trim(line),parsed=.false.)
+        call xml_AddCharacters(xf,trim(line),parsed=.false.,ws_significant=ws_significant)
         call xml_AddNewLine(xf)
      enddo
      call xml_EndElement(xf,"XYZ_data")
@@ -2102,5 +2121,80 @@ contains
       call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, this%mpi_obj%my_proc)
     end if
   end subroutine gap_fit_print_linear_system_dump_file
+
+  subroutine gap_fit_estimate_memory(this)
+    type(gap_fit), intent(in) :: this
+
+    integer(idp), parameter :: mega = 10**6
+    integer(idp), parameter :: rmem = storage_size(1.0_dp, idp) / 8_idp
+
+    integer :: i
+    integer(idp) :: s1, s2, entries
+    integer(idp) :: mem, memt, memp1  ! scratch, total, peak
+    integer(idp) :: sys_total_mem, sys_free_mem
+
+    call print_title("Memory Estimate (per process)")
+    
+    call print("Descriptors")
+    memt = 0
+    do i = 1, this%n_coordinate
+      s1 = descriptor_dimensions(this%my_descriptor(i))
+
+      entries = s1 * this%n_descriptors(i)
+      mem = entries * rmem
+      memt = memt + mem
+      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//mem/mega//" MB")
+
+      entries = s1 * this%n_cross(i)
+      mem = entries * rmem
+      memt = memt + mem
+      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//mem/mega//" MB")
+    end do
+    call print("Subtotal "//memt/mega//" MB")
+    call print("")
+    memp1 = memt
+
+
+    call print("Covariances")
+    memt = 0
+    s1 = sum(this%config_type_n_sparseX)
+    s2 = (this%n_ener + this%n_local_property) + (this%n_force + this%n_virial + this%n_hessian)
+
+    entries = s1 * s2
+    mem = entries * rmem
+    memt = memt + mem * 2
+    call print("yY "//s1//" "//s2//" memory "//mem/mega//" MB * 2")
+    memp1 = memp1 + mem
+
+    entries = s1 * s1
+    mem = entries * rmem
+    memt = memt + mem
+    call print("yy "//s1//" "//s1//" memory "//mem/mega//" MB")
+
+    entries = s1 * (s1 + s2)
+    mem = entries * rmem
+    memt = memt + mem * 2
+    call print("A "//s1//" "//s1+s2//" memory "//mem/mega//" MB * 2")
+    call print("Subtotal "//memt/mega//" MB")
+    call print("")
+
+    
+    mem = max(memp1, memt)
+    call print("Peak1 "//memp1/mega//" MB")
+    call print("Peak2 "//memt/mega//" MB")
+    call print("PEAK  "//mem/mega//" MB")
+    call print("")
+
+    call mem_info(sys_total_mem, sys_free_mem)
+    call print("Free system memory  "//sys_free_mem/mega//" MB")
+    call print("Total system memory "//sys_total_mem/mega//" MB")
+
+    mem = sys_free_mem - mem
+    if (mem < 0) then
+      call print_warning("Memory estimate exceeds free system memory by "//-mem/mega//" MB.")
+    end if
+
+    call print_title("")
+  end subroutine gap_fit_estimate_memory
 
 end module gap_fit_module

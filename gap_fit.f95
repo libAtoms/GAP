@@ -74,6 +74,7 @@ program gap_fit_program
   call fit_n_from_xyz(main_gap_fit) ! counts number of energies, forces, virials. computes number of descriptors and gradients.
   call gap_fit_distribute_tasks(main_gap_fit)
   if (main_gap_fit%task_manager%n_workers > 1) call fit_n_from_xyz(main_gap_fit)
+  call gap_fit_estimate_memory(main_gap_fit)
 
   call set_baselines(main_gap_fit) ! sets e0 etc.
 
@@ -81,6 +82,10 @@ program gap_fit_program
   call print('Cartesian coordinates transformed to descriptors')
 
   if(main_gap_fit%sparsify_only_no_fit) then
+     if (gap_fit_is_root(main_gap_fit)) then
+        call initialise(main_gap_fit%gp_sp, main_gap_fit%my_gp)
+        call gap_fit_print_xml(main_gap_fit, main_gap_fit%gp_file, main_gap_fit%sparseX_separate_file)
+     end if
      call system_finalise()
      stop
   end if
@@ -90,7 +95,7 @@ program gap_fit_program
 
   call gp_covariance_sparse(main_gap_fit%my_gp)
   call gap_fit_print_linear_system_dump_file(main_gap_fit)
-  call initialise(main_gap_fit%gp_sp, main_gap_fit%my_gp, main_gap_fit%task_manager, main_gap_fit%condition_number_norm)
+  call gpSparse_fit(main_gap_fit%gp_sp, main_gap_fit%my_gp, main_gap_fit%task_manager, main_gap_fit%condition_number_norm)
 
   if (gap_fit_is_root(main_gap_fit)) call gap_fit_print_xml(main_gap_fit, main_gap_fit%gp_file, main_gap_fit%sparseX_separate_file)
 
