@@ -90,6 +90,7 @@ module gap_fit_module
      integer :: n_local_property = 0
      integer :: n_species = 0
      integer :: min_save
+     integer :: mpi_blocksize
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
@@ -174,6 +175,7 @@ contains
      real(dp), pointer :: default_local_property_sigma
 
      integer :: rnd_seed
+     integer, pointer :: mpi_blocksize
 
      at_file => this%at_file
      e0_str => this%e0_str
@@ -204,6 +206,7 @@ contains
      sparsify_only_no_fit => this%sparsify_only_no_fit
      condition_number_norm => this%condition_number_norm
      linear_system_dump_file => this%linear_system_dump_file
+     mpi_blocksize => this%mpi_blocksize
      
      call initialise(params)
      
@@ -316,8 +319,11 @@ contains
      call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
           help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
 
-      call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
+     call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
           help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
+
+     call param_register(params, 'mpi_blocksize', '0', mpi_blocksize, &
+          help_string="Blocksize of MPI distributed matrices. Affects efficiency and memory usage. Max if 0 (default).")
 
      if (.not. param_read_args(params, command_line=this%command_line)) then
         call print("gap_fit")
@@ -2098,14 +2104,18 @@ contains
     call task_manager_init_workers(this%task_manager, this%ScaLAPACK_obj%n_proc_rows)
     call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
     this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
+
+    if (this%task_manager%active) then
+      call task_manager_init_idata(this%task_manager, 1)
+      this%task_manager%idata(1) = this%mpi_blocksize
+    end if
   end subroutine gap_fit_init_task_manager
 
   subroutine gap_fit_distribute_tasks(this)
     type(gap_fit), intent(inout) :: this
 
     ! add special task for Cholesky matrix addon to last worker
-    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), worker_id=this%task_manager%n_workers)
-
+    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
@@ -2174,7 +2184,7 @@ contains
     entries = s1 * (s1 + s2)
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("A "//s1//" "//s1+s2//" memory "//mem/mega//" MB * 2")
+    call print("A "//s1//" "//(s1+s2)//" memory "//mem/mega//" MB * 2")
     call print("Subtotal "//memt/mega//" MB")
     call print("")
 
