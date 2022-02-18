@@ -659,7 +659,7 @@ contains
        call system_abort("read_fit_xyz: at_file "//this%at_file//" could not be found")
     endif
 
-    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
     this%n_frame = xyzfile%n_frame
 
     allocate(this%at(this%n_frame))
@@ -671,6 +671,10 @@ contains
     enddo
 
     call finalise(xyzfile)
+
+    if(this%n_frame <= 0) then
+      call system_abort("read_fit_xyz: "//this%n_frame//" frames read from "//this%at_file//".")
+   endif
 
   endsubroutine read_fit_xyz
 
@@ -1488,7 +1492,7 @@ contains
     type(cinoutput) :: xyzfile
     type(atoms) :: at
 
-    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
 
     call read(xyzfile,at,frame=0)
     !call get_weights(at,this%w_Z)
