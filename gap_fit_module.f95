@@ -2135,7 +2135,6 @@ contains
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
 
-    integer(idp), parameter :: mega = 10**6
     integer(idp), parameter :: rmem = storage_size(1.0_dp, idp) / 8_idp
 
     integer :: i
@@ -2153,14 +2152,14 @@ contains
       entries = s1 * this%n_descriptors(i)
       mem = entries * rmem
       memt = memt + mem
-      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//mem/mega//" MB")
+      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//i2si(mem)//"B")
 
       entries = s1 * this%n_cross(i)
       mem = entries * rmem
       memt = memt + mem
-      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//mem/mega//" MB")
+      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//i2si(mem)//"B")
     end do
-    call print("Subtotal "//memt/mega//" MB")
+    call print("Subtotal "//i2si(memt)//"B")
     call print("")
     memp1 = memt
 
@@ -2173,35 +2172,35 @@ contains
     entries = s1 * s2
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("yY "//s1//" "//s2//" memory "//mem/mega//" MB * 2")
+    call print("yY "//s1//" "//s2//" memory "//i2si(mem)//"B * 2")
     memp1 = memp1 + mem
 
     entries = s1 * s1
     mem = entries * rmem
     memt = memt + mem
-    call print("yy "//s1//" "//s1//" memory "//mem/mega//" MB")
+    call print("yy "//s1//" "//s1//" memory "//i2si(mem)//"B")
 
     entries = s1 * (s1 + s2)
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("A "//s1//" "//(s1+s2)//" memory "//mem/mega//" MB * 2")
-    call print("Subtotal "//memt/mega//" MB")
+    call print("A "//s1//" "//(s1+s2)//" memory "//i2si(mem)//"B * 2")
+    call print("Subtotal "//i2si(memt)//"B")
     call print("")
 
     
     mem = max(memp1, memt)
-    call print("Peak1 "//memp1/mega//" MB")
-    call print("Peak2 "//memt/mega//" MB")
-    call print("PEAK  "//mem/mega//" MB")
+    call print("Peak1 "//i2si(memp1)//"B")
+    call print("Peak2 "//i2si(memt)//"B")
+    call print("PEAK  "//i2si(mem)//"B")
     call print("")
 
     call mem_info(sys_total_mem, sys_free_mem)
-    call print("Free system memory  "//sys_free_mem/mega//" MB")
-    call print("Total system memory "//sys_total_mem/mega//" MB")
+    call print("Free system memory  "//i2si(sys_free_mem)//"B")
+    call print("Total system memory "//i2si(sys_total_mem)//"B")
 
     mem = sys_free_mem - mem
     if (mem < 0) then
-      call print_warning("Memory estimate exceeds free system memory by "//-mem/mega//" MB.")
+      call print_warning("Memory estimate exceeds free system memory by "//i2si(-mem)//"B.")
     end if
 
     call print_title("")

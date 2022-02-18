@@ -53,9 +53,9 @@ module gp_predict_module
 #ifdef _OPENMP  
    use omp_lib  
 #endif  
-   use system_module, only : dp, qp, optional_default, reallocate, NUMERICAL_ZERO, & 
+   use system_module, only : idp, dp, qp, optional_default, reallocate, NUMERICAL_ZERO, & 
        system_timer, string_to_numerical, print_warning, progress, progress_timer, &
-       current_times, InOutput, OUTPUT, increase_to_multiple, PRINT_VERBOSE
+       current_times, InOutput, OUTPUT, increase_to_multiple, i2si, PRINT_VERBOSE
    use units_module  
    use linearalgebra_module  
    use extendable_str_module  
@@ -799,10 +799,10 @@ module gp_predict_module
 
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
-         blocksize = merge(task_manager%idata(1), n_globalSparseX, task_manager%idata(1) > 0)
+         blocksize = get_blocksize(task_manager%idata(1), task_manager%unified_workload, n_globalSparseX)
          nlrows = increase_to_multiple(task_manager%unified_workload, blocksize)
-         call print("distA extension: "// &
-            (nlrows - task_manager%unified_workload) * n_globalSparseX * 8 / 10**6//" MB", PRINT_VERBOSE)
+         o = nlrows - task_manager%unified_workload
+         call print("distA extension: "//o//" "//n_globalSparseX//" memory "//i2si(8_idp * o * n_globalSparseX)//"B", PRINT_VERBOSE)
          allocate(globalY(nlrows))
          allocate(a(nlrows,n_globalSparseX))
          alpha = 0.0_qp
@@ -926,6 +926,19 @@ module gp_predict_module
       this%fitted = .true.
 
    endsubroutine gpSparse_fit
+
+   function get_blocksize(arg, nrows, ncols) result(blocksize)
+      integer, intent(in) :: arg, nrows, ncols
+      integer :: blocksize
+
+      integer, parameter :: OVERHEAD_FACTOR = 2  ! worst case: +1/2=50% matrix size
+
+      if (arg > 0) then
+         blocksize = arg
+      else
+         blocksize = merge(nrows, ncols, (nrows < ncols * OVERHEAD_FACTOR))
+      end if
+   end function get_blocksize
 
    subroutine gpSparse_finalise(this,error)
       type(gpSparse), intent(inout) :: this
