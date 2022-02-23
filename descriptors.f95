@@ -9099,8 +9099,15 @@ module descriptors_module
             descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%rcut_hard)
-
+!           l_n_neighbours = n_neighbours(at,i,max_dist=this%rcut_hard)
+            l_n_neighbours = 0
+            do n = 1, n_neighbours(at, i)
+               j = neighbour(at, i, n, distance = r_ij)
+!              The neighbors list past to the soap_turbo library must only contained the "seen" species
+               if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
+                  l_n_neighbours = l_n_neighbours + 1
+               endif
+            enddo
             allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
             allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
             allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
