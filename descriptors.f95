@@ -9135,7 +9135,15 @@ module descriptors_module
             descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
-         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
+!         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
+         n_atom_pairs = 1 !Including the central atom
+         do n = 1, n_neighbours(at, i)
+            j = neighbour(at, i, n)
+!           The neighbors list past to the soap_turbo library must only contained the "seen" species
+            if(species_map(at%Z(j)) > 0)then
+               n_atom_pairs = n_atom_pairs + 1
+            endif
+         enddo
          allocate( rjs(n_atom_pairs) )
          allocate( thetas(n_atom_pairs) )
          allocate( phis(n_atom_pairs) )
@@ -9150,23 +9158,21 @@ module descriptors_module
          do n = 1, n_neighbours(at,i)
             j = neighbour(at, i, n, distance = r_ij, diff = d_ij, cosines = u_ij)
 
-            if( r_ij >= this%rcut_hard ) cycle
+            if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
             i_n = i_n + 1
 
             rjs(i_n) = r_ij
 
             thetas(i_n) = dacos( u_ij(3) )
             phis(i_n) = datan2( d_ij(2), d_ij(1) )
-            if( species_map(at%Z(j)) > 0 )then
-               mask(i_n,species_map(at%Z(j))) = .true.
-            endif
+            mask(i_n,species_map(at%Z(j))) = .true.
          enddo
 
          if( my_do_grad_descriptor ) then
             i_n = 0
             do n = 1, n_neighbours(at,i)
                j = neighbour(at, i, n, distance = r_ij, shift = shift_ij)
-               if( r_ij >= this%rcut_hard ) cycle
+               if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
                i_n = i_n + 1
                descriptor_out%x(i_desc)%ii(i_n) = j
                descriptor_out%x(i_desc)%pos(:,i_n) = at%pos(:,j) + matmul(at%lattice,shift_ij)
@@ -9192,7 +9198,7 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
             do k = 1, 3
-               descriptor_out%x(i_desc)%grad_data(:,k,0:) = grad_descriptor_i(k,:,:)
+               descriptor_out%x(i_desc)%grad_data(:,k,0:n_atom_pairs-1) = grad_descriptor_i(k,:,1:n_atom_pairs)
             enddo
          endif
 
