@@ -9138,9 +9138,9 @@ module descriptors_module
 !         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
          n_atom_pairs = 1 !Including the central atom
          do n = 1, n_neighbours(at, i)
-            j = neighbour(at, i, n)
+            j = neighbour(at, i, n, distance = r_ij)
 !           The neighbors list past to the soap_turbo library must only contained the "seen" species
-            if(species_map(at%Z(j)) > 0)then
+            if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
                n_atom_pairs = n_atom_pairs + 1
             endif
          enddo
