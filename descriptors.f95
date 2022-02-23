@@ -9037,7 +9037,8 @@ module descriptors_module
 
       if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
 
-      allocate(species_map(maxval(this%species_Z)))
+!      allocate(species_map(maxval(this%species_Z)))
+      allocate(species_map(1:118))
       species_map = 0
       species_map(this%species_Z) = (/(i, i = 1, this%n_species)/)
 
@@ -9156,7 +9157,9 @@ module descriptors_module
 
             thetas(i_n) = dacos( u_ij(3) )
             phis(i_n) = datan2( d_ij(2), d_ij(1) )
-            mask(i_n,species_map(at%Z(j))) = .true.
+            if( species_map(at%Z(j)) > 0 )then
+               mask(i_n,species_map(at%Z(j))) = .true.
+            endif
          enddo
 
          if( my_do_grad_descriptor ) then
