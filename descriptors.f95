@@ -9319,7 +9319,8 @@ module descriptors_module
 
       if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
 
-      allocate(species_map(maxval(this%species_Z)))
+!      allocate(species_map(maxval(this%species_Z)))
+      allocate(species_map(1:118))
       species_map = 0
       species_map(this%species_Z) = (/(i, i = 1, this%n_species)/)
 
@@ -9380,8 +9381,15 @@ module descriptors_module
             descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%rcut_hard)
-
+!           l_n_neighbours = n_neighbours(at,i,max_dist=this%rcut_hard)
+            l_n_neighbours = 0
+            do n = 1, n_neighbours(at, i)
+               j = neighbour(at, i, n, distance = r_ij)
+!              The neighbors list past to the soap_turbo library must only contained the "seen" species
+               if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
+                  l_n_neighbours = l_n_neighbours + 1
+               endif
+            enddo
             allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
             allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
             allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
@@ -9416,7 +9424,15 @@ module descriptors_module
             descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
-         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
+!         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
+         n_atom_pairs = 1 !Including the central atom
+         do n = 1, n_neighbours(at, i)
+            j = neighbour(at, i, n, distance = r_ij)
+!           The neighbors list past to the soap_turbo library must only contained the "seen" species
+            if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
+               n_atom_pairs = n_atom_pairs + 1
+            endif
+         enddo
          allocate( rjs(n_atom_pairs) )
          allocate( thetas(n_atom_pairs) )
          allocate( phis(n_atom_pairs) )
@@ -9431,7 +9447,7 @@ module descriptors_module
          do n = 1, n_neighbours(at,i)
             j = neighbour(at, i, n, distance = r_ij, diff = d_ij, cosines = u_ij)
 
-            if( r_ij >= this%rcut_hard ) cycle
+            if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
             i_n = i_n + 1
 
             rjs(i_n) = r_ij
@@ -9445,7 +9461,7 @@ module descriptors_module
             i_n = 0
             do n = 1, n_neighbours(at,i)
                j = neighbour(at, i, n, distance = r_ij, shift = shift_ij)
-               if( r_ij >= this%rcut_hard ) cycle
+               if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
                i_n = i_n + 1
                descriptor_out%x(i_desc)%ii(i_n) = j
                descriptor_out%x(i_desc)%pos(:,i_n) = at%pos(:,j) + matmul(at%lattice,shift_ij)
@@ -9471,7 +9487,7 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
             do k = 1, 3
-               descriptor_out%x(i_desc)%grad_data(:,k,0:) = grad_descriptor_i(k,:,:)
+               descriptor_out%x(i_desc)%grad_data(:,k,0:n_atom_pairs-1) = grad_descriptor_i(k,:,1:n_atom_pairs)
             enddo
          endif
 

@@ -90,6 +90,7 @@ module gap_fit_module
      integer :: n_local_property = 0
      integer :: n_species = 0
      integer :: min_save
+     integer :: mpi_blocksize
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
@@ -174,6 +175,7 @@ contains
      real(dp), pointer :: default_local_property_sigma
 
      integer :: rnd_seed
+     integer, pointer :: mpi_blocksize
 
      at_file => this%at_file
      e0_str => this%e0_str
@@ -204,6 +206,7 @@ contains
      sparsify_only_no_fit => this%sparsify_only_no_fit
      condition_number_norm => this%condition_number_norm
      linear_system_dump_file => this%linear_system_dump_file
+     mpi_blocksize => this%mpi_blocksize
      
      call initialise(params)
      
@@ -316,8 +319,11 @@ contains
      call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
           help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
 
-      call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
+     call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
           help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
+
+     call param_register(params, 'mpi_blocksize', '0', mpi_blocksize, &
+          help_string="Blocksize of MPI distributed matrices. Affects efficiency and memory usage. Max if 0 (default).")
 
      if (.not. param_read_args(params, command_line=this%command_line)) then
         call print("gap_fit")
@@ -653,7 +659,7 @@ contains
        call system_abort("read_fit_xyz: at_file "//this%at_file//" could not be found")
     endif
 
-    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
     this%n_frame = xyzfile%n_frame
 
     allocate(this%at(this%n_frame))
@@ -665,6 +671,10 @@ contains
     enddo
 
     call finalise(xyzfile)
+
+    if(this%n_frame <= 0) then
+      call system_abort("read_fit_xyz: "//this%n_frame//" frames read from "//this%at_file//".")
+   endif
 
   endsubroutine read_fit_xyz
 
@@ -1482,7 +1492,7 @@ contains
     type(cinoutput) :: xyzfile
     type(atoms) :: at
 
-    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
 
     call read(xyzfile,at,frame=0)
     !call get_weights(at,this%w_Z)
@@ -2098,14 +2108,18 @@ contains
     call task_manager_init_workers(this%task_manager, this%ScaLAPACK_obj%n_proc_rows)
     call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
     this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
+
+    if (this%task_manager%active) then
+      call task_manager_init_idata(this%task_manager, 1)
+      this%task_manager%idata(1) = this%mpi_blocksize
+    end if
   end subroutine gap_fit_init_task_manager
 
   subroutine gap_fit_distribute_tasks(this)
     type(gap_fit), intent(inout) :: this
 
     ! add special task for Cholesky matrix addon to last worker
-    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), worker_id=this%task_manager%n_workers)
-
+    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
@@ -2125,7 +2139,6 @@ contains
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
 
-    integer(idp), parameter :: mega = 10**6
     integer(idp), parameter :: rmem = storage_size(1.0_dp, idp) / 8_idp
 
     integer :: i
@@ -2143,14 +2156,14 @@ contains
       entries = s1 * this%n_descriptors(i)
       mem = entries * rmem
       memt = memt + mem
-      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//mem/mega//" MB")
+      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//i2si(mem)//"B")
 
       entries = s1 * this%n_cross(i)
       mem = entries * rmem
       memt = memt + mem
-      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//mem/mega//" MB")
+      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//i2si(mem)//"B")
     end do
-    call print("Subtotal "//memt/mega//" MB")
+    call print("Subtotal "//i2si(memt)//"B")
     call print("")
     memp1 = memt
 
@@ -2163,35 +2176,35 @@ contains
     entries = s1 * s2
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("yY "//s1//" "//s2//" memory "//mem/mega//" MB * 2")
+    call print("yY "//s1//" "//s2//" memory "//i2si(mem)//"B * 2")
     memp1 = memp1 + mem
 
     entries = s1 * s1
     mem = entries * rmem
     memt = memt + mem
-    call print("yy "//s1//" "//s1//" memory "//mem/mega//" MB")
+    call print("yy "//s1//" "//s1//" memory "//i2si(mem)//"B")
 
     entries = s1 * (s1 + s2)
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("A "//s1//" "//s1+s2//" memory "//mem/mega//" MB * 2")
-    call print("Subtotal "//memt/mega//" MB")
+    call print("A "//s1//" "//(s1+s2)//" memory "//i2si(mem)//"B * 2")
+    call print("Subtotal "//i2si(memt)//"B")
     call print("")
 
     
     mem = max(memp1, memt)
-    call print("Peak1 "//memp1/mega//" MB")
-    call print("Peak2 "//memt/mega//" MB")
-    call print("PEAK  "//mem/mega//" MB")
+    call print("Peak1 "//i2si(memp1)//"B")
+    call print("Peak2 "//i2si(memt)//"B")
+    call print("PEAK  "//i2si(mem)//"B")
     call print("")
 
     call mem_info(sys_total_mem, sys_free_mem)
-    call print("Free system memory  "//sys_free_mem/mega//" MB")
-    call print("Total system memory "//sys_total_mem/mega//" MB")
+    call print("Free system memory  "//i2si(sys_free_mem)//"B")
+    call print("Total system memory "//i2si(sys_total_mem)//"B")
 
     mem = sys_free_mem - mem
     if (mem < 0) then
-      call print_warning("Memory estimate exceeds free system memory by "//-mem/mega//" MB.")
+      call print_warning("Memory estimate exceeds free system memory by "//i2si(-mem)//"B.")
     end if
 
     call print_title("")
