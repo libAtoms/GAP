@@ -136,10 +136,6 @@ module gp_predict_module
    integer, parameter, public :: GP_SPARSE_CUR_POINTS = 12
    integer, parameter, public :: GP_SPARSE_NONE = 13
 
-   integer, parameter, public :: GP_COVARIANCE_FITC = 1
-   integer, parameter, public :: GP_COVARIANCE_DTC = 2
-
-
    integer, parameter, public :: COVARIANCE_NONE             = 0
    integer, parameter, public :: COVARIANCE_ARD_SE           = 1
    integer, parameter, public :: COVARIANCE_DOT_PRODUCT      = 2
@@ -263,7 +259,7 @@ module gp_predict_module
       real(dp), dimension(:), allocatable :: sigma_y, sigma_yPrime
       ! estimated error of function values, derivatives
 
-      real(dp), dimension(:,:), allocatable :: covariance_subY_y, covariance_subY_subY, covariance_y_y, inverse_sparse_full
+      real(dp), dimension(:,:), allocatable :: covariance_subY_y, covariance_subY_subY, covariance_y_y
       ! covariance matrix
 
       real(dp), dimension(:), allocatable :: covarianceDiag_y_y, lambda, alpha
@@ -273,7 +269,6 @@ module gp_predict_module
 
       type(gpCoordinates), dimension(:), allocatable :: coordinate
 
-      integer :: covariance_method = GP_COVARIANCE_DTC
       logical :: initialised = .false.
 
    endtype gpFull
@@ -989,8 +984,6 @@ module gp_predict_module
       if(allocated(this%covarianceDiag_y_y)) deallocate( this%covarianceDiag_y_y )
       if(allocated(this%lambda)) deallocate( this%lambda )
       if(allocated(this%alpha)) deallocate( this%alpha )
-      if(allocated(this%inverse_sparse_full)) deallocate( this%inverse_sparse_full )
-
 
       this%n_coordinate = 0
       this%n_y = 0
@@ -1551,17 +1544,12 @@ module gp_predict_module
    subroutine gpFull_covarianceMatrix_sparse(this,error)
       type(gpFull), intent(inout), target :: this
       integer, optional, intent(out) :: error
+
       integer :: i_coordinate, i_global_sparseX, j_global_sparseX, i_sparseX, j_sparseX, &
-      n_globalY, i_globalY, i_global_yPrime, i_y, i_yPrime, i_x, j_x, n_x, i_xPrime, j_xPrime, n_xPrime, n, i
-      real(dp) :: covariance_xPrime_sparseX, covariance_x_x_single, covariance_xPrime_xPrime, fc_i, fc_j, dfc_i, dfc_j
-      real(dp), dimension(:,:,:,:), allocatable :: grad2_Covariance
-      real(dp), dimension(:,:,:), allocatable :: grad_Covariance_j
-      real(dp), dimension(:,:), allocatable :: grad_Covariance_i, covariance_x_x
+      n_globalY, i_globalY, i_global_yPrime, i_y, i_yPrime, i_x, j_x, n_x, i_xPrime, j_xPrime, n_xPrime
+      real(dp) :: covariance_xPrime_sparseX
+      real(dp), dimension(:,:), allocatable :: grad_Covariance_i
       real(dp), dimension(:), allocatable :: covariance_x_sparseX, covariance_subY_currentX_y, covariance_subY_currentX_suby
-      real(dp), dimension(:), pointer :: xPrime_i, xPrime_j
-      integer, dimension(:), allocatable :: xIndex, xPrime_Index, xPrime_x_Index
-      type(LA_matrix) :: LA_covariance_subY_subY
-      logical :: found_i_x
       real(dp) :: start_time, cpu_time, wall_time
 
       
@@ -1627,10 +1615,9 @@ module gp_predict_module
       call reallocate(this%covariance_subY_subY, this%n_globalSparseX, this%n_globalSparseX, zero = .true.)
       call reallocate(this%covarianceDiag_y_y, n_globalY, zero = .true.)
       call reallocate(this%lambda, n_globalY, zero = .true.)
-      call reallocate(this%inverse_sparse_full, this%n_globalSparseX, n_globalY, zero = .true.)
 
-      allocate( covariance_subY_currentX_y(n_globalY),covariance_subY_currentX_suby(this%n_globalSparseX) )	
-      covariance_subY_currentX_y = 0.0_dp	
+      allocate( covariance_subY_currentX_y(n_globalY),covariance_subY_currentX_suby(this%n_globalSparseX) )
+      covariance_subY_currentX_y = 0.0_dp
       covariance_subY_currentX_suby = 0.0_dp
 
       do i_coordinate = 1, this%n_coordinate
@@ -1723,173 +1710,15 @@ module gp_predict_module
          call print('Finished sparse covariance matrix calculation of coordinate '//i_coordinate)
          call system_timer('gpFull_covarianceMatrix_sparse_Coordinate'//i_coordinate//'_sparse')
 
-         select case(this%covariance_method)
-         case(GP_COVARIANCE_FITC)
-            call system_timer('gpFull_covarianceMatrix_sparse_Coordinate'//i_coordinate//'_diag')
-            do i_y = 1, this%n_y
-               ! loop over all function values
-
-               i_globalY = this%map_y_globalY(i_y)
-               ! find unique function value/derivative identifier
-
-               n_x = count( this%coordinate(i_coordinate)%map_x_y == i_y )
-               allocate(xIndex(n_x))
-               
-               n = 1
-               do i = 1, size(this%coordinate(i_coordinate)%map_x_y)
-                  if(this%coordinate(i_coordinate)%map_x_y(i) == i_y) then
-                     xIndex(n) = i
-                     n = n+1
-                  endif
-               enddo
-
-               ! construct index array of all contributions to a given function value
-
-               do i_x = 1, n_x
-                  do j_x = 1, n_x
-                     covariance_x_x_single = gpCoordinates_Covariance( this%coordinate(i_coordinate), i_x = xIndex(i_x), j_x = xIndex(j_x) ) * &
-                     this%coordinate(i_coordinate)%cutoff(xIndex(i_x))*this%coordinate(i_coordinate)%cutoff(xIndex(j_x))
-                     this%covarianceDiag_y_y(i_globalY) = this%covarianceDiag_y_y(i_globalY) + covariance_x_x_single
-                  enddo
-               enddo
-               deallocate(xIndex)
-            enddo
-            call system_timer('gpFull_covarianceMatrix_sparse_Coordinate'//i_coordinate//'_diag')
-
-            call system_timer('gpFull_covarianceMatrix_sparse_Coordinate'//i_coordinate//'_grad_diag')
-
-            do i_yPrime = 1, this%n_yPrime
-               ! loop over all derivative values
-               i_global_yPrime = this%map_yPrime_globalY(i_yPrime)
-               ! find unique function value/derivative identifier
-
-               !n_xPrime = count( this%coordinate(i_coordinate)%map_xPrime_yPrime == i_yPrime )
-               allocate(xPrime_Index(size(this%coordinate(i_coordinate)%map_xPrime_yPrime)))
-               
-               ! construct index array of all contributions to a given derivative value
-               n = 0
-               do i = 1, size(this%coordinate(i_coordinate)%map_xPrime_yPrime)
-                  if(this%coordinate(i_coordinate)%map_xPrime_yPrime(i) == i_yPrime) then
-                     n = n + 1
-                     xPrime_Index(n) = i
-                  endif
-               enddo
-               n_xPrime = n
-               call reallocate(xPrime_Index,n_xPrime,copy=.true.)
-
-               ! xIndex: for each xPrime that contributes to the given i_yPrime, this contains the indices 
-               ! of the x in the main database. Length is less or equal to the number of xPrimes.
-               ! xPrime_x_Index: this is the inverse of xIndex, i.e. for each xPrime this contains the index
-               ! of x in xIndex.
-               allocate(xPrime_x_Index(n_xPrime),xIndex(n_xPrime))
-               xIndex = -1
-               n_x = 1
-               xIndex(1) = this%coordinate(i_coordinate)%map_xPrime_x(xPrime_Index(1))
-               xPrime_x_Index(1) = 1
-               ! Search started off.
-               do i_xPrime = 2, n_xPrime
-                  i_x = this%coordinate(i_coordinate)%map_xPrime_x(xPrime_Index(i_xPrime))
-                  found_i_x = .false.
-                  do i = 1, n_x
-                     if(xIndex(i) == i_x) then
-                        xPrime_x_Index(i_xPrime) = i
-                        found_i_x = .true.
-                        exit
-                     endif
-                  enddo
-                  if(.not. found_i_x) then
-                     n_x = n_x + 1
-                     xIndex(n_x) = i_x
-                     xPrime_x_Index(i_xPrime) = n_x
-                  endif
-
-                  !if( any(xIndex(:n_x) == i_x) ) then
-                  !   do i = 1, n_x
-                  !      if(xIndex(i) == i_x) xPrime_x_Index(i_xPrime) = i
-                  !   enddo
-                  !   cycle
-                  !else
-                  !   n_x = n_x + 1
-                  !   xIndex(n_x) = i_x
-                  !   xPrime_x_Index(i_xPrime) = n_x
-                  !endif
-               enddo
-               call reallocate(xIndex,n_x,copy=.true.)
-
-
-               allocate( grad2_Covariance(this%coordinate(i_coordinate)%d,this%coordinate(i_coordinate)%d,n_x,n_x), &
-              grad_Covariance_j(this%coordinate(i_coordinate)%d,n_x,n_x), covariance_x_x(n_x,n_x) ) !, &
-   !            xPrime_i_grad2_Covariance(this%coordinate(i_coordinate)%d) )
-               grad2_Covariance = 0.0_dp
-               do i_x = 1, n_x
-                  do j_x = 1, n_x
-                     covariance_x_x(j_x,i_x) = gpCoordinates_Covariance( this%coordinate(i_coordinate), i_x = xIndex(i_x), j_x = xIndex(j_x), &
-                     grad_Covariance_j = grad_Covariance_j(:,j_x,i_x), grad2_Covariance=grad2_Covariance(:,:,j_x,i_x) )
-                  enddo
-               enddo
-
-               do i_xPrime = 1, n_xPrime
-                  i_x = xPrime_x_Index(i_xPrime)
-                  xPrime_i => this%coordinate(i_coordinate)%xPrime(:,xPrime_Index(i_xPrime))
-                  
-                  fc_i = this%coordinate(i_coordinate)%cutoff(xIndex(i_x))
-                  dfc_i = this%coordinate(i_coordinate)%cutoffPrime(xPrime_Index(i_xPrime))
-                  do j_xPrime = 1, n_xPrime
-                     j_x = xPrime_x_Index(j_xPrime)
-                     xPrime_j => this%coordinate(i_coordinate)%xPrime(:,xPrime_Index(j_xPrime))
-
-                     fc_j = this%coordinate(i_coordinate)%cutoff(xIndex(j_x))
-                     dfc_j = this%coordinate(i_coordinate)%cutoffPrime(xPrime_Index(j_xPrime))
-
-                     covariance_xPrime_xPrime = dot_product(matmul(xPrime_i,grad2_Covariance(:,:,j_x,i_x)),xPrime_j)*&
-                     fc_i*fc_j + &
-                     dot_product(grad_Covariance_j(:,j_x,i_x),xPrime_i)*fc_i*dfc_j + &
-                     dot_product(grad_Covariance_j(:,j_x,i_x),xPrime_j)*fc_j*dfc_i + &
-                     covariance_x_x(j_x,i_x)*dfc_i*dfc_j
-                     !gpCoordinates_Covariance( this%coordinate(i_coordinate), i_xPrime = xPrime_Index(i_xPrime), j_xPrime = xPrime_Index(j_xPrime) )
-                     this%covarianceDiag_y_y(i_global_yPrime) = this%covarianceDiag_y_y(i_global_yPrime) + covariance_xPrime_xPrime
-                  enddo
-               enddo
-
-               if(allocated(xPrime_Index)) deallocate(xPrime_Index)
-               if(allocated(xIndex)) deallocate(xIndex)
-               if(allocated(xPrime_x_Index)) deallocate(xPrime_x_Index)
-               if(allocated(grad2_Covariance)) deallocate(grad2_Covariance)
-               if(allocated(grad_Covariance_j)) deallocate(grad_Covariance_j)
-               if(allocated(covariance_x_x)) deallocate(covariance_x_x)
-            enddo
-            call system_timer('gpFull_covarianceMatrix_sparse_Coordinate'//i_coordinate//'_grad_diag')
-         case(GP_COVARIANCE_DTC)
-            this%covarianceDiag_y_y = 0.0_dp
-         case default
-            this%covarianceDiag_y_y = 0.0_dp
-         endselect
+         this%covarianceDiag_y_y = 0.0_dp
 
          if (allocated(this%coordinate(i_coordinate)%x)) deallocate(this%coordinate(i_coordinate)%x)
          if (allocated(this%coordinate(i_coordinate)%xPrime)) deallocate(this%coordinate(i_coordinate)%xPrime)
          call system_timer('gpFull_covarianceMatrix_sparse_Coordinate'//i_coordinate)
       enddo
 
-      call system_timer('gpFull_covarianceMatrix_sparse_LinearAlgebra')
-      call initialise(LA_covariance_subY_subY,this%covariance_subY_subY)
-      call Matrix_Solve(LA_covariance_subY_subY, this%covariance_subY_y, this%inverse_sparse_full,error=error)
-      call finalise(LA_covariance_subY_subY)
-      call system_timer('gpFull_covarianceMatrix_sparse_LinearAlgebra')
-
       call system_timer('gpFull_covarianceMatrix_sparse_FunctionValues')
-      select case(this%covariance_method)
-      case(GP_COVARIANCE_FITC)
-         do i_globalY = 1, n_globalY
-            ! loop over all function values
-
-            this%lambda(i_globalY) = this%covarianceDiag_y_y(i_globalY) - &
-               dot_product( this%inverse_sparse_full(:,i_globalY), this%covariance_subY_y(:,i_globalY) )
-         enddo
-      case(GP_COVARIANCE_DTC)
-         this%lambda = 0.0_dp
-      case default
-         this%lambda = 0.0_dp
-      endselect
+      this%lambda = 0.0_dp
 
       do i_y = 1, this%n_y
          ! loop over all function values
