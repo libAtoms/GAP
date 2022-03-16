@@ -46,6 +46,7 @@ module gap_fit_module
   use potential_module
   use ScaLAPACK_module
   use task_manager_module
+  use MPI_context_module, only : is_root
 
   implicit none
 
@@ -2133,10 +2134,11 @@ contains
     call task_manager_check_distribution(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
-  function gap_fit_is_root(this) result(is_root)
+  function gap_fit_is_root(this, root) result(res)
     type(gap_fit), intent(in) :: this
-    logical :: is_root
-    is_root = (.not. this%MPI_obj%active .or. this%MPI_obj%my_proc == 0)
+    integer, intent(in), optional :: root
+    logical :: res
+    res = is_root(this%MPI_obj, root)
   end function gap_fit_is_root
   
   subroutine gap_fit_print_linear_system_dump_file(this)
