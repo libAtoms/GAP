@@ -2130,6 +2130,7 @@ contains
     ! add special task for Cholesky matrix addon to last worker
     call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
+    call task_manager_check_distribution(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
   function gap_fit_is_root(this) result(is_root)
