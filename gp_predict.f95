@@ -68,6 +68,7 @@ module gp_predict_module
    use CInOutput_module, only : quip_md5sum
    use task_manager_module
    use matrix_module
+   use MPI_context_module, only : scatterv
 
    implicit none
 
@@ -268,6 +269,8 @@ module gp_predict_module
       integer, dimension(:), allocatable :: map_y_globalY, map_yPrime_globalY
 
       type(gpCoordinates), dimension(:), allocatable :: coordinate
+
+      logical :: do_subY_subY = .true.
 
       logical :: initialised = .false.
 
@@ -751,10 +754,10 @@ module gp_predict_module
 
       character(len=STRING_LENGTH) :: my_condition_number_norm
 
-      integer :: i, j, n, o, t, w, blocksize
+      integer :: i, j, blocksize
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i_y, i_yPrime, &
       i_globalY, i_global_yPrime, nlrows
-#ifdef HAVE_QR      
+#ifdef HAVE_QR
       real(qp) :: rcond
       real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
       real(qp), dimension(:), allocatable :: globalY, alpha
@@ -780,24 +783,26 @@ module gp_predict_module
       call matrix_product_vect_asdiagonal_sub(c_subYY_sqrtInverseLambda,from%covariance_subY_y,sqrt(1.0_qp/from%lambda)) ! O(NM)
       if (allocated(from%covariance_subY_y)) deallocate(from%covariance_subY_y)  ! free input component to save memory
       
-      allocate(factor_c_subYsubY(n_globalSparseX,n_globalSparseX))
-      call initialise(LA_c_subYsubY,from%covariance_subY_subY)
-      call LA_Matrix_Factorise(LA_c_subYsubY,factor_c_subYsubY,error=error)
-      call finalise(LA_c_subYsubY)
-      if (allocated(from%covariance_subY_subY)) deallocate(from%covariance_subY_subY)  ! free input component to save memory
+      if (from%do_subY_subY) then
+         allocate(factor_c_subYsubY(n_globalSparseX,n_globalSparseX))
+         call initialise(LA_c_subYsubY,from%covariance_subY_subY,use_allocate=.false.)
+         call LA_Matrix_Factorise(LA_c_subYsubY,factor_c_subYsubY,error=error)
+         call finalise(LA_c_subYsubY)
+         if (allocated(from%covariance_subY_subY)) deallocate(from%covariance_subY_subY)  ! free input component to save memory
 
-      do i = 1, n_globalSparseX-1
-         do j = i+1, n_globalSparseX
-            factor_c_subYsubY(j,i) = 0.0_qp
+         do i = 1, n_globalSparseX-1
+            do j = i+1, n_globalSparseX
+               factor_c_subYsubY(j,i) = 0.0_qp
+            end do
          end do
-      end do
+      end if
 
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
          blocksize = get_blocksize(task_manager%idata(1), task_manager%unified_workload, n_globalSparseX)
          nlrows = increase_to_multiple(task_manager%unified_workload, blocksize)
-         o = nlrows - task_manager%unified_workload
-         call print("distA extension: "//o//" "//n_globalSparseX//" memory "//i2si(8_idp * o * n_globalSparseX)//"B", PRINT_VERBOSE)
+         i = nlrows - task_manager%unified_workload
+         call print("distA extension: "//i//" "//n_globalSparseX//" memory "//i2si(8_idp * i * n_globalSparseX)//"B", PRINT_VERBOSE)
          allocate(globalY(nlrows))
          allocate(a(nlrows,n_globalSparseX))
          alpha = 0.0_qp
@@ -812,13 +817,7 @@ module gp_predict_module
       if (allocated(c_subYY_sqrtInverseLambda)) deallocate(c_subYY_sqrtInverseLambda)
 
       if (task_manager%active) then
-         ! put L part at the end of local A (take info from last task of each worker)
-         w = task_manager%my_worker_id
-         t = task_manager%workers(w)%n_tasks
-         n = task_manager%workers(w)%tasks(t)%idata(1)
-         o = task_manager%workers(w)%tasks(t)%idata(2)
-         n = min(o+n, n_globalSparseX) - o ! secure against sparseX reduction since distribution
-         a(n_globalY+1:n_globalY+n,:) = factor_c_subYsubY(o+1:o+n,:)
+         call scatter_shared_task(task_manager, factor_c_subYsubY, a, n_globalY, n_globalSparseX, from%do_subY_subY)
       else
          a(n_globalY+1:,:) = factor_c_subYsubY
       end if
@@ -921,6 +920,59 @@ module gp_predict_module
       this%fitted = .true.
 
    endsubroutine gpSparse_fit
+
+   ! put L part at the end of local A (take info from last task of each worker)
+   subroutine scatter_shared_task(task_manager, factor_c_subYsubY, a, n_globalY, n_globalSparseX, do_subY_subY)
+      type(task_manager_type), intent(in) :: task_manager
+      real(qp), intent(inout) :: factor_c_subYsubY(:,:)
+      real(qp), intent(inout) :: a(:,:)
+      integer, intent(in) :: n_globalY
+      integer, intent(in) :: n_globalSparseX
+      logical, intent(in) :: do_subY_subY
+
+      integer :: n, t, w
+      integer, allocatable :: counts(:)
+      real(dp), allocatable :: tmp(:,:)
+
+      ! scattering works with cols, so transposing input and output
+      if (do_subY_subY) then
+         factor_c_subYsubY = transpose(factor_c_subYsubY)
+         call get_shared_task_counts(task_manager, n_globalSparseX, counts)
+      end if
+
+      w = task_manager%my_worker_id
+      t = task_manager%workers(w)%n_tasks
+      n = task_manager%workers(w)%tasks(t)%idata(1)
+      allocate(tmp(n_globalSparseX,n))
+      tmp = 0.0_dp
+
+      call scatterv(task_manager%MPI_obj, factor_c_subYsubY, tmp, counts)
+      a(n_globalY+1:n_globalY+n,:) = transpose(tmp)
+   end subroutine scatter_shared_task
+
+   subroutine get_shared_task_counts(task_manager, ncols, counts)
+      type(task_manager_type), intent(in) :: task_manager
+      integer, intent(in) :: ncols
+      integer, intent(out), allocatable :: counts(:)
+
+      integer :: n, o, t, w
+
+      allocate(counts(task_manager%n_workers))
+      counts = 0
+      o = 0
+      do w = 1, task_manager%n_workers
+         t = task_manager%workers(w)%n_tasks
+         n = task_manager%workers(w)%tasks(t)%idata(1)
+         counts(w) = n * ncols
+         o = o + n
+         if (o > ncols) then
+            counts(w) = (n - (o - ncols)) * ncols
+            call print_warning("get_shared_task_counts: Not enough data. &
+               &Were sparse points reduced since task distribution?")
+            exit
+         end if
+      end do
+   end subroutine get_shared_task_counts
 
    function get_blocksize(arg, nrows, ncols) result(blocksize)
       integer, intent(in) :: arg, nrows, ncols
@@ -1611,8 +1663,13 @@ module gp_predict_module
          this%map_yPrime_globalY(i_yPrime) = i_globalY
       enddo
 
+      if (this%do_subY_subY) then
+         call reallocate(this%covariance_subY_subY, this%n_globalSparseX, this%n_globalSparseX, zero = .true.)
+      else
+         call reallocate(this%covariance_subY_subY, 1, 1, zero = .true.)
+      end if
+
       call reallocate(this%covariance_subY_y, this%n_globalSparseX, n_globalY, zero = .true.)
-      call reallocate(this%covariance_subY_subY, this%n_globalSparseX, this%n_globalSparseX, zero = .true.)
       call reallocate(this%covarianceDiag_y_y, n_globalY, zero = .true.)
       call reallocate(this%lambda, n_globalY, zero = .true.)
 
@@ -1698,9 +1755,12 @@ module gp_predict_module
                gpCoordinates_Covariance(this%coordinate(i_coordinate), j_sparseX = j_sparseX, i_sparseX = i_sparseX) * this%coordinate(i_coordinate)%sparseCutoff(i_sparseX)*this%coordinate(i_coordinate)%sparseCutoff(j_sparseX)
             enddo
 
-            this%covariance_subY_subY(i_global_sparseX,i_global_sparseX) = this%covariance_subY_subY(i_global_sparseX,i_global_sparseX) + this%sparse_jitter
+            if (this%do_subY_subY) then
+               this%covariance_subY_subY(i_global_sparseX,i_global_sparseX) = this%covariance_subY_subY(i_global_sparseX,i_global_sparseX) + this%sparse_jitter
+               this%covariance_subY_subY(:,i_global_sparseX) = this%covariance_subY_subY(:,i_global_sparseX) + covariance_subY_currentX_suby
+            end if
+
             this%covariance_subY_y(i_global_sparseX,:) = this%covariance_subY_y(i_global_sparseX,:) + covariance_subY_currentX_y
-            this%covariance_subY_subY(:,i_global_sparseX) = this%covariance_subY_subY(:,i_global_sparseX) + covariance_subY_currentX_suby
 
             call current_times(cpu_time, wall_time)
             if(mod(i_sparseX,100) == 0) call progress_timer(this%coordinate(i_coordinate)%n_sparseX, i_sparseX, "Covariance matrix", wall_time-start_time)
@@ -4039,20 +4099,26 @@ module gp_predict_module
    end subroutine gpCoordinates_print_sparseX_file
 
    ! print covariances and lambda to process-dependent files, one value per line
-   subroutine gpFull_print_covariances_lambda(this, file_prefix, my_proc)
+   subroutine gpFull_print_covariances_lambda(this, file_prefix, my_proc, do_Kmm)
       type(gpFull), intent(in) :: this
       character(*), intent(in) :: file_prefix
-      integer, intent(in), optional :: my_proc
+      integer, intent(in) :: my_proc
+      logical, intent(in) :: do_Kmm
 
-      integer :: my_proc_opt
+      call fwrite_array_d(size(this%covariance_subY_y), this%covariance_subY_y, trim(file_prefix)//'_Kmn.'//my_proc//C_NULL_CHAR)
+      call fwrite_array_d(size(this%lambda), this%lambda, trim(file_prefix)//'_lambda.'//my_proc//C_NULL_CHAR)
 
-      my_proc_opt = optional_default(0, opt_val=my_proc)
-      
-      if (my_proc_opt == 0) then
-         call fwrite_array_d(size(this%covariance_subY_subY), this%covariance_subY_subY, trim(file_prefix)//'_Kmm'//C_NULL_CHAR)
+      if (.not. do_Kmm) return
+      if (.not. this%do_subY_subY) then
+         call print_warning("gpFull_print_covariances_lambda: Called to print Kmm but do_subY_subY is false.")
+         return
       end if
-      call fwrite_array_d(size(this%covariance_subY_y), this%covariance_subY_y, trim(file_prefix)//'_Kmn.'//my_proc_opt//C_NULL_CHAR)
-      call fwrite_array_d(size(this%lambda), this%lambda, trim(file_prefix)//'_lambda.'//my_proc_opt//C_NULL_CHAR)
+      if (.not. allocated(this%covariance_subY_subY)) then
+         call print_warning("gpFull_print_covariances_lambda: Called to print Kmm but not allocated.")
+         return
+     end if
+ 
+      call fwrite_array_d(size(this%covariance_subY_subY), this%covariance_subY_subY, trim(file_prefix)//'_Kmm'//C_NULL_CHAR)
    end subroutine gpFull_print_covariances_lambda
 
    subroutine gpCoordinates_printXML(this,xf,label,sparseX_base_filename,error)

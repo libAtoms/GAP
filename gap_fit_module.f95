@@ -897,6 +897,7 @@ contains
     INIT_ERROR(error)
 
     do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
+    this%my_gp%do_subY_subY = merge(gap_fit_is_root(this), .true., this%task_manager%active)
 
     my_cutoff = 0.0_dp
     call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian,this%sparse_jitter)
@@ -2144,7 +2145,8 @@ contains
   subroutine gap_fit_print_linear_system_dump_file(this)
     type(gap_fit), intent(in) :: this
     if (this%has_linear_system_dump_file) then
-      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, this%mpi_obj%my_proc)
+      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, &
+         this%mpi_obj%my_proc, do_Kmm=is_root(this%mpi_obj))
     end if
   end subroutine gap_fit_print_linear_system_dump_file
 
