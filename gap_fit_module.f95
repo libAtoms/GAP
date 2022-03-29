@@ -46,6 +46,7 @@ module gap_fit_module
   use potential_module
   use ScaLAPACK_module
   use task_manager_module
+  use MPI_context_module, only : is_root
 
   implicit none
 
@@ -896,6 +897,7 @@ contains
     INIT_ERROR(error)
 
     do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
+    this%my_gp%do_subY_subY = merge(gap_fit_is_root(this), .true., this%task_manager%active)
 
     my_cutoff = 0.0_dp
     call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian,this%sparse_jitter)
@@ -2130,18 +2132,21 @@ contains
     ! add special task for Cholesky matrix addon to last worker
     call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
+    call task_manager_check_distribution(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
-  function gap_fit_is_root(this) result(is_root)
+  function gap_fit_is_root(this, root) result(res)
     type(gap_fit), intent(in) :: this
-    logical :: is_root
-    is_root = (.not. this%MPI_obj%active .or. this%MPI_obj%my_proc == 0)
+    integer, intent(in), optional :: root
+    logical :: res
+    res = is_root(this%MPI_obj, root)
   end function gap_fit_is_root
   
   subroutine gap_fit_print_linear_system_dump_file(this)
     type(gap_fit), intent(in) :: this
     if (this%has_linear_system_dump_file) then
-      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, this%mpi_obj%my_proc)
+      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, &
+         this%mpi_obj%my_proc, do_Kmm=is_root(this%mpi_obj))
     end if
   end subroutine gap_fit_print_linear_system_dump_file
 
