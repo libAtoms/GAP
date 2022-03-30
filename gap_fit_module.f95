@@ -2107,6 +2107,9 @@ contains
 
     call initialise(this%mpi_obj)
     call initialise(this%ScaLAPACK_obj, this%mpi_obj, np_r=this%mpi_obj%n_procs, np_c=1)
+    if (this%mpi_obj%n_procs > 1 .and. .not. this%ScaLAPACK_obj%active) then
+      call system_abort('Init MPI+Scalapack: n_procs > 1 but ScaLAPACK is inactive.')
+    end if
   end subroutine gap_fit_init_mpi_scalapack
 
   subroutine gap_fit_init_task_manager(this)
