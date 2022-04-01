@@ -71,7 +71,7 @@ module gap_fit_module
      energy_parameter_name, local_property_parameter_name, force_parameter_name, virial_parameter_name, &
      stress_parameter_name, hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
      config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name, &
-     condition_number_norm, linear_system_dump_file
+     condition_number_norm, linear_system_dump_file, config_file
 
      character(len=10240) :: command_line = ''
      real(dp), dimension(total_elements) :: e0, local_property0
@@ -154,7 +154,9 @@ contains
   subroutine gap_fit_parse_command_line(this)
   !% This subroutine parses the main command line options.
      type(gap_fit), intent(inout), target :: this
+
      type(Dictionary) :: params
+     type(extendable_str) :: config_str
 
      character(len=STRING_LENGTH), pointer :: at_file, e0_str, local_property0_str, &
           core_param_file, core_ip_args, &
@@ -162,14 +164,14 @@ contains
           virial_parameter_name, stress_parameter_name, hessian_parameter_name, &
           config_type_parameter_name, sigma_parameter_name, config_type_sigma_string, &
           gp_file, template_file, force_mask_parameter_name, condition_number_norm, &
-          linear_system_dump_file
+          linear_system_dump_file, config_file
 
      character(len=STRING_LENGTH) ::  gap_str, verbosity, sparse_method_str, covariance_type_str, e0_method, &
-        parameter_name_prefix
+        parameter_name_prefix, string_to_parse
 
-     logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov
-     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_default_sigma, mpi_print_all
-     logical, pointer :: sparsify_only_no_fit
+     logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov, sparsify_only_no_fit
+     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_config_file, has_default_sigma
+     logical :: mpi_print_all, file_exists
      
      real(dp), pointer :: e0_offset, sparse_jitter, hessian_delta
      real(dp), dimension(:), pointer :: default_sigma
@@ -178,6 +180,7 @@ contains
      integer :: rnd_seed
      integer, pointer :: mpi_blocksize
 
+     config_file => this%config_file
      at_file => this%at_file
      e0_str => this%e0_str
      local_property0_str => this%local_property0_str
@@ -210,7 +213,23 @@ contains
      mpi_blocksize => this%mpi_blocksize
      
      call initialise(params)
-     
+
+     call param_register(params, 'config_file', '', config_file, has_value_target=has_config_file, &
+          help_string="File as alternative input (newlines converted to spaces)")
+
+     ! check if config file is given, ignore everything else
+     ! prepare parsing of config file or command line string later
+     if (param_read_args(params, ignore_unknown=.true., command_line=this%command_line)) then
+        if (has_config_file) then
+           inquire(file=config_file, exist=file_exists)
+           if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
+           call read(config_str, config_file, keep_lf=.false.)
+           string_to_parse = string(config_str)
+           call finalise(config_str)
+        end if
+     end if
+     if (.not. has_config_file) string_to_parse = this%command_line
+
      call param_register(params, 'atoms_filename', '//MANDATORY//', at_file, has_value_target = has_at_file, help_string="XYZ file with fitting configurations", altkey="at_file")
      call param_register(params, 'gap', '//MANDATORY//', gap_str, has_value_target = has_gap, help_string="Initialisation string for GAPs")
      call param_register(params, 'e0', '0.0', e0_str, has_value_target = this%has_e0, &
@@ -329,8 +348,7 @@ contains
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
 
-     if (.not. param_read_args(params, command_line=this%command_line)) then
-        call print("gap_fit")
+     if (.not. param_read_line(params, string_to_parse)) then
         call system_abort('Exit: Mandatory argument(s) missing...')
      endif
      call print_title("Input parameters")
