@@ -305,7 +305,7 @@ contains
      call param_register(params, "rnd_seed", "-1", rnd_seed, &
           help_string="Random seed.")
    
-     call param_register(params, "openmp_chunk_size", "1", openmp_chunk_size, &
+     call param_register(params, "openmp_chunk_size", ""//openmp_chunk_size, openmp_chunk_size, &
           help_string="Chunk size in OpenMP scheduling")
    
      call param_register(params, 'do_ip_timing', 'F', do_ip_timing, &
