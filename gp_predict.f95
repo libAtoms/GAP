@@ -938,6 +938,8 @@ module gp_predict_module
       if (do_subY_subY) then
          factor_c_subYsubY = transpose(factor_c_subYsubY)
          call get_shared_task_counts(task_manager, n_globalSparseX, counts)
+      else
+         allocate(counts(1), source=0)
       end if
 
       w = task_manager%my_worker_id
