@@ -145,7 +145,7 @@ module gp_predict_module
 
    integer, parameter, public :: PP_Q = 1
 
-   integer, public :: openmp_chunk_size = 1
+   integer, public, save :: openmp_chunk_size = 1000  ! loop iterations per OpenMP thread
 
    type gpCovariance_bond_real_space
 
