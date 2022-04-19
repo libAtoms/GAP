@@ -46,6 +46,7 @@ module gap_fit_module
   use potential_module
   use ScaLAPACK_module
   use task_manager_module
+  use MPI_context_module, only : is_root
 
   implicit none
 
@@ -167,7 +168,7 @@ contains
         parameter_name_prefix
 
      logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov
-     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_default_sigma
+     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_default_sigma, mpi_print_all
      logical, pointer :: sparsify_only_no_fit
      
      real(dp), pointer :: e0_offset, sparse_jitter, hessian_delta
@@ -304,7 +305,7 @@ contains
      call param_register(params, "rnd_seed", "-1", rnd_seed, &
           help_string="Random seed.")
    
-     call param_register(params, "openmp_chunk_size", "1", openmp_chunk_size, &
+     call param_register(params, "openmp_chunk_size", ""//openmp_chunk_size, openmp_chunk_size, &
           help_string="Chunk size in OpenMP scheduling")
    
      call param_register(params, 'do_ip_timing', 'F', do_ip_timing, &
@@ -325,6 +326,9 @@ contains
      call param_register(params, 'mpi_blocksize', '0', mpi_blocksize, &
           help_string="Blocksize of MPI distributed matrices. Affects efficiency and memory usage. Max if 0 (default).")
 
+     call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
+          help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
+
      if (.not. param_read_args(params, command_line=this%command_line)) then
         call print("gap_fit")
         call system_abort('Exit: Mandatory argument(s) missing...')
@@ -333,7 +337,13 @@ contains
      call param_print(params)
      call print_title("")
      call finalise(params)
-     
+
+     if (mpi_print_all) then
+         call mpi_all_inoutput(mainlog, .true.)
+         call activate(mainlog)
+         call mpi_all_inoutput(errorlog, .true.)
+         call activate(errorlog)
+     end if
 
      if (len_trim(parameter_name_prefix) > 0) then
         energy_parameter_name = trim(parameter_name_prefix) // trim(energy_parameter_name)
@@ -887,6 +897,7 @@ contains
     INIT_ERROR(error)
 
     do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
+    this%my_gp%do_subY_subY = merge(gap_fit_is_root(this), .true., this%task_manager%active)
 
     my_cutoff = 0.0_dp
     call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian,this%sparse_jitter)
@@ -2096,6 +2107,9 @@ contains
 
     call initialise(this%mpi_obj)
     call initialise(this%ScaLAPACK_obj, this%mpi_obj, np_r=this%mpi_obj%n_procs, np_c=1)
+    if (this%mpi_obj%n_procs > 1 .and. .not. this%ScaLAPACK_obj%active) then
+      call system_abort('Init MPI+Scalapack: n_procs > 1 but ScaLAPACK is inactive.')
+    end if
   end subroutine gap_fit_init_mpi_scalapack
 
   subroutine gap_fit_init_task_manager(this)
@@ -2121,18 +2135,21 @@ contains
     ! add special task for Cholesky matrix addon to last worker
     call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
+    call task_manager_check_distribution(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
-  function gap_fit_is_root(this) result(is_root)
+  function gap_fit_is_root(this, root) result(res)
     type(gap_fit), intent(in) :: this
-    logical :: is_root
-    is_root = (.not. this%MPI_obj%active .or. this%MPI_obj%my_proc == 0)
+    integer, intent(in), optional :: root
+    logical :: res
+    res = is_root(this%MPI_obj, root)
   end function gap_fit_is_root
   
   subroutine gap_fit_print_linear_system_dump_file(this)
     type(gap_fit), intent(in) :: this
     if (this%has_linear_system_dump_file) then
-      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, this%mpi_obj%my_proc)
+      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, &
+         this%mpi_obj%my_proc, do_Kmm=is_root(this%mpi_obj))
     end if
   end subroutine gap_fit_print_linear_system_dump_file
 
