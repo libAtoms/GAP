@@ -224,11 +224,9 @@ contains
            inquire(file=config_file, exist=file_exists)
            if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
            call read(config_str, config_file, keep_lf=.false.)
-           string_to_parse = string(config_str)
-           call finalise(config_str)
         end if
      end if
-     if (.not. has_config_file) string_to_parse = this%command_line
+     if (.not. has_config_file) config_str = this%command_line
 
      call param_register(params, 'atoms_filename', '//MANDATORY//', at_file, has_value_target = has_at_file, help_string="XYZ file with fitting configurations", altkey="at_file")
      call param_register(params, 'gap', '//MANDATORY//', gap_str, has_value_target = has_gap, help_string="Initialisation string for GAPs")
@@ -348,9 +346,10 @@ contains
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
 
-     if (.not. param_read_line(params, string_to_parse)) then
+     if (.not. param_read_line(params, string(config_str))) then
         call system_abort('Exit: Mandatory argument(s) missing...')
      endif
+     call finalise(config_str)
      call print_title("Input parameters")
      call param_print(params)
      call print_title("")
