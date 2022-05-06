@@ -167,7 +167,7 @@ contains
           linear_system_dump_file, config_file
 
      character(len=STRING_LENGTH) ::  gap_str, verbosity, sparse_method_str, covariance_type_str, e0_method, &
-        parameter_name_prefix, string_to_parse
+        parameter_name_prefix
 
      logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov, sparsify_only_no_fit
      logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_config_file, has_default_sigma
