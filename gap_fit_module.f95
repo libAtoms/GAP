@@ -144,6 +144,7 @@ module gap_fit_module
   public :: gap_fit_init_mpi_scalapack
   public :: gap_fit_init_task_manager
   public :: gap_fit_distribute_tasks
+  public :: gap_fit_set_mpi_blocksizes
 
   public :: gap_fit_is_root
 
@@ -2145,18 +2146,22 @@ contains
     call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
     this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
 
-    if (this%task_manager%active) then
-      call task_manager_init_idata(this%task_manager, 2)
-      this%task_manager%idata(1) = this%mpi_blocksize_rows
-      this%task_manager%idata(2) = this%mpi_blocksize_cols
-    end if
+    if (.not. this%task_manager%active) return
+
+    call task_manager_init_idata(this%task_manager, 3)  ! space for nrows, blocksizes
   end subroutine gap_fit_init_task_manager
 
   subroutine gap_fit_distribute_tasks(this)
     type(gap_fit), intent(inout) :: this
 
+    integer :: n_sparseX
+
+    if (.not. this%task_manager%active) return
+
+    n_sparseX = sum(this%config_type_n_sparseX)
+
     ! add special task for Cholesky matrix addon to last worker
-    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
+    call task_manager_add_task(this%task_manager, n_sparseX, n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
     call task_manager_check_distribution(this%task_manager)
   end subroutine gap_fit_distribute_tasks
@@ -2175,6 +2180,57 @@ contains
          this%mpi_obj%my_proc, do_Kmm=is_root(this%mpi_obj))
     end if
   end subroutine gap_fit_print_linear_system_dump_file
+
+  ! set blocksize, abort if ScaLAPACK would overflow 32bit integer
+  subroutine gap_fit_set_mpi_blocksizes(this)
+   type(gap_fit), intent(inout) :: this
+
+   integer(idp), parameter :: bit_limit = 2_idp**31
+
+   integer :: nrows, nrows0, ncols, mb_A, nb_A, i
+   integer(idp) :: lwork, trows
+
+   if (.not. this%task_manager%active) return
+
+   nrows0 = this%task_manager%unified_workload
+   ncols = sum(this%config_type_n_sparseX)
+
+   mb_A = this%mpi_blocksize_rows
+   if (mb_A == 0) then
+      call print("Defaulting mpi_blocksize_rows (arg = 0) ...", PRINT_VERBOSE)
+      mb_A = nrows0
+   end if
+   call print("mpi_blocksize_rows = "//mb_A, PRINT_VERBOSE)
+
+   nb_A = this%mpi_blocksize_cols
+   if (nb_A == 0) then
+      call print("Defaulting mpi_blocksize_cols (arg = 0) ...", PRINT_VERBOSE)
+      nb_A = ncols
+   end if
+   call print("mpi_blocksize_cols = "//nb_A, PRINT_VERBOSE)
+
+   nrows = increase_to_multiple(nrows0, mb_A)
+   call print("nrows = "//nrows, PRINT_VERBOSE)
+   i = nrows - nrows0
+   call print("distA extension: "//i//" "//ncols//" memory "//i2si(8_idp * i * ncols)//"B", PRINT_VERBOSE)
+
+   trows = int(nrows, idp) * this%task_manager%n_workers
+   if (trows > bit_limit) then
+      call print_warning("Total rows of distributed matrix A is too large for 32bit integer: "//trows//" = "//int(trows, isp))
+   end if
+
+   lwork = get_lwork_pdgeqrf(this%ScaLAPACK_obj, int(trows, isp), ncols, mb_A, nb_A)
+   call print("lwork_pdgeqrf = "//lwork//" = "//int(lwork, isp), PRINT_VERBOSE)
+   if (lwork > bit_limit) then
+      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!"//char(10) &
+         //"Set mpi_blocksize_cols to something smaller, see --help.")
+   end if
+
+   ! transfer nrows and blocksizes to gp_predict
+   this%task_manager%idata(1) = nrows
+   this%task_manager%idata(2) = mb_A
+   this%task_manager%idata(3) = nb_A
+ end subroutine gap_fit_set_mpi_blocksizes
 
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
