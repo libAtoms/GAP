@@ -801,7 +801,7 @@ module gp_predict_module
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
          mb_A = get_blocksize(task_manager%idata(1), task_manager%unified_workload)
-         nb_A = min(n_globalSparseX, nb_A_limit)
+         nb_A = get_blocksize(task_manager%idata(2), min(n_globalSparseX, nb_A_limit))
          nlrows = increase_to_multiple(task_manager%unified_workload, mb_A)
          i = nlrows - task_manager%unified_workload
          call print("distA extension: "//i//" "//n_globalSparseX//" memory "//i2si(8_idp * i * n_globalSparseX)//"B", PRINT_VERBOSE)
