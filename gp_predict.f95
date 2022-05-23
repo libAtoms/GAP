@@ -754,7 +754,8 @@ module gp_predict_module
 
       character(len=STRING_LENGTH) :: my_condition_number_norm
 
-      integer :: i, j, blocksize
+      integer, parameter :: nb_A_limit = 10000  ! arbitrary choice
+      integer :: i, j, mb_A, nb_A
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i_y, i_yPrime, &
       i_globalY, i_global_yPrime, nlrows
 #ifdef HAVE_QR
@@ -799,8 +800,9 @@ module gp_predict_module
 
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
-         blocksize = get_blocksize(task_manager%idata(1), task_manager%unified_workload, n_globalSparseX)
-         nlrows = increase_to_multiple(task_manager%unified_workload, blocksize)
+         mb_A = get_blocksize(task_manager%idata(1), task_manager%unified_workload)
+         nb_A = min(n_globalSparseX, nb_A_limit)
+         nlrows = increase_to_multiple(task_manager%unified_workload, mb_A)
          i = nlrows - task_manager%unified_workload
          call print("distA extension: "//i//" "//n_globalSparseX//" memory "//i2si(8_idp * i * n_globalSparseX)//"B", PRINT_VERBOSE)
          allocate(globalY(nlrows))
@@ -853,7 +855,7 @@ module gp_predict_module
 
       if (task_manager%active) then
          call print("Using ScaLAPACK to solve QR")
-         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%ScaLAPACK_obj, blocksize)
+         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%ScaLAPACK_obj, mb_A, nb_A)
       else
          call print("Using LAPACK to solve QR")
          call initialise(LA_q_subYsubY, a, use_allocate=.false.)
@@ -976,16 +978,14 @@ module gp_predict_module
       end do
    end subroutine get_shared_task_counts
 
-   function get_blocksize(arg, nrows, ncols) result(blocksize)
-      integer, intent(in) :: arg, nrows, ncols
+   function get_blocksize(arg, nrows) result(blocksize)
+      integer, intent(in) :: arg, nrows
       integer :: blocksize
-
-      integer, parameter :: OVERHEAD_FACTOR = 2  ! worst case: +1/2=50% matrix size
 
       if (arg > 0) then
          blocksize = arg
       else
-         blocksize = merge(nrows, ncols, (nrows < ncols * OVERHEAD_FACTOR))
+         blocksize = nrows
       end if
    end function get_blocksize
 
