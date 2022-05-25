@@ -46,6 +46,7 @@ module gap_fit_module
   use potential_module
   use ScaLAPACK_module
   use task_manager_module
+  use MPI_context_module, only : is_root
 
   implicit none
 
@@ -70,7 +71,7 @@ module gap_fit_module
      energy_parameter_name, local_property_parameter_name, force_parameter_name, virial_parameter_name, &
      stress_parameter_name, hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
      config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name, &
-     condition_number_norm, linear_system_dump_file
+     condition_number_norm, linear_system_dump_file, config_file
 
      character(len=10240) :: command_line = ''
      real(dp), dimension(total_elements) :: e0, local_property0
@@ -90,6 +91,7 @@ module gap_fit_module
      integer :: n_local_property = 0
      integer :: n_species = 0
      integer :: min_save
+     integer :: mpi_blocksize
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
@@ -152,7 +154,9 @@ contains
   subroutine gap_fit_parse_command_line(this)
   !% This subroutine parses the main command line options.
      type(gap_fit), intent(inout), target :: this
+
      type(Dictionary) :: params
+     type(extendable_str) :: config_str
 
      character(len=STRING_LENGTH), pointer :: at_file, e0_str, local_property0_str, &
           core_param_file, core_ip_args, &
@@ -160,21 +164,23 @@ contains
           virial_parameter_name, stress_parameter_name, hessian_parameter_name, &
           config_type_parameter_name, sigma_parameter_name, config_type_sigma_string, &
           gp_file, template_file, force_mask_parameter_name, condition_number_norm, &
-          linear_system_dump_file
+          linear_system_dump_file, config_file
 
      character(len=STRING_LENGTH) ::  gap_str, verbosity, sparse_method_str, covariance_type_str, e0_method, &
         parameter_name_prefix
 
-     logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov
-     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_default_sigma
-     logical, pointer :: sparsify_only_no_fit
+     logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov, sparsify_only_no_fit
+     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_config_file, has_default_sigma
+     logical :: mpi_print_all, file_exists
      
      real(dp), pointer :: e0_offset, sparse_jitter, hessian_delta
      real(dp), dimension(:), pointer :: default_sigma
      real(dp), pointer :: default_local_property_sigma
 
      integer :: rnd_seed
+     integer, pointer :: mpi_blocksize
 
+     config_file => this%config_file
      at_file => this%at_file
      e0_str => this%e0_str
      local_property0_str => this%local_property0_str
@@ -204,9 +210,24 @@ contains
      sparsify_only_no_fit => this%sparsify_only_no_fit
      condition_number_norm => this%condition_number_norm
      linear_system_dump_file => this%linear_system_dump_file
+     mpi_blocksize => this%mpi_blocksize
      
      call initialise(params)
-     
+
+     call param_register(params, 'config_file', '', config_file, has_value_target=has_config_file, &
+          help_string="File as alternative input (newlines converted to spaces)")
+
+     ! check if config file is given, ignore everything else
+     ! prepare parsing of config file or command line string later
+     if (param_read_args(params, ignore_unknown=.true., command_line=this%command_line)) then
+        if (has_config_file) then
+           inquire(file=config_file, exist=file_exists)
+           if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
+           call read(config_str, config_file, keep_lf=.false.)
+        end if
+     end if
+     if (.not. has_config_file) config_str = this%command_line
+
      call param_register(params, 'atoms_filename', '//MANDATORY//', at_file, has_value_target = has_at_file, help_string="XYZ file with fitting configurations", altkey="at_file")
      call param_register(params, 'gap', '//MANDATORY//', gap_str, has_value_target = has_gap, help_string="Initialisation string for GAPs")
      call param_register(params, 'e0', '0.0', e0_str, has_value_target = this%has_e0, &
@@ -301,7 +322,7 @@ contains
      call param_register(params, "rnd_seed", "-1", rnd_seed, &
           help_string="Random seed.")
    
-     call param_register(params, "openmp_chunk_size", "1", openmp_chunk_size, &
+     call param_register(params, "openmp_chunk_size", ""//openmp_chunk_size, openmp_chunk_size, &
           help_string="Chunk size in OpenMP scheduling")
    
      call param_register(params, 'do_ip_timing', 'F', do_ip_timing, &
@@ -316,18 +337,30 @@ contains
      call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
           help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
 
-      call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
+     call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
           help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
 
-     if (.not. param_read_args(params, command_line=this%command_line)) then
-        call print("gap_fit")
+     call param_register(params, 'mpi_blocksize', '0', mpi_blocksize, &
+          help_string="Blocksize of MPI distributed matrices. Affects efficiency and memory usage. Max if 0 (default).")
+
+     call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
+          help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
+
+     if (.not. param_read_line(params, string(config_str))) then
         call system_abort('Exit: Mandatory argument(s) missing...')
      endif
+     call finalise(config_str)
      call print_title("Input parameters")
      call param_print(params)
      call print_title("")
      call finalise(params)
-     
+
+     if (mpi_print_all) then
+         call mpi_all_inoutput(mainlog, .true.)
+         call activate(mainlog)
+         call mpi_all_inoutput(errorlog, .true.)
+         call activate(errorlog)
+     end if
 
      if (len_trim(parameter_name_prefix) > 0) then
         energy_parameter_name = trim(parameter_name_prefix) // trim(energy_parameter_name)
@@ -653,7 +686,7 @@ contains
        call system_abort("read_fit_xyz: at_file "//this%at_file//" could not be found")
     endif
 
-    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
     this%n_frame = xyzfile%n_frame
 
     allocate(this%at(this%n_frame))
@@ -665,6 +698,10 @@ contains
     enddo
 
     call finalise(xyzfile)
+
+    if(this%n_frame <= 0) then
+      call system_abort("read_fit_xyz: "//this%n_frame//" frames read from "//this%at_file//".")
+   endif
 
   endsubroutine read_fit_xyz
 
@@ -877,6 +914,7 @@ contains
     INIT_ERROR(error)
 
     do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
+    this%my_gp%do_subY_subY = merge(gap_fit_is_root(this), .true., this%task_manager%active)
 
     my_cutoff = 0.0_dp
     call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian,this%sparse_jitter)
@@ -1489,7 +1527,7 @@ contains
     type(cinoutput) :: xyzfile
     type(atoms) :: at
 
-    call initialise(xyzfile,this%at_file,no_compute_index=this%task_manager%active)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
 
     call read(xyzfile,at,frame=0)
     !call get_weights(at,this%w_Z)
@@ -2093,6 +2131,9 @@ contains
 
     call initialise(this%mpi_obj)
     call initialise(this%ScaLAPACK_obj, this%mpi_obj, np_r=this%mpi_obj%n_procs, np_c=1)
+    if (this%mpi_obj%n_procs > 1 .and. .not. this%ScaLAPACK_obj%active) then
+      call system_abort('Init MPI+Scalapack: n_procs > 1 but ScaLAPACK is inactive.')
+    end if
   end subroutine gap_fit_init_mpi_scalapack
 
   subroutine gap_fit_init_task_manager(this)
@@ -2105,34 +2146,40 @@ contains
     call task_manager_init_workers(this%task_manager, this%ScaLAPACK_obj%n_proc_rows)
     call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
     this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
+
+    if (this%task_manager%active) then
+      call task_manager_init_idata(this%task_manager, 1)
+      this%task_manager%idata(1) = this%mpi_blocksize
+    end if
   end subroutine gap_fit_init_task_manager
 
   subroutine gap_fit_distribute_tasks(this)
     type(gap_fit), intent(inout) :: this
 
     ! add special task for Cholesky matrix addon to last worker
-    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), worker_id=this%task_manager%n_workers)
-
+    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
+    call task_manager_check_distribution(this%task_manager)
   end subroutine gap_fit_distribute_tasks
 
-  function gap_fit_is_root(this) result(is_root)
+  function gap_fit_is_root(this, root) result(res)
     type(gap_fit), intent(in) :: this
-    logical :: is_root
-    is_root = (.not. this%MPI_obj%active .or. this%MPI_obj%my_proc == 0)
+    integer, intent(in), optional :: root
+    logical :: res
+    res = is_root(this%MPI_obj, root)
   end function gap_fit_is_root
   
   subroutine gap_fit_print_linear_system_dump_file(this)
     type(gap_fit), intent(in) :: this
     if (this%has_linear_system_dump_file) then
-      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, this%mpi_obj%my_proc)
+      call gpFull_print_covariances_lambda(this%my_gp, this%linear_system_dump_file, &
+         this%mpi_obj%my_proc, do_Kmm=is_root(this%mpi_obj))
     end if
   end subroutine gap_fit_print_linear_system_dump_file
 
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
 
-    integer(idp), parameter :: mega = 10**6
     integer(idp), parameter :: rmem = storage_size(1.0_dp, idp) / 8_idp
 
     integer :: i
@@ -2150,14 +2197,14 @@ contains
       entries = s1 * this%n_descriptors(i)
       mem = entries * rmem
       memt = memt + mem
-      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//mem/mega//" MB")
+      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//i2si(mem)//"B")
 
       entries = s1 * this%n_cross(i)
       mem = entries * rmem
       memt = memt + mem
-      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//mem/mega//" MB")
+      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//i2si(mem)//"B")
     end do
-    call print("Subtotal "//memt/mega//" MB")
+    call print("Subtotal "//i2si(memt)//"B")
     call print("")
     memp1 = memt
 
@@ -2170,35 +2217,35 @@ contains
     entries = s1 * s2
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("yY "//s1//" "//s2//" memory "//mem/mega//" MB * 2")
+    call print("yY "//s1//" "//s2//" memory "//i2si(mem)//"B * 2")
     memp1 = memp1 + mem
 
     entries = s1 * s1
     mem = entries * rmem
     memt = memt + mem
-    call print("yy "//s1//" "//s1//" memory "//mem/mega//" MB")
+    call print("yy "//s1//" "//s1//" memory "//i2si(mem)//"B")
 
     entries = s1 * (s1 + s2)
     mem = entries * rmem
     memt = memt + mem * 2
-    call print("A "//s1//" "//s1+s2//" memory "//mem/mega//" MB * 2")
-    call print("Subtotal "//memt/mega//" MB")
+    call print("A "//s1//" "//(s1+s2)//" memory "//i2si(mem)//"B * 2")
+    call print("Subtotal "//i2si(memt)//"B")
     call print("")
 
     
     mem = max(memp1, memt)
-    call print("Peak1 "//memp1/mega//" MB")
-    call print("Peak2 "//memt/mega//" MB")
-    call print("PEAK  "//mem/mega//" MB")
+    call print("Peak1 "//i2si(memp1)//"B")
+    call print("Peak2 "//i2si(memt)//"B")
+    call print("PEAK  "//i2si(mem)//"B")
     call print("")
 
     call mem_info(sys_total_mem, sys_free_mem)
-    call print("Free system memory  "//sys_free_mem/mega//" MB")
-    call print("Total system memory "//sys_total_mem/mega//" MB")
+    call print("Free system memory  "//i2si(sys_free_mem)//"B")
+    call print("Total system memory "//i2si(sys_total_mem)//"B")
 
     mem = sys_free_mem - mem
     if (mem < 0) then
-      call print_warning("Memory estimate exceeds free system memory by "//-mem/mega//" MB.")
+      call print_warning("Memory estimate exceeds free system memory by "//i2si(-mem)//"B.")
     end if
 
     call print_title("")

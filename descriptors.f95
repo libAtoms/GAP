@@ -439,12 +439,12 @@ module descriptors_module
    type soap_turbo
       ! User controllable parameters
       real(dp) :: rcut_hard, rcut_soft, nf
-      integer  :: n_species, radial_enhancement, central_index, l_max
-      character(len=STRING_LENGTH) :: basis, scaling_mode, compress_file
+      integer  :: n_species, radial_enhancement, central_index, l_max, compress_P_nonzero
+      character(len=STRING_LENGTH) :: basis, scaling_mode, compress_file, compress_mode
 
       real(dp), dimension(:), allocatable :: atom_sigma_r, atom_sigma_r_scaling, &
-         atom_sigma_t, atom_sigma_t_scaling, amplitude_scaling, central_weight
-      integer, dimension(:), allocatable :: species_Z, alpha_max, compress_indices
+         atom_sigma_t, atom_sigma_t_scaling, amplitude_scaling, central_weight, compress_P_el
+      integer, dimension(:), allocatable :: species_Z, alpha_max, compress_P_i, compress_P_j
 
       logical :: initialised = .false., compress = .false.
    endtype soap_turbo
@@ -3051,6 +3051,8 @@ module descriptors_module
    endsubroutine distance_Nb_permutations
 
    subroutine soap_turbo_initialise(this,args_str,error)
+      use soap_turbo_compress_module
+
       type(soap_turbo), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       integer, optional, intent(out) :: error
@@ -3059,9 +3061,10 @@ module descriptors_module
 
       logical :: has_atom_sigma_angular
 
-      integer :: l, k, i, j, m, n
+      integer :: l, k, i, j, m, n, n_nonzero
       real(dp) :: fact, fact1, fact2, ppi, atom_sigma_radial_normalised, cutoff_hard,&
          s2, I_n, N_n, N_np1, N_np2, I_np1, I_np2, C2
+      character(len=64) :: compress_string
 
       type(LA_Matrix) :: LA_overlap
       real(dp), dimension(:), allocatable :: s
@@ -3082,6 +3085,7 @@ module descriptors_module
       call param_register(params, 'basis', "poly3", this%basis, help_string="poly3 or poly3gauss")
       call param_register(params, 'scaling_mode', "polynomial", this%scaling_mode, help_string="TODO")
       call param_register(params, 'compress_file', "None", this%compress_file, help_string="TODO")
+      call param_register(params, 'compress_mode', "None", this%compress_mode, help_string="TODO")
       call param_register(params, 'central_index', "1", this%central_index, help_string="Index of central atom species_Z in the >species< array")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
@@ -3089,17 +3093,6 @@ module descriptors_module
       endif
 
       call finalise(params)
-
-      if( this%compress_file /= "None" )then
-        this%compress = .true.
-        open(unit=10, file=this%compress_file, status="old")
-        read(10, *) (i, j=1,this%n_species), i, n
-        allocate(this%compress_indices(1:n))
-                do i = 1, n
-          read(10, *) this%compress_indices(i)
-        end do
-        close(10)
-      end if
 
       allocate(this%atom_sigma_r(this%n_species))
       allocate(this%atom_sigma_r_scaling(this%n_species))
@@ -3147,11 +3140,60 @@ module descriptors_module
             help_string="Atomic number of species, including the central atom")
       endif
 
-
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
          RAISE_ERROR("soap_turbo_initialise failed to parse args_str='"//trim(args_str)//"'", error)
       endif
       call finalise(params)
+
+!     Here we read in the compression information from a file (compress_file) or rely on a keyword provided
+!     by the user (compress_mode) which leads to a predefined recipe to compress the soap_turbo descriptor
+!     The file always takes precedence over the keyword.
+      if( this%compress_file /= "None" )then
+        this%compress = .true.
+        open(unit=10, file=this%compress_file, status="old")
+        read(10, *) (i, j=1,this%n_species), i, n
+        read(10, '(A)') compress_string
+        if( compress_string == "P_transformation" )then
+          n_nonzero = -1
+          do while( compress_string /= "end_transformation" )
+            read(10, '(A)') compress_string
+            n_nonzero = n_nonzero + 1
+          end do
+          this%compress_P_nonzero = n_nonzero
+          allocate( this%compress_P_el(1:n_nonzero) )
+          allocate( this%compress_P_i(1:n_nonzero) )
+          allocate( this%compress_P_j(1:n_nonzero) )
+          do i = 1, n_nonzero+1
+            backspace(10)
+          end do
+          do i = 1, n_nonzero
+            read(10,*) this%compress_P_i(i), this%compress_P_j(i), this%compress_P_el(i)
+          end do
+        else
+!         Old way to handle compression for backcompatibility
+          backspace(10)
+          this%compress_P_nonzero = n
+          allocate( this%compress_P_el(1:n) )
+          allocate( this%compress_P_i(1:n) )
+          allocate( this%compress_P_j(1:n) )
+          do i = 1, n
+            read(10, *) this%compress_P_j(i)
+            this%compress_P_i(i) = i
+            this%compress_P_el(i) = 1.0_dp
+          end do
+        end if
+        close(10)
+      else if( this%compress_mode /= "None" )then
+        this%compress = .true.
+        call get_compress_indices( this%compress_mode, this%alpha_max, this%l_max, n, this%compress_P_nonzero, &
+                                   this%compress_P_i, this%compress_P_j, this%compress_P_el, "get_dim" )
+        allocate( this%compress_P_i(1:this%compress_P_nonzero) )
+        allocate( this%compress_P_j(1:this%compress_P_nonzero) )
+        allocate( this%compress_P_el(1:this%compress_P_nonzero) )
+        call get_compress_indices( this%compress_mode, this%alpha_max, this%l_max, n, this%compress_P_nonzero, &
+                                   this%compress_P_i, this%compress_P_j, this%compress_P_el, "set_indices" )
+      end if
+
 
       this%initialised = .true.
 
@@ -8995,7 +9037,8 @@ module descriptors_module
 
       if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
 
-      allocate(species_map(maxval(this%species_Z)))
+!      allocate(species_map(maxval(this%species_Z)))
+      allocate(species_map(1:118))
       species_map = 0
       species_map(this%species_Z) = (/(i, i = 1, this%n_species)/)
 
@@ -9056,8 +9099,15 @@ module descriptors_module
             descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%rcut_hard)
-
+!           l_n_neighbours = n_neighbours(at,i,max_dist=this%rcut_hard)
+            l_n_neighbours = 0
+            do n = 1, n_neighbours(at, i)
+               j = neighbour(at, i, n, distance = r_ij)
+!              The neighbors list past to the soap_turbo library must only contained the "seen" species
+               if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
+                  l_n_neighbours = l_n_neighbours + 1
+               endif
+            enddo
             allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
             allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
             allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
@@ -9092,7 +9142,15 @@ module descriptors_module
             descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
-         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
+!         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
+         n_atom_pairs = 1 !Including the central atom
+         do n = 1, n_neighbours(at, i)
+            j = neighbour(at, i, n, distance = r_ij)
+!           The neighbors list past to the soap_turbo library must only contained the "seen" species
+            if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
+               n_atom_pairs = n_atom_pairs + 1
+            endif
+         enddo
          allocate( rjs(n_atom_pairs) )
          allocate( thetas(n_atom_pairs) )
          allocate( phis(n_atom_pairs) )
@@ -9107,7 +9165,7 @@ module descriptors_module
          do n = 1, n_neighbours(at,i)
             j = neighbour(at, i, n, distance = r_ij, diff = d_ij, cosines = u_ij)
 
-            if( r_ij >= this%rcut_hard ) cycle
+            if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
             i_n = i_n + 1
 
             rjs(i_n) = r_ij
@@ -9121,7 +9179,7 @@ module descriptors_module
             i_n = 0
             do n = 1, n_neighbours(at,i)
                j = neighbour(at, i, n, distance = r_ij, shift = shift_ij)
-               if( r_ij >= this%rcut_hard ) cycle
+               if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
                i_n = i_n + 1
                descriptor_out%x(i_desc)%ii(i_n) = j
                descriptor_out%x(i_desc)%pos(:,i_n) = at%pos(:,j) + matmul(at%lattice,shift_ij)
@@ -9138,7 +9196,8 @@ module descriptors_module
             n_atom_pairs, mask, rjs, thetas, phis, this%alpha_max, this%l_max, rcut_hard, rcut_soft, nf, &
             global_scaling, this%atom_sigma_r, this%atom_sigma_r_scaling, &
             this%atom_sigma_t, this%atom_sigma_t_scaling, this%amplitude_scaling, this%radial_enhancement, this%central_weight, &
-            this%basis, this%scaling_mode, .false., my_do_grad_descriptor, this%compress, this%compress_indices, descriptor_i, grad_descriptor_i)
+            this%basis, this%scaling_mode, .false., my_do_grad_descriptor, this%compress, this%compress_P_nonzero, this%compress_P_i, &
+            this%compress_P_j, this%compress_P_el, descriptor_i, grad_descriptor_i)
 
          if(my_do_descriptor) then
             descriptor_out%x(i_desc)%data = descriptor_i(:,1)
@@ -9146,7 +9205,7 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
             do k = 1, 3
-               descriptor_out%x(i_desc)%grad_data(:,k,0:) = grad_descriptor_i(k,:,:)
+               descriptor_out%x(i_desc)%grad_data(:,k,0:n_atom_pairs-1) = grad_descriptor_i(k,:,1:n_atom_pairs)
             enddo
          endif
 
@@ -11284,7 +11343,7 @@ call print("mask present ? "//present(mask))
       endif
 
       if( this%compress )then
-         i = size(this%compress_indices)
+         i = maxval(this%compress_P_i)
       else
          n_max = sum(this%alpha_max)
          i = ( this%l_max+1 ) * ( n_max*(n_max+1) ) / 2
