@@ -2187,8 +2187,8 @@ contains
 
    integer(idp), parameter :: bit_limit = 2_idp**31
 
-   integer :: nrows, nrows0, ncols, mb_A, nb_A, i
-   integer(idp) :: lwork, trows
+   integer :: nrows, nrows0, trows, ncols, mb_A, nb_A, i
+   integer(idp) :: lwork1, lwork2, trows64
 
    if (.not. this%task_manager%active) return
 
@@ -2214,14 +2214,17 @@ contains
    i = nrows - nrows0
    call print("distA extension: "//i//" "//ncols//" memory "//i2si(8_idp * i * ncols)//"B", PRINT_VERBOSE)
 
-   trows = int(nrows, idp) * this%task_manager%n_workers
+   trows64 = int(nrows, idp) * this%task_manager%n_workers
+   trows = int(trows64, isp)
    if (trows > bit_limit) then
-      call print_warning("Total rows of distributed matrix A is too large for 32bit integer: "//trows//" = "//int(trows, isp))
+      call print_warning("Total rows of distributed matrix A is too large for 32bit integer: "//trows64//" = "//trows)
    end if
 
-   lwork = get_lwork_pdgeqrf(this%ScaLAPACK_obj, int(trows, isp), ncols, mb_A, nb_A)
-   call print("lwork_pdgeqrf = "//lwork//" = "//int(lwork, isp), PRINT_VERBOSE)
-   if (lwork > bit_limit) then
+   lwork1 = get_lwork_pdgeqrf(this%ScaLAPACK_obj, trows, ncols, mb_A, nb_A)
+   call print("lwork_pdgeqrf = "//lwork1//" = "//int(lwork1, isp), PRINT_VERBOSE)
+   lwork2 = get_lwork_pdormqr(this%ScaLAPACK_obj, 'L', trows, 1, mb_A, nb_A, mb_A, 1)
+   call print("lwork_pdormqr = "//lwork2//" = "//int(lwork2, isp), PRINT_VERBOSE)
+   if (max(lwork1, lwork2) > bit_limit) then
       call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!"//char(10) &
          //"Set mpi_blocksize_cols to something smaller, see --help.")
    end if
