@@ -76,6 +76,12 @@ program gap_fit_program
   if (main_gap_fit%task_manager%n_workers > 1) call fit_n_from_xyz(main_gap_fit)
   call gap_fit_estimate_memory(main_gap_fit)
 
+  if (main_gap_fit%dryrun) then
+     call print('Exit before major allocations because dryrun is true.')
+     call system_finalise()
+     stop
+  end if
+
   call set_baselines(main_gap_fit) ! sets e0 etc.
 
   call fit_data_from_xyz(main_gap_fit) ! converts atomic neighbourhoods (bond neighbourhoods etc.) do descriptors, and feeds those to the GP

@@ -82,6 +82,7 @@ module gap_fit_module
      integer :: e0_method = E0_ISOLATED
      logical :: do_core = .false., do_copy_at_file, has_config_type_sigma, sigma_per_atom = .true.
      logical :: sparsify_only_no_fit = .false.
+     logical :: dryrun = .false.
      integer :: n_frame = 0
      integer :: n_coordinate = 0
      integer :: n_ener = 0
@@ -170,6 +171,7 @@ contains
         parameter_name_prefix
 
      logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov, sparsify_only_no_fit
+     logical, pointer :: dryrun
      logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_config_file, has_default_sigma
      logical :: mpi_print_all, file_exists
      
@@ -208,6 +210,7 @@ contains
      gp_file => this%gp_file
      template_file => this%template_file
      sparsify_only_no_fit => this%sparsify_only_no_fit
+     dryrun => this%dryrun
      condition_number_norm => this%condition_number_norm
      linear_system_dump_file => this%linear_system_dump_file
      mpi_blocksize => this%mpi_blocksize
@@ -333,7 +336,10 @@ contains
 
      call param_register(params, 'sparsify_only_no_fit', 'F', sparsify_only_no_fit, &
           help_string="If true, sparsification is done, but no fitting. print the sparse index by adding print_sparse_index=file.dat to the descriptor string.")
-     
+
+     call param_register(params, 'dryrun', 'F', dryrun, &
+          help_string="If true, exits after memory estimate, before major allocations.")
+
      call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
           help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
 
