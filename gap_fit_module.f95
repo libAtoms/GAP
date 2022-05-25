@@ -902,7 +902,7 @@ contains
     real(dp), dimension(:,:), allocatable :: f_core
     integer, dimension(:,:), allocatable :: force_loc, permutations
     integer :: ie, i, j, n, k, l, i_coordinate, n_hessian, n_energy_sigma, n_force_sigma, n_force_atom_sigma, &
-    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors
+    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors, n_virial_component_sigma
     integer, dimension(:), allocatable :: xloc, hessian_loc, local_property_loc
     integer, dimension(3,3) :: virial_loc
 
@@ -948,6 +948,7 @@ contains
     n_force_sigma = 0
     n_force_atom_sigma = 0
     n_force_component_sigma = 0
+    n_virial_component_sigma=0
     n_hessian_sigma = 0
     n_virial_sigma = 0
     n_local_property_sigma = 0
@@ -1126,7 +1127,9 @@ contains
        else
           n_virial_sigma = n_virial_sigma + 1
        endif
-       if ( .not. has_virial_component_sigma) then
+       if (has_virial_component_sigma) then
+          n_virial_component_sigma = n_virial_component_sigma + 9
+       else
           virial_component_sigma = virial_sigma
        endif
 
@@ -1359,6 +1362,7 @@ contains
     call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//sum(this%task_manager%MPI_obj, n_local_property_sigma))
     call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_atom_sigma))
     call print("Number of per-component setting of force_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_component_sigma))
+    call print("Number of per-component setting of virial_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_virial_component_sigma))
     call print_title("End of report")
 
     do i_coordinate = 1, this%n_coordinate
