@@ -3630,6 +3630,19 @@ module gp_predict_module
          RAISE_ERROR('gpCoordinates_Predict: object not initialised', error)
       endif
 
+      my_do_variance_estimate = present(variance_estimate) .and. optional_default(.false.,do_variance_estimate)
+
+      if( this%n_sparseX == 0 ) then
+         gpCoordinates_Predict = 0.0_dp
+         if( present(gradPredict) ) gradPredict = 0.0_dp
+         if( my_do_variance_estimate ) then
+            variance_estimate = 0.0_dp
+            if( present( grad_variance_estimate ) ) grad_variance_estimate = 0.0_dp
+         endif
+         return
+      endif
+
+
       if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
 #ifdef _OPENMP  
          if (OMP_IN_PARALLEL()) then  
@@ -3822,7 +3835,6 @@ module gp_predict_module
             call dgemv('N', size(grad_k,1), size(grad_k,2), 1.0_dp, grad_k(1,1), size(grad_k,1), &  
                this%alpha(1), 1, 0.0_dp, gradPredict(1), 1)  
       endif
-      my_do_variance_estimate = present(variance_estimate) .and. optional_default(.false.,do_variance_estimate)  
 
       if(my_do_variance_estimate) then  
          allocate(k_mm_k(this%n_sparseX))
@@ -3955,6 +3967,8 @@ module gp_predict_module
          endif
       endif
 
+      if( this%n_sparseX == 0 ) return
+
       if( regularisation < 0.0_dp ) then
          RAISE_ERROR("gpCoordinates_initialise_variance_estimate: regularisation ("//regularisation//") is negative.",error)  
       elseif( regularisation == 0.0_dp ) then
@@ -4056,6 +4070,11 @@ module gp_predict_module
 
       if( .not. this%initialised ) then
          RAISE_ERROR('gpCoordinates_log_likelihood: object not initialised', error)
+      endif
+
+      if( this%n_sparseX == 0 ) then
+         log_likelihood = 0.0_dp
+         return
       endif
 
       was_initialised = this%variance_estimate_initialised
