@@ -343,10 +343,10 @@ contains
           help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
 
      call param_register(params, 'mpi_blocksize_rows', '0', mpi_blocksize_rows, &
-          help_string="Blocksize of MPI distributed matrix rows. Affects efficiency and memory usage. Max if 0 (default).")
+          help_string="Blocksize of MPI distributed matrix rows. Affects efficiency and memory usage slightly. Max if 0 (default).")
 
-     call param_register(params, 'mpi_blocksize_cols', '0', mpi_blocksize_cols, &
-          help_string="Blocksize of MPI distributed matrix cols. Affects efficiency and memory usage. Max if 0 (default).")
+     call param_register(params, 'mpi_blocksize_cols', '100', mpi_blocksize_cols, &
+          help_string="Blocksize of MPI distributed matrix cols. Affects efficiency and memory usage considerably. Max if 0. Default: 100")
 
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")

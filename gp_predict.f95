@@ -754,7 +754,6 @@ module gp_predict_module
 
       character(len=STRING_LENGTH) :: my_condition_number_norm
 
-      integer, parameter :: nb_A_limit = 10000  ! arbitrary choice
       integer :: i, j, mb_A, nb_A
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i_y, i_yPrime, &
       i_globalY, i_global_yPrime, nlrows
@@ -801,7 +800,7 @@ module gp_predict_module
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
          mb_A = get_blocksize(task_manager%idata(1), task_manager%unified_workload)
-         nb_A = get_blocksize(task_manager%idata(2), min(n_globalSparseX, nb_A_limit))
+         nb_A = get_blocksize(task_manager%idata(2), n_globalSparseX)
          nlrows = increase_to_multiple(task_manager%unified_workload, mb_A)
          i = nlrows - task_manager%unified_workload
          call print("distA extension: "//i//" "//n_globalSparseX//" memory "//i2si(8_idp * i * n_globalSparseX)//"B", PRINT_VERBOSE)
