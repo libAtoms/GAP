@@ -229,7 +229,7 @@ contains
         if (has_config_file) then
            inquire(file=config_file, exist=file_exists)
            if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
-           call read(config_str, config_file, keep_lf=.false.)
+           call read(config_str, config_file, keep_lf=.false., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
         end if
      end if
      if (.not. has_config_file) config_str = this%command_line
