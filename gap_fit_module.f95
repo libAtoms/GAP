@@ -91,7 +91,8 @@ module gap_fit_module
      integer :: n_local_property = 0
      integer :: n_species = 0
      integer :: min_save
-     integer :: mpi_blocksize
+     integer :: mpi_blocksize_rows = 0
+     integer :: mpi_blocksize_cols = 0
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
@@ -178,7 +179,7 @@ contains
      real(dp), pointer :: default_local_property_sigma
 
      integer :: rnd_seed
-     integer, pointer :: mpi_blocksize
+     integer, pointer :: mpi_blocksize_rows, mpi_blocksize_cols
 
      config_file => this%config_file
      at_file => this%at_file
@@ -210,7 +211,8 @@ contains
      sparsify_only_no_fit => this%sparsify_only_no_fit
      condition_number_norm => this%condition_number_norm
      linear_system_dump_file => this%linear_system_dump_file
-     mpi_blocksize => this%mpi_blocksize
+     mpi_blocksize_rows => this%mpi_blocksize_rows
+     mpi_blocksize_cols => this%mpi_blocksize_cols
      
      call initialise(params)
 
@@ -340,8 +342,11 @@ contains
      call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
           help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
 
-     call param_register(params, 'mpi_blocksize', '0', mpi_blocksize, &
-          help_string="Blocksize of MPI distributed matrices. Affects efficiency and memory usage. Max if 0 (default).")
+     call param_register(params, 'mpi_blocksize_rows', '0', mpi_blocksize_rows, &
+          help_string="Blocksize of MPI distributed matrix rows. Affects efficiency and memory usage slightly. Max if 0 (default).")
+
+     call param_register(params, 'mpi_blocksize_cols', '100', mpi_blocksize_cols, &
+          help_string="Blocksize of MPI distributed matrix cols. Affects efficiency and memory usage considerably. Max if 0. Default: 100")
 
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
@@ -2141,8 +2146,9 @@ contains
     this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
 
     if (this%task_manager%active) then
-      call task_manager_init_idata(this%task_manager, 1)
-      this%task_manager%idata(1) = this%mpi_blocksize
+      call task_manager_init_idata(this%task_manager, 2)
+      this%task_manager%idata(1) = this%mpi_blocksize_rows
+      this%task_manager%idata(2) = this%mpi_blocksize_cols
     end if
   end subroutine gap_fit_init_task_manager
 
