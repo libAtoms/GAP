@@ -899,12 +899,12 @@ contains
     integer :: d
     integer :: n_con
     logical :: has_ener, has_force, has_virial, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
-       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_hessian_sigma, &
+       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_virial_component_sigma, has_hessian_sigma, &
        has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, exclude_atom
     real(dp) :: ener, ener_core, my_cutoff, energy_sigma, force_sigma, virial_sigma, hessian_sigma, local_property_sigma, &
        grad_covariance_cutoff, use_force_sigma
     real(dp), dimension(3) :: pos
-    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3
+    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3, virial_component_sigma
     real(dp), dimension(6) :: stress_voigt
     real(dp), dimension(:), allocatable :: theta, theta_fac, hessian, hessian_core, grad_data
     real(dp), dimension(:), pointer :: force_atom_sigma
@@ -914,7 +914,7 @@ contains
     real(dp), dimension(:,:), allocatable :: f_core
     integer, dimension(:,:), allocatable :: force_loc, permutations
     integer :: ie, i, j, n, k, l, i_coordinate, n_hessian, n_energy_sigma, n_force_sigma, n_force_atom_sigma, &
-    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors
+    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors, n_virial_component_sigma
     integer, dimension(:), allocatable :: xloc, hessian_loc, local_property_loc
     integer, dimension(3,3) :: virial_loc
 
@@ -960,6 +960,7 @@ contains
     n_force_sigma = 0
     n_force_atom_sigma = 0
     n_force_component_sigma = 0
+    n_virial_component_sigma=0
     n_hessian_sigma = 0
     n_virial_sigma = 0
     n_local_property_sigma = 0
@@ -972,6 +973,7 @@ contains
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
        has_virial = get_value(this%at(n_con)%params,this%virial_parameter_name,virial)
+       has_virial_component_sigma = get_value(this%at(n_con)%params,'virial_component_'//trim(this%sigma_parameter_name),virial_component_sigma)
        has_stress_voigt = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_voigt)
        has_stress_3_3 = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_3_3)
        has_hessian = get_value(this%at(n_con)%params,"n_"//this%hessian_parameter_name,n_hessian)
@@ -1137,6 +1139,11 @@ contains
        else
           n_virial_sigma = n_virial_sigma + 1
        endif
+       if (has_virial_component_sigma) then
+          n_virial_component_sigma = n_virial_component_sigma + 9
+       else
+          virial_component_sigma = virial_sigma
+       endif
 
        if( .not. has_hessian_sigma ) then
           hessian_sigma = this%sigma(4,n_config_type)
@@ -1202,14 +1209,17 @@ contains
 
           ! Now symmetrise matrix
           virial = ( virial + transpose(virial) ) / 2.0_dp
-
+          virial_component_sigma = ( virial_component_sigma + transpose(virial_component_sigma) ) / 2.0_dp
           if( virial_sigma .feq. 0.0_dp ) then
              RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_sigma//"), should be greater than zero",error)
           endif
 
           do k = 1, 3
              do l = k, 3
-                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_sigma)
+                if( virial_component_sigma(l,k) .feq. 0.0_dp ) then
+                   RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_component_sigma(l,k)//"), should be greater than zero",error)
+                endif
+                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_component_sigma(l,k))
              enddo
           enddo
        endif
@@ -1364,6 +1374,7 @@ contains
     call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//sum(this%task_manager%MPI_obj, n_local_property_sigma))
     call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_atom_sigma))
     call print("Number of per-component setting of force_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_component_sigma))
+    call print("Number of per-component setting of virial_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_virial_component_sigma))
     call print_title("End of report")
 
     do i_coordinate = 1, this%n_coordinate
