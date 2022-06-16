@@ -756,7 +756,7 @@ module gp_predict_module
 
       integer :: i, j, mb_A, nb_A
       integer :: i_coordinate, i_sparseX, i_global_sparseX, n_globalSparseX, n_globalY, i_y, i_yPrime, &
-      i_globalY, i_global_yPrime, nlrows
+      i_globalY, i_global_yPrime, nrows
 #ifdef HAVE_QR
       real(qp) :: rcond
       real(qp), dimension(:,:), allocatable :: c_subYY_sqrtInverseLambda, factor_c_subYsubY, a
@@ -799,13 +799,11 @@ module gp_predict_module
 
       allocate(alpha(n_globalSparseX))
       if (task_manager%active) then
-         mb_A = get_blocksize(task_manager%idata(1), task_manager%unified_workload)
-         nb_A = get_blocksize(task_manager%idata(2), n_globalSparseX)
-         nlrows = increase_to_multiple(task_manager%unified_workload, mb_A)
-         i = nlrows - task_manager%unified_workload
-         call print("distA extension: "//i//" "//n_globalSparseX//" memory "//i2si(8_idp * i * n_globalSparseX)//"B", PRINT_VERBOSE)
-         allocate(globalY(nlrows))
-         allocate(a(nlrows,n_globalSparseX))
+         nrows = task_manager%idata(1)
+         mb_A = task_manager%idata(2)
+         nb_A = task_manager%idata(3)
+         allocate(globalY(nrows))
+         allocate(a(nrows,n_globalSparseX))
          alpha = 0.0_qp
          globalY = 0.0_qp
          a = 0.0_qp
@@ -976,17 +974,6 @@ module gp_predict_module
          end if
       end do
    end subroutine get_shared_task_counts
-
-   function get_blocksize(arg, nrows) result(blocksize)
-      integer, intent(in) :: arg, nrows
-      integer :: blocksize
-
-      if (arg > 0) then
-         blocksize = arg
-      else
-         blocksize = nrows
-      end if
-   end function get_blocksize
 
    subroutine gpSparse_finalise(this,error)
       type(gpSparse), intent(inout) :: this
