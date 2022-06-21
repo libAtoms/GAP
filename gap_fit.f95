@@ -45,9 +45,9 @@ program gap_fit_program
   type(gap_fit) :: main_gap_fit
 
   call system_initialise(verbosity=PRINT_NORMAL, enable_timing=.false.)
+  call gap_fit_init_mpi_scalapack(main_gap_fit)
 
   call gap_fit_parse_command_line(main_gap_fit)
-  call gap_fit_init_mpi_scalapack(main_gap_fit)
   call gap_fit_parse_gap_str(main_gap_fit)
 
   call gap_fit_read_core_param_file(main_gap_fit)
