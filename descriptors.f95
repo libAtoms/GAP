@@ -7230,7 +7230,7 @@ module descriptors_module
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
 
-      print *, "jpd47 calling soap_calc", at%N
+      !print *, "jpd47 calling soap_calc", at%N
 
       INIT_ERROR(error)
 
@@ -7261,10 +7261,10 @@ module descriptors_module
       !print *, "size of species map is", size(species_map)
 
       !jpd47
-      print *, "ispeices=, this%speices_Z(i_species)="
-      do i_species = 1, size(this%species_Z)
-         print *, i_species, this%species_Z(i_species)
-      enddo
+      !print *, "ispeices=, this%speices_Z(i_species)="
+      !do i_species = 1, size(this%species_Z)
+      !   print *, i_species, this%species_Z(i_species)
+      !enddo
 
       do i_species = 1, this%n_species
          !jpd47 default for n_species = 1. set the map for all elements to be 1s
@@ -7282,9 +7282,9 @@ module descriptors_module
       enddo
 
       !jpd47
-      do i_species = 1, size(species_map)
-         print *, i_species, species_map(i_species)
-      enddo
+      !do i_species = 1, size(species_map)
+      !   print *, i_species, species_map(i_species)
+      !enddo
 
       my_do_descriptor = optional_default(.false., do_descriptor)
       my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
@@ -7357,7 +7357,7 @@ module descriptors_module
          call descriptor_sizes(this,at,n_descriptors,n_cross,n_index=n_index,error=error)
       endif
 
-      print *, "jpd47 n_descriptors is", n_descriptors
+      !print *, "jpd47 n_descriptors is", n_descriptors
       allocate(descriptor_out%x(n_descriptors))
       allocate(i_desc(at%N))
 
@@ -7501,7 +7501,7 @@ module descriptors_module
 
                l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
                !jpd47 
-               print * , "l_n_neighbours=", l_n_neighbours
+               !print * , "l_n_neighbours=", l_n_neighbours
                sum_l_n_neighbours = sum_l_n_neighbours + l_n_neighbours + 1 ! include central atom as well!
 
                !jpd47 changing limits to 0-n_max, also changed limts here to be from 
@@ -7598,8 +7598,8 @@ total_grad_time = 0.0
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
 
                !jpd47 include for 4 reasons. 0). total density channel a). all central atoms included b). correct species c). species_Z=0, which is the default for n_species=1
-               print *, "i_species is", i_species
-               print *, "jpd47 at%Z(i)=", at%Z(i)
+               !print *, "i_species is", i_species
+               !print *, "jpd47 at%Z(i)=", at%Z(i)
 
                !jpd47 this fails iwth -fcheck=all for i_species=0 because final 2 equalities get checked.
                if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
@@ -7775,15 +7775,15 @@ total_grad_time = 0.0
 
          !jpd47 store structure-wise gradient, if required
          if(this%global .and. my_do_grad_descriptor) then
-            print *, "jpd47 sizes are"
-            print *, size(grad_fourier_so3_r)
-            print *, size(global_grad_fourier_so3_r_array)
-            print *, size(global_grad_fourier_so3_r_array(i_desc_i)%x)
+            !print *, "jpd47 sizes are"
+            !print *, size(grad_fourier_so3_r)
+            !print *, size(global_grad_fourier_so3_r_array)
+            !print *, size(global_grad_fourier_so3_r_array(i_desc_i)%x)
 
             !jpd47 getting a mismatch here... grad_fourier_so3_r uses max_n_neigh whereas other uses actuall number of neighbours
             !jpd47 if this is really going on it seems orthogonal to anything I've ever changed...
-            global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r
-            global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i
+            global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
+            global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             !do n_i = lbound(grad_fourier_so3_r,3), ubound(grad_fourier_so3_r,3)
             !   do a = lbound(grad_fourier_so3_r,2), ubound(grad_fourier_so3_r,2)
             !      do l = lbound(grad_fourier_so3_r,1), ubound(grad_fourier_so3_r,1)

@@ -2255,8 +2255,8 @@ module gp_predict_module
             gpCoordinates_Covariance = gpCoordinates_Covariance + covariancePP_ij
 
             if( ( present(grad_Covariance_i) .or. present(grad_Covariance_j) ) .and. (r_ij > 0.0_dp) ) then
-               grad_covariancePP_ij = grad_covariancePP(r_ij,PP_Q, this%d) / r_ij
-               !xI_xJ(:) = x_i(this%permutations(:,i_p)) - x_j(:)
+               grad_covariancePP_ij = this%delta**2 * grad_covariancePP(r_ij,PP_Q, this%d) / r_ij
+               xI_xJ(:) = x_i(this%permutations(:,i_p)) - x_j(:)
 
                if(present(grad_Covariance_i)) &
                   grad_Covariance_i(this%permutations(:,i_p)) = grad_Covariance_i(this%permutations(:,i_p)) + grad_covariancePP_ij * xI_xJ(:)
