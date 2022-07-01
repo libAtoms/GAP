@@ -45,9 +45,9 @@ program gap_fit_program
   type(gap_fit) :: main_gap_fit
 
   call system_initialise(verbosity=PRINT_NORMAL, enable_timing=.false.)
+  call gap_fit_init_mpi_scalapack(main_gap_fit)
 
   call gap_fit_parse_command_line(main_gap_fit)
-  call gap_fit_init_mpi_scalapack(main_gap_fit)
   call gap_fit_parse_gap_str(main_gap_fit)
 
   call gap_fit_read_core_param_file(main_gap_fit)
@@ -74,7 +74,14 @@ program gap_fit_program
   call fit_n_from_xyz(main_gap_fit) ! counts number of energies, forces, virials. computes number of descriptors and gradients.
   call gap_fit_distribute_tasks(main_gap_fit)
   if (main_gap_fit%task_manager%n_workers > 1) call fit_n_from_xyz(main_gap_fit)
+  call gap_fit_set_mpi_blocksizes(main_gap_fit)
   call gap_fit_estimate_memory(main_gap_fit)
+
+  if (main_gap_fit%dryrun) then
+     call print('Exit before major allocations because dryrun is true.')
+     call system_finalise()
+     stop
+  end if
 
   call set_baselines(main_gap_fit) ! sets e0 etc.
 

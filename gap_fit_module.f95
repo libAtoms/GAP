@@ -82,6 +82,7 @@ module gap_fit_module
      integer :: e0_method = E0_ISOLATED
      logical :: do_core = .false., do_copy_at_file, has_config_type_sigma, sigma_per_atom = .true.
      logical :: sparsify_only_no_fit = .false.
+     logical :: dryrun = .false.
      integer :: n_frame = 0
      integer :: n_coordinate = 0
      integer :: n_ener = 0
@@ -91,7 +92,8 @@ module gap_fit_module
      integer :: n_local_property = 0
      integer :: n_species = 0
      integer :: min_save
-     integer :: mpi_blocksize
+     integer :: mpi_blocksize_rows = 0
+     integer :: mpi_blocksize_cols = 0
      type(extendable_str) :: quip_string
      type(Potential) :: core_pot
 
@@ -143,6 +145,7 @@ module gap_fit_module
   public :: gap_fit_init_mpi_scalapack
   public :: gap_fit_init_task_manager
   public :: gap_fit_distribute_tasks
+  public :: gap_fit_set_mpi_blocksizes
 
   public :: gap_fit_is_root
 
@@ -170,6 +173,7 @@ contains
         parameter_name_prefix
 
      logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov, sparsify_only_no_fit
+     logical, pointer :: dryrun
      logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_config_file, has_default_sigma
      logical :: mpi_print_all, file_exists
      
@@ -178,7 +182,7 @@ contains
      real(dp), pointer :: default_local_property_sigma
 
      integer :: rnd_seed
-     integer, pointer :: mpi_blocksize
+     integer, pointer :: mpi_blocksize_rows, mpi_blocksize_cols
 
      config_file => this%config_file
      at_file => this%at_file
@@ -208,9 +212,11 @@ contains
      gp_file => this%gp_file
      template_file => this%template_file
      sparsify_only_no_fit => this%sparsify_only_no_fit
+     dryrun => this%dryrun
      condition_number_norm => this%condition_number_norm
      linear_system_dump_file => this%linear_system_dump_file
-     mpi_blocksize => this%mpi_blocksize
+     mpi_blocksize_rows => this%mpi_blocksize_rows
+     mpi_blocksize_cols => this%mpi_blocksize_cols
      
      call initialise(params)
 
@@ -223,7 +229,7 @@ contains
         if (has_config_file) then
            inquire(file=config_file, exist=file_exists)
            if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
-           call read(config_str, config_file, keep_lf=.false.)
+           call read(config_str, config_file, keep_lf=.false., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
         end if
      end if
      if (.not. has_config_file) config_str = this%command_line
@@ -333,15 +339,21 @@ contains
 
      call param_register(params, 'sparsify_only_no_fit', 'F', sparsify_only_no_fit, &
           help_string="If true, sparsification is done, but no fitting. print the sparse index by adding print_sparse_index=file.dat to the descriptor string.")
-     
+
+     call param_register(params, 'dryrun', 'F', dryrun, &
+          help_string="If true, exits after memory estimate, before major allocations.")
+
      call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
           help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
 
      call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
           help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
 
-     call param_register(params, 'mpi_blocksize', '0', mpi_blocksize, &
-          help_string="Blocksize of MPI distributed matrices. Affects efficiency and memory usage. Max if 0 (default).")
+     call param_register(params, 'mpi_blocksize_rows', '0', mpi_blocksize_rows, &
+          help_string="Blocksize of MPI distributed matrix rows. Affects efficiency and memory usage slightly. Max if 0 (default).")
+
+     call param_register(params, 'mpi_blocksize_cols', '100', mpi_blocksize_cols, &
+          help_string="Blocksize of MPI distributed matrix cols. Affects efficiency and memory usage considerably. Max if 0. Default: 100")
 
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
@@ -887,12 +899,12 @@ contains
     integer :: d
     integer :: n_con
     logical :: has_ener, has_force, has_virial, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
-       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_hessian_sigma, &
+       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_virial_component_sigma, has_hessian_sigma, &
        has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, exclude_atom
     real(dp) :: ener, ener_core, my_cutoff, energy_sigma, force_sigma, virial_sigma, hessian_sigma, local_property_sigma, &
        grad_covariance_cutoff, use_force_sigma
     real(dp), dimension(3) :: pos
-    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3
+    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3, virial_component_sigma
     real(dp), dimension(6) :: stress_voigt
     real(dp), dimension(:), allocatable :: theta, theta_fac, hessian, hessian_core, grad_data
     real(dp), dimension(:), pointer :: force_atom_sigma
@@ -902,7 +914,7 @@ contains
     real(dp), dimension(:,:), allocatable :: f_core
     integer, dimension(:,:), allocatable :: force_loc, permutations
     integer :: ie, i, j, n, k, l, i_coordinate, n_hessian, n_energy_sigma, n_force_sigma, n_force_atom_sigma, &
-    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors
+    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors, n_virial_component_sigma
     integer, dimension(:), allocatable :: xloc, hessian_loc, local_property_loc
     integer, dimension(3,3) :: virial_loc
 
@@ -948,6 +960,7 @@ contains
     n_force_sigma = 0
     n_force_atom_sigma = 0
     n_force_component_sigma = 0
+    n_virial_component_sigma=0
     n_hessian_sigma = 0
     n_virial_sigma = 0
     n_local_property_sigma = 0
@@ -960,6 +973,7 @@ contains
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
        has_virial = get_value(this%at(n_con)%params,this%virial_parameter_name,virial)
+       has_virial_component_sigma = get_value(this%at(n_con)%params,'virial_component_'//trim(this%sigma_parameter_name),virial_component_sigma)
        has_stress_voigt = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_voigt)
        has_stress_3_3 = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_3_3)
        has_hessian = get_value(this%at(n_con)%params,"n_"//this%hessian_parameter_name,n_hessian)
@@ -1125,6 +1139,11 @@ contains
        else
           n_virial_sigma = n_virial_sigma + 1
        endif
+       if (has_virial_component_sigma) then
+          n_virial_component_sigma = n_virial_component_sigma + 9
+       else
+          virial_component_sigma = virial_sigma
+       endif
 
        if( .not. has_hessian_sigma ) then
           hessian_sigma = this%sigma(4,n_config_type)
@@ -1190,14 +1209,17 @@ contains
 
           ! Now symmetrise matrix
           virial = ( virial + transpose(virial) ) / 2.0_dp
-
+          virial_component_sigma = ( virial_component_sigma + transpose(virial_component_sigma) ) / 2.0_dp
           if( virial_sigma .feq. 0.0_dp ) then
              RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_sigma//"), should be greater than zero",error)
           endif
 
           do k = 1, 3
              do l = k, 3
-                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_sigma)
+                if( virial_component_sigma(l,k) .feq. 0.0_dp ) then
+                   RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_component_sigma(l,k)//"), should be greater than zero",error)
+                endif
+                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_component_sigma(l,k))
              enddo
           enddo
        endif
@@ -1352,6 +1374,7 @@ contains
     call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//sum(this%task_manager%MPI_obj, n_local_property_sigma))
     call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_atom_sigma))
     call print("Number of per-component setting of force_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_component_sigma))
+    call print("Number of per-component setting of virial_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_virial_component_sigma))
     call print_title("End of report")
 
     do i_coordinate = 1, this%n_coordinate
@@ -2140,17 +2163,22 @@ contains
     call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
     this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
 
-    if (this%task_manager%active) then
-      call task_manager_init_idata(this%task_manager, 1)
-      this%task_manager%idata(1) = this%mpi_blocksize
-    end if
+    if (.not. this%task_manager%active) return
+
+    call task_manager_init_idata(this%task_manager, 3)  ! space for nrows, blocksizes
   end subroutine gap_fit_init_task_manager
 
   subroutine gap_fit_distribute_tasks(this)
     type(gap_fit), intent(inout) :: this
 
+    integer :: n_sparseX
+
+    if (.not. this%task_manager%active) return
+
+    n_sparseX = sum(this%config_type_n_sparseX)
+
     ! add special task for Cholesky matrix addon to last worker
-    call task_manager_add_task(this%task_manager, sum(this%config_type_n_sparseX), n_idata=2, worker_id=SHARED)
+    call task_manager_add_task(this%task_manager, n_sparseX, n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
     call task_manager_check_distribution(this%task_manager)
   end subroutine gap_fit_distribute_tasks
@@ -2169,6 +2197,60 @@ contains
          this%mpi_obj%my_proc, do_Kmm=is_root(this%mpi_obj))
     end if
   end subroutine gap_fit_print_linear_system_dump_file
+
+  ! set blocksize, abort if ScaLAPACK would overflow 32bit integer
+  subroutine gap_fit_set_mpi_blocksizes(this)
+   type(gap_fit), intent(inout) :: this
+
+   integer(idp), parameter :: bit_limit = 2_idp**31
+
+   integer :: nrows, nrows0, trows, ncols, mb_A, nb_A, i
+   integer(idp) :: lwork1, lwork2, trows64
+
+   if (.not. this%task_manager%active) return
+
+   nrows0 = this%task_manager%unified_workload
+   ncols = sum(this%config_type_n_sparseX)
+
+   mb_A = this%mpi_blocksize_rows
+   if (mb_A == 0) then
+      call print("Defaulting mpi_blocksize_rows (arg = 0) ...", PRINT_VERBOSE)
+      mb_A = nrows0
+   end if
+   call print("mpi_blocksize_rows = "//mb_A, PRINT_VERBOSE)
+
+   nb_A = this%mpi_blocksize_cols
+   if (nb_A == 0) then
+      call print("Defaulting mpi_blocksize_cols (arg = 0) ...", PRINT_VERBOSE)
+      nb_A = ncols
+   end if
+   call print("mpi_blocksize_cols = "//nb_A, PRINT_VERBOSE)
+
+   nrows = increase_to_multiple(nrows0, mb_A)
+   call print("nrows = "//nrows, PRINT_VERBOSE)
+   i = nrows - nrows0
+   call print("distA extension: "//i//" "//ncols//" memory "//i2si(8_idp * i * ncols)//"B", PRINT_VERBOSE)
+
+   trows64 = int(nrows, idp) * this%task_manager%n_workers
+   trows = int(trows64, isp)
+   if (trows > bit_limit) then
+      call print_warning("Total rows of distributed matrix A is too large for 32bit integer: "//trows64//" = "//trows)
+   end if
+
+   lwork1 = get_lwork_pdgeqrf(this%ScaLAPACK_obj, trows, ncols, mb_A, nb_A)
+   call print("lwork_pdgeqrf = "//lwork1//" = "//int(lwork1, isp), PRINT_VERBOSE)
+   lwork2 = get_lwork_pdormqr(this%ScaLAPACK_obj, 'L', trows, 1, mb_A, nb_A, mb_A, 1)
+   call print("lwork_pdormqr = "//lwork2//" = "//int(lwork2, isp), PRINT_VERBOSE)
+   if (max(lwork1, lwork2) > bit_limit) then
+      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!"//char(10) &
+         //"Set mpi_blocksize_cols to something smaller, see --help.")
+   end if
+
+   ! transfer nrows and blocksizes to gp_predict
+   this%task_manager%idata(1) = nrows
+   this%task_manager%idata(2) = mb_A
+   this%task_manager%idata(3) = nb_A
+ end subroutine gap_fit_set_mpi_blocksizes
 
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
