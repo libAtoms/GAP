@@ -384,7 +384,7 @@ module descriptors_module
       real(dp) :: cutoff_rate
       integer :: l_max, n_max, n_Z, n_species
       !jpd47
-      integer :: nu, nu_hat, mu, mu_hat
+      integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
       real(dp), dimension(:,:), allocatable :: transform_basis,cholesky_overlap_basis
@@ -2501,10 +2501,8 @@ module descriptors_module
       call param_register(params, 'xml_version', '1426512068', xml_version, help_string="Version of GAP the XML potential file was created")
 
       !jpd47
-      call param_register(params, 'nu', '2', this%nu, help_string="a gen kernel index")
-      call param_register(params, 'nu_hat', '0', this%nu_hat, help_string="a gen kernel index")
-      call param_register(params, 'mu', '0', this%mu, help_string="a gen kernel index")
-      call param_register(params, 'mu_hat', '0', this%mu_hat, help_string="a gen kernel index")
+      call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
+      call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -2654,10 +2652,8 @@ module descriptors_module
       this%n_Z = 0
       this%n_species = 0
       !jpd47
-      this%nu = 2
-      this%nu_hat = 0
-      this%mu = 0
-      this%mu_hat = 0
+      this%nu_R = 2
+      this%nu_S = 2
 
       if(allocated(this%r_basis)) deallocate(this%r_basis)
       if(allocated(this%transform_basis)) deallocate(this%transform_basis)
@@ -7120,12 +7116,11 @@ module descriptors_module
 
    endsubroutine power_SO4_calc
 
-   !jpd47 replacement for rs_index in order to handle all 9 cases
+   !jpd47 NEW!! replacement for rs_index in order to handle all 9 cases
    subroutine form_gs_index(this, gs_index, error)
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
-      integer :: a, b, i, j, xtemp, smin, smax, sdif, nmin, nmax, ndif, done, j_species, i_species
-      integer, dimension(3,4)  :: gk_inds
+      integer :: a, i, j, smin, smax, sdif, nmin, nmax, ndif, j_species, nu_R, nu_S
       type(int_2d), dimension(:), allocatable :: gs_index
 
       INIT_ERROR(error)
@@ -7134,40 +7129,50 @@ module descriptors_module
          RAISE_ERROR("form_gs_index: descriptor object not initialised", error)
       endif
 
-      if ( this%nu + this%nu_hat + this%mu + this%mu_hat /= 2) then
-         RAISE_ERROR("soap_dimensions: nu+mu+nu_hat+mu_hat /= 2", error)
+      if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
+         RAISE_ERROR("nu_R outside allowed range of 0-2", error)
       endif
 
-      gk_inds(1,:) = (/ this%nu, this%nu_hat, this%mu, this%mu_hat /)
-      gk_inds(2,:) = (/ 1, 1, 0, 0 /)
-      gk_inds(3,:) = (/ 1, 0, 1, 0 /)
+      if (( this%nu_S > 2) .OR. (this%nu_S < 0)) then
+         RAISE_ERROR("nu_S outside allowed range of 0-2", error)
+      endif
 
-
+   
       allocate(gs_index(2))
-      done = 0
-      do i = 1,4
-         xtemp = gk_inds(1,i)
-         do while (xtemp > 0)
-            smin = gk_inds(2,i)
-            smax = smin*this%n_species
-            sdif = smax -smin
-            nmin = gk_inds(3,i)
-            nmax = nmin*this%n_max
-            ndif = nmax-nmin
+      nu_R = this%nu_R
+      nu_S = this%nu_S
 
-            allocate(gs_index(done+1)%mm((ndif+1)*(sdif+1), 2))
-            j = 0
-            do j_species = smin, smax
-               do a = nmin, nmax
-                  j = j +1
-                  gs_index(done+1)%mm(j,:) = (/ j_species, a /)
-               enddo
+      !new loop
+      do i = 1,2
+         if (nu_R > 0) then
+            nmin = 1
+            nu_R  = nu_R - 1
+         else
+            nmin = 0
+         endif
+         nmax =this%n_max * nmin
+         ndif = nmax-nmin
+
+         if (nu_S > 0) then
+            smin = 1
+            nu_S  = nu_S - 1
+         else
+            smin = 0
+         endif
+         smax = this%n_species* smin
+         sdif = smax-smin
+         allocate(gs_index(i)%mm((ndif+1)*(sdif+1), 2))
+
+         j = 0
+         do j_species = smin, smax
+            do a = nmin, nmax
+               j = j +1
+               gs_index(i)%mm(j,:) = (/ j_species, a /)
             enddo
-            done  = done + 1
-            xtemp = xtemp - 1
          enddo
       enddo
    endsubroutine form_gs_index
+
 
 !jpd47 power spectrum function
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
@@ -7241,17 +7246,20 @@ module descriptors_module
       endif
 
       !jpd47 check for general kernel
-      if ( this%nu + this%nu_hat + this%mu + this%mu_hat /= 2) then
-         RAISE_ERROR("soap:calc: nu+mu+nu_hat+mu_hat /= 2", error)
+      if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
+         RAISE_ERROR("nu_R outside allowed range of 0-2", error)
       endif
 
+      if (( this%nu_S > 2) .OR. (this%nu_S < 0)) then
+         RAISE_ERROR("nu_S outside allowed range of 0-2", error)
+      endif
 
       !jpd47 setup the alternative to rs_index + sym_desc
       call form_gs_index(this, gs_index, error)
-      if (MAXVAL((/ this%nu, this%nu_hat, this%mu, this%mu_hat /)) == 2) then
-         sym_desc = .true.
-      else
+      if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
          sym_desc = .false.
+      else
+         sym_desc = .true.
       endif
 
 
@@ -7366,7 +7374,7 @@ module descriptors_module
          max_n_neigh = max(max_n_neigh, n_neighbours(at, n_i))
       end do
       !jpd47
-      print *, "jpd47 max_n_neigh is", max_n_neigh
+      !print *, "jpd47 max_n_neigh is", max_n_neigh
 
 !$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh) private(i_species, a, l, n_i, ub)
       allocate(descriptor_i(d))
@@ -7904,7 +7912,7 @@ total_grad_time = 0.0
                !SPEED    enddo !jb
                !SPEED enddo !ia
 
-               if (this%nu /= 2) then
+               if ((this%nu_R /= 2) .OR. (this%nu_S /=2)) then
                   !jpd47 V2 ***********************
                   do ia = 1, SIZE(gs_index(1)%mm(:,0))
                      a = gs_index(1)%mm(ia,2)
@@ -7941,7 +7949,7 @@ total_grad_time = 0.0
                   enddo !ia
                endif
 
-               if (this%nu == 2) then
+               if ((this%nu_R == 2) .AND. (this%nu_S == 2)) then
                   !jpd47 V3 ****************** save
                   do l=0, this%l_max
                   !jpd47 flatten grad_fourier_so3 across a and ignore n_i
@@ -8035,7 +8043,7 @@ total_grad_time = 0.0
 do i = 0, at%N
    total_grad_time = total_grad_time + gradient_times(i)
 enddo
-print *, "jpd47 total gradient time was ", total_grad_time
+!print *, "jpd47 total gradient time was ", total_grad_time
 
 if (allocated(gradient_times)) then
    deallocate(gradient_times)
@@ -8086,11 +8094,15 @@ endif
       if(allocated(grad_radial_fun)) deallocate(grad_radial_fun)
       if(allocated(grad_radial_coefficient)) deallocate(grad_radial_coefficient)
       if(allocated(descriptor_i)) deallocate(descriptor_i)
+
+      !print *, "about to deallocate grad_descriptor_i"
       if(allocated(grad_descriptor_i)) deallocate(grad_descriptor_i)
 
+        !jpd47 adjust the bounds for n_max here?
         if (allocated(grad_fourier_so3_r)) then ! should really check for grad_fourier_so3_i also
             do n_i = 1, max_n_neigh
-               do a = 1, this%n_max
+               !jpd47 change from a=1 -> a=0
+               do a = 0, this%n_max
                   do l = 0, this%l_max
                      !SPEED deallocate(grad_fourier_so3(l,a,n_i)%mm)
                      if(allocated(grad_fourier_so3_r(l,a,n_i)%mm)) deallocate(grad_fourier_so3_r(l,a,n_i)%mm)
@@ -8215,7 +8227,7 @@ endif
                   grad_descriptor_i = 0.0_dp
                   
                   !jpd47 global compressed gradients
-                  if (this%nu /= 2) then
+                  if ((this%nu_S /= 2) .OR. (this%nu_R /= 2)) then
                      !jpd47 V2 ***********************
                      do ia = 1, SIZE(gs_index(1)%mm(:,0))
                         a = gs_index(1)%mm(ia,2)
@@ -8253,7 +8265,7 @@ endif
                   endif
 
 
-                  if (this%nu == 2) then
+                  if ((this%nu_R == 2) .AND. (this%nu_S == 2)) then
                      do l=0, this%l_max
                         do a = 1, this%n_max
                            do alpha=1, 3
@@ -10228,10 +10240,10 @@ endif
          NS2 = SIZE(gs_index(2)%mm(:,0))
 
          !jpd47 check if symmetric or not
-         if (MAXVAL((/ this%nu, this%nu_hat, this%mu, this%mu_hat /)) == 2) then
-            i = NS1 * (NS1+1) * (this%l_max +1) /2 +1
-         else
+         if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
             i = NS1 * NS2 * (this%l_max + 1) +1
+         else
+            i = NS1 * (NS1+1) * (this%l_max +1) /2 +1
          endif
       endif
 
