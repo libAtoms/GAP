@@ -383,7 +383,7 @@ module descriptors_module
       real(dp) :: cutoff_scale
       real(dp) :: cutoff_rate
       integer :: l_max, n_max, n_Z, n_species
-      !jpd47
+
       integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
@@ -2453,7 +2453,6 @@ module descriptors_module
 
    endsubroutine power_so4_finalise
 
-   !jpd47 setup the soap parameters, includes setting up the radial basis.
    subroutine soap_initialise(this,args_str,error)
       type(soap), intent(inout) :: this
       character(len=*), intent(in) :: args_str
@@ -2500,7 +2499,6 @@ module descriptors_module
       call param_register(params, 'species_Z', '', species_Z_str, has_value_target=has_species_Z, help_string="Atomic number of species")
       call param_register(params, 'xml_version', '1426512068', xml_version, help_string="Version of GAP the XML potential file was created")
 
-      !jpd47
       call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
       call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
 
@@ -2557,11 +2555,10 @@ module descriptors_module
       call finalise(params)
 
 
-      !jpd47 start of setting up the radial basis functions
-      this%alpha = 0.5_dp / this%atom_sigma**2     !jpd47 use the same sigma to determine the width of the basis function Gaussians. No need for this to be true. TODO change this to rcut/nmax*1.2?
+      this%alpha = 0.5_dp / this%atom_sigma**2
       alpha_basis = this%alpha
-      cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))    !jpd47 ACTUAL cutoff for the the radial basis functions.
-      spacing_basis = cutoff_basis / this%n_max    !jpd47 spacing between the gaussians
+      cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
+      spacing_basis = cutoff_basis / this%n_max
 
       allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
          covariance_basis(this%n_max,this%n_max), overlap_basis(this%n_max,this%n_max), this%cholesky_overlap_basis(this%n_max,this%n_max))
@@ -2571,7 +2568,6 @@ module descriptors_module
       !   this%r_basis(i)  = this%r_basis(i+1) - spacing_basis
       !enddo
 
-      !jpd47 r_basis contains the positions of the centers of the equispaced gaussians used as starting point for g_n(r)
       this%r_basis(1) = 0.0_dp
       do i = 2, this%n_max
          this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
@@ -2580,7 +2576,7 @@ module descriptors_module
 
       do i = 1, this%n_max
          do j = 1, this%n_max
-            covariance_basis(j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)   !jpd47 exp(-alpha*(r_i-r_j)^2)
+            covariance_basis(j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
             !overlap_basis(j,i) = exp(-0.5_dp * alpha_basis* (this%r_basis(i) - this%r_basis(j))**2) * ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) )
             !print*, 'A', exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) )
             !print*, 'B', sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j))
@@ -2591,8 +2587,6 @@ module descriptors_module
             !   alpha_basis*exp(0.5_dp * alpha_basis * (this%r_basis(i) + this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
             !   ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
 
-
-            !jpd47 overlap_basis, not sure what this corresponds to....
             overlap_basis(j,i) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
                sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
                alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
@@ -2603,8 +2597,6 @@ module descriptors_module
       !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
       overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
 
-
-      !jpd47 cholesky decomposition, force to be lower/upper triangular
       call initialise(LA_covariance_basis,covariance_basis)
       call initialise(LA_overlap_basis,overlap_basis)
       call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
@@ -2651,7 +2643,6 @@ module descriptors_module
       this%n_max = 0
       this%n_Z = 0
       this%n_species = 0
-      !jpd47
       this%nu_R = 2
       this%nu_S = 2
 
@@ -7116,8 +7107,8 @@ module descriptors_module
 
    endsubroutine power_SO4_calc
 
-   !jpd47 NEW!! replacement for rs_index in order to handle all 9 cases
    subroutine form_gs_index(this, gs_index, error)
+      !replacement for the old rs_index
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
       integer :: a, i, j, smin, smax, sdif, nmin, nmax, ndif, j_species, nu_R, nu_S
@@ -7137,7 +7128,7 @@ module descriptors_module
          RAISE_ERROR("nu_S outside allowed range of 0-2", error)
       endif
 
-   
+
       allocate(gs_index(2))
       nu_R = this%nu_R
       nu_S = this%nu_S
@@ -7174,10 +7165,8 @@ module descriptors_module
    endsubroutine form_gs_index
 
 
-!jpd47 power spectrum function
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 
-      !jpd47 variable declaration
       type real_2d_array
          type(real_2d), dimension(:,:,:), allocatable :: x
       endtype real_2d_array
@@ -7223,10 +7212,6 @@ module descriptors_module
       complex(dp), allocatable, save :: sphericalycartesian_all_t(:,:), gradsphericalycartesian_all_t(:,:,:)
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
-      real :: grad_start, grad_finish, total_grad_time
-      real, dimension(:), allocatable, save :: gradient_times
-
-   
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
@@ -7234,8 +7219,6 @@ module descriptors_module
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
-
-      !print *, "jpd47 calling soap_calc", at%N
 
       INIT_ERROR(error)
 
@@ -7245,7 +7228,6 @@ module descriptors_module
          RAISE_ERROR("soap_calc: descriptor object not initialised", error)
       endif
 
-      !jpd47 check for general kernel
       if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
          RAISE_ERROR("nu_R outside allowed range of 0-2", error)
       endif
@@ -7254,7 +7236,6 @@ module descriptors_module
          RAISE_ERROR("nu_S outside allowed range of 0-2", error)
       endif
 
-      !jpd47 setup the alternative to rs_index + sym_desc
       call form_gs_index(this, gs_index, error)
       if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
          sym_desc = .false.
@@ -7262,44 +7243,19 @@ module descriptors_module
          sym_desc = .true.
       endif
 
-
-      !jpd47 species_map is a 118 element list. Maps the chosen Zs onto 1,2,3.... If an element is not listed species_map[Z]=0
-      !jpd47 species_map starts at 1 so species_map(0) gives a segfault
-      !species_map = 0
-      !print *, "size of species map is", size(species_map)
-
-      !jpd47
-      !print *, "ispeices=, this%speices_Z(i_species)="
-      !do i_species = 1, size(this%species_Z)
-      !   print *, i_species, this%species_Z(i_species)
-      !enddo
-
       do i_species = 1, this%n_species
-         !jpd47 default for n_species = 1. set the map for all elements to be 1s
          if(this%species_Z(i_species) == 0) then
             species_map = 1
-            !jpd47
-            !print *, "top option, ispecies=", i_species
-            !print *, "this%species_Z(i_species)=", this%species_Z(i_species)
-         !jpd47 otherwise set the map to be Z1=1, Z2=2, ...
          else
             species_map(this%species_Z(i_species)) = i_species
-            !jpd47
-            !print *, "bottom option, ispecies", i_species
          endif
       enddo
-
-      !jpd47
-      !do i_species = 1, size(species_map)
-      !   print *, i_species, species_map(i_species)
-      !enddo
 
       my_do_descriptor = optional_default(.false., do_descriptor)
       my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
 
       if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
 
-      !jpd47 which atoms to compute descriptors for
       has_atom_mask_name = .false. ! allow atom mask column in the atom table
       atom_mask_pointer => null()  ! allow atom mask column in the atom table
       xml_version = 1423143769     ! This is the version number where the 2l+1 normalisation of soap vectors was introduced
@@ -7329,7 +7285,6 @@ module descriptors_module
 
       endif
 
-      !jpd47 radial cutoff decay
       if( this%cutoff_dexp > 0 ) then
          if( this%cutoff_rate == 0.0_dp ) then
             norm_radial_decay = 1.0_dp
@@ -7342,8 +7297,6 @@ module descriptors_module
 
       do_two_l_plus_one = (xml_version >= 1423143769)
 
-      !jpd47 combined alpha and nmax
-      !jpd47 AVERAGE changed rs_index to include 0-N and 0-S
       allocate(rs_index(2,(this%n_max+1)*(this%n_species+1)))
       i = 0
       do i_species = 0, this%n_species
@@ -7355,7 +7308,6 @@ module descriptors_module
 
       call finalise(descriptor_out)
 
-      !jpd47 set the dimension of the final descriptor here
       d = soap_dimensions(this,error)
 
       if(associated(atom_mask_pointer)) then
@@ -7365,7 +7317,6 @@ module descriptors_module
          call descriptor_sizes(this,at,n_descriptors,n_cross,n_index=n_index,error=error)
       endif
 
-      !print *, "jpd47 n_descriptors is", n_descriptors
       allocate(descriptor_out%x(n_descriptors))
       allocate(i_desc(at%N))
 
@@ -7373,8 +7324,6 @@ module descriptors_module
       do n_i = 1, at%N
          max_n_neigh = max(max_n_neigh, n_neighbours(at, n_i))
       end do
-      !jpd47
-      !print *, "jpd47 max_n_neigh is", max_n_neigh
 
 !$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh) private(i_species, a, l, n_i, ub)
       allocate(descriptor_i(d))
@@ -7382,7 +7331,6 @@ module descriptors_module
 
       allocate(radial_fun(0:this%l_max, this%n_max), radial_coefficient(0:this%l_max, this%n_max))
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
-      !jpd47 changed to 0:n_max and 0:n_species to store spherical projection and total densities
       allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
 
       if(my_do_grad_descriptor) then
@@ -7395,7 +7343,6 @@ module descriptors_module
           allocate(gradsphericalycartesian_all_t(0:this%l_max, -this%l_max:this%l_max, 3))
       end if
 
-      !jpd47 limits changed here
       do i_species = 0, this%n_species
          do a = 0, this%n_max
             do l = 0, this%l_max
@@ -7417,11 +7364,9 @@ module descriptors_module
 
       if (my_do_grad_descriptor) then
           !SPEED allocate( grad_fourier_so3(0:this%l_max,this%n_max,n_neighbours(at,i,max_dist=this%cutoff)) )
-          !jpd47 changed size here
           allocate( grad_fourier_so3_r(0:this%l_max,0:this%n_max,max_n_neigh) )
           allocate( grad_fourier_so3_i(0:this%l_max,0:this%n_max,max_n_neigh) )
           do n_i=1, max_n_neigh
-              !jpd47 change limits
               do a = 0, this%n_max
                   do l = 0, this%l_max
                      !SPEED allocate(grad_fourier_so3(l,a,n_i)%mm(3,-l:l))
@@ -7475,8 +7420,7 @@ module descriptors_module
             endif
          endif
       enddo
-      
-      !jpd47 AVERAGE, n=0-N (0 is projection) alpha=0-S (0 is total density)
+
       allocate( &
          global_fourier_so3_r_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
          global_fourier_so3_i_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
@@ -7508,11 +7452,8 @@ module descriptors_module
                endif
 
                l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
-               !jpd47 
-               !print * , "l_n_neighbours=", l_n_neighbours
                sum_l_n_neighbours = sum_l_n_neighbours + l_n_neighbours + 1 ! include central atom as well!
 
-               !jpd47 changing limits to 0-n_max, also changed limts here to be from 
                ! allocate( &
                ! global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,0:this%n_max,l_n_neighbours), &
                !global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,0:this%n_max,l_n_neighbours) )
@@ -7520,8 +7461,6 @@ module descriptors_module
                global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh), &
                global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh) )
 
-
-               !jpd47 changin limts to 0-n_max
                do n_i = 1, l_n_neighbours
                   do a = 0, this%n_max
                      do l = 0, this%l_max
@@ -7548,16 +7487,10 @@ module descriptors_module
          global_fourier_so3_i_array = 0.0_dp
       endif ! this%global
 
-!jpd47 gradient
-allocate(gradient_times(at%N))
-do i = 1, at%N 
-   gradient_times(i) = 0.0
-enddo
-total_grad_time = 0.0
 
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
-!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay, gradient_times) &
-!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, grad_start, grad_finish) &
+!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
+!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
 !$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
@@ -7567,10 +7500,8 @@ total_grad_time = 0.0
 
 
 
-!jpd47 HUGE loop over all atoms in the environment
       do i = 1, at%N
 
-        !jpd47 decide whether or not computing descriptor (and gradients) for this atom
          if(i_desc(i) == 0) then
             cycle
          else
@@ -7600,33 +7531,23 @@ total_grad_time = 0.0
          radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
 
 
-         !jpd47 include/don't include central atom in density expansion
          do i_species = 0, this%n_species
             do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
 
-               !jpd47 include for 4 reasons. 0). total density channel a). all central atoms included b). correct species c). species_Z=0, which is the default for n_species=1
-               !print *, "i_species is", i_species
-               !print *, "jpd47 at%Z(i)=", at%Z(i)
-
-               !jpd47 this fails iwth -fcheck=all for i_species=0 because final 2 equalities get checked.
                if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
-                  !jpd47 if projection then don't include radial_coefficient
                   if (a == 0) then
                      fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
                      fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
-                  !jpd47 include radial coefficient when not projecting
                   else
                      fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
                      fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
                   endif
-               !jpd47 otherwise zero the m=0 component of the channel
                else
                   fourier_so3_i(0,a,i_species)%m(0) = 0.0_dp
                   fourier_so3_r(0,a,i_species)%m(0) = 0.0_dp
                endif
 
-               !jpd47 always zero the m/=0 components
                do l = 1, this%l_max
                   !SPEED fourier_so3(l,a,i_species)%m(:) = CPLX_ZERO
                   fourier_so3_r(l,a,i_species)%m(:) = 0.0_dp
@@ -7638,7 +7559,6 @@ total_grad_time = 0.0
 
 
 ! soap_calc 20 takes 0.0052 s
-         !jpd47 start of big-neighbour-loop, loop over all neighbouring atoms in the structure
          n_i = 0
          do n = 1, n_neighbours(at,i)
             j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij)
@@ -7649,15 +7569,12 @@ total_grad_time = 0.0
             i_species = species_map(at%Z(j))
             if( i_species == 0 ) cycle
 
-            !jpd47 some setup if computing a descriptor for each atom
             if(.not. this%global .and. my_do_grad_descriptor) then
                descriptor_out%x(i_desc_i)%ii(n_i) = j
                descriptor_out%x(i_desc_i)%pos(:,n_i) = at%pos(:,j) + matmul(at%lattice,shift_ij)
                descriptor_out%x(i_desc_i)%has_grad_data(n_i) = .true.
             endif
 
-
-            !jpd47 some setup todo with cutoff function
             f_cut = coordination_function(r_ij, this%cutoff, this%cutoff_transition_width)
             radial_decay = ( 1.0_dp + this%cutoff_rate ) / ( this%cutoff_rate + ( r_ij / this%cutoff_scale )**this%cutoff_dexp )
             radial_decay = norm_radial_decay * radial_decay
@@ -7672,14 +7589,11 @@ total_grad_time = 0.0
             endif
             f_cut = f_cut * radial_decay
 
-            !jpd47 bessel function loops, what's going on here? Why spherical bessel functions?
-            !jpd47 n-loop over radial basis functions
             do a = 1, this%n_max
                arg_bess = 2.0_dp * this%alpha * r_ij * this%r_basis(a)
                exp_p = exp( -this%alpha*( r_ij + this%r_basis(a) )**2 )
                exp_m = exp( -this%alpha*( r_ij - this%r_basis(a) )**2 )
 
-               !jpd47 l-loop
                do l = 0, this%l_max
                   if( l == 0 ) then
                      if(arg_bess == 0.0_dp) then
@@ -7714,16 +7628,14 @@ total_grad_time = 0.0
                   if(my_do_grad_descriptor) grad_radial_fun(l,a) = -2.0_dp * this%alpha * r_ij * mo_spher_bess_fi_ki_l + &
                      l*mo_spher_bess_fi_ki_l / r_ij + mo_spher_bess_fi_ki_lp * 2.0_dp * this%alpha * this%r_basis(a)
 
-               enddo !jpd47 l-loop end
-            enddo !jpd47 n-loop end
+               enddo
+            enddo
 
-
-            !jpd47 radial expansion
             radial_coefficient = matmul( radial_fun, this%transform_basis )
-            if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut     !jpd47 chain rule for radial derivatives. Adapt for sphere.
+            if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
             radial_coefficient = radial_coefficient * f_cut
 
-            !jpd47 angular expansion done here
+
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
             if(my_do_grad_descriptor) gradsphericalycartesian_all_t = GradSphericalYCartesian_all(this%l_max, d_ij)
             do l = 0, this%l_max
@@ -7733,8 +7645,7 @@ total_grad_time = 0.0
                enddo
             enddo
 
-            !jpd47 combine the radial and angular coefficents into the full c^a_{nlm}. Split into real and imaginary parts for speed.
-            !jpd47 changed the limits here to a=0-n_max to include projection. Also add to the total density channel
+
             do a = 0, this%n_max
                do l = 0, this%l_max
                   do m = -l, l
@@ -7742,25 +7653,20 @@ total_grad_time = 0.0
                      !SPEED if(my_do_grad_descriptor) grad_fourier_so3(l,a,n_i)%mm(:,m) = grad_fourier_so3(l,a,n_i)%mm(:,m) + &
                      !SPEED    grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
 
-                     !jpd47 project onto the unit sphere. Still multiply by f_cut so that atoms enter and leave the cutoff smoothly
                      if (a==0) then
                         c_tmp(1) = f_cut * SphericalY_ij(l)%m(m)
-                     !jpd47 normal, not projecting
                      else
                         c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
 
                      endif
 
-                     !jpd47 add to the species density channel
                      fourier_so3_r(l,a,i_species)%m(m) = fourier_so3_r(l,a,i_species)%m(m) + real(c_tmp(1))
                      fourier_so3_i(l,a,i_species)%m(m) = fourier_so3_i(l,a,i_species)%m(m) + aimag(c_tmp(1))
-                     !jpd47 add to the the total density channel
                      fourier_so3_r(l,a,0)%m(m) = fourier_so3_r(l,a,0)%m(m) + real(c_tmp(1))
                      fourier_so3_i(l,a,0)%m(m) = fourier_so3_i(l,a,0)%m(m) + aimag(c_tmp(1))
 
 
                      if(my_do_grad_descriptor) then
-                        !jpd47 replace grad of radial coefficient with grad of cutoff alone
                         if (a==0) then
                            c_tmp(:) = df_cut * SphericalY_ij(l)%m(m) * u_ij(:) + &
                                        f_cut * grad_SphericalY_ij(l)%mm(:,m)
@@ -7771,7 +7677,7 @@ total_grad_time = 0.0
                         endif
                         ! grad_fourier_so3_r(l,a,n_i)%mm(:,m) = grad_fourier_so3_r(l,a,n_i)%mm(:,m) + real(c_tmp)
                         ! grad_fourier_so3_i(l,a,n_i)%mm(:,m) = grad_fourier_so3_i(l,a,n_i)%mm(:,m) + imag(c_tmp)
-                        !jpd47 no species stuff here, gradient is per neighbour
+
                         grad_fourier_so3_r(l,a,n_i)%mm(:,m) = real(c_tmp)
                         grad_fourier_so3_i(l,a,n_i)%mm(:,m) = aimag(c_tmp)
                      endif ! my_do_grad_descriptor
@@ -7779,17 +7685,11 @@ total_grad_time = 0.0
                enddo ! l
             enddo ! a
 
-         enddo ! n   jpd47 end of big-neighbour-loop
+         enddo ! n
 
-         !jpd47 store structure-wise gradient, if required
+
          if(this%global .and. my_do_grad_descriptor) then
-            !print *, "jpd47 sizes are"
-            !print *, size(grad_fourier_so3_r)
-            !print *, size(global_grad_fourier_so3_r_array)
-            !print *, size(global_grad_fourier_so3_r_array(i_desc_i)%x)
 
-            !jpd47 getting a mismatch here... grad_fourier_so3_r uses max_n_neigh whereas other uses actuall number of neighbours
-            !jpd47 if this is really going on it seems orthogonal to anything I've ever changed...
             global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             !do n_i = lbound(grad_fourier_so3_r,3), ubound(grad_fourier_so3_r,3)
@@ -7802,8 +7702,7 @@ total_grad_time = 0.0
             !enddo ! n_i
          endif
 
-         !jpd47 stored the expansions coefficents in global array, flattening them. Used if computing an average descriptor, one per atoms object
-         !jpd47 AVERAGE change limits on sum
+
          if(this%global) then
             i_coeff = 0
             do ia = 1, (this%n_species+1)*(this%n_max+1)
@@ -7817,9 +7716,7 @@ total_grad_time = 0.0
             enddo
          endif
 
-         !jpd47 combine the expansion coefficients to form the actual descriptor
-         !jpd47 gs_index now handles the differnet indexing for differnet general kernel options
-         !jpd47 note that a and i_species can now be 0 for total density and projection onto the sphere respectively
+
          i_pow = 0
          do ia = 1, SIZE(gs_index(1)%mm(:,0))
             a = gs_index(1)%mm(ia,2)
@@ -7834,7 +7731,6 @@ total_grad_time = 0.0
                b = gs_index(2)%mm(jb, 2)
                j_species = gs_index(2)%mm(jb, 1)
 
-               !jpd47 leave in for backwards compatibility with default of nu=2
                if(this%diagonal_radial .and. a /= b) cycle
 
                do l = 0, this%l_max
@@ -7849,7 +7745,6 @@ total_grad_time = 0.0
             enddo !jb
          enddo !ia
 
-         !jpd47 normalise the descriptor THEN add covariance_sigma0
          descriptor_i(d) = 0.0_dp
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
 
@@ -7863,21 +7758,9 @@ total_grad_time = 0.0
             descriptor_out%x(i_desc_i)%data(d) = this%covariance_sigma0
          endif
 
-         !jpd47 print out the descriptor
-         !print *, "power spectrum: start", d
-         !do n = 1, d
-         !   print *, n, descriptor_out%x(i_desc_i)%data(n)
-         !enddo
-         !print *, "power spectrum: end"
 
-
-
-
-         !jpd47 compute gradients
          if(my_do_grad_descriptor) then
 ! soap_calc 33 takes 0.047 s
-            !jpd47 gradient
-            call cpu_time(grad_start)
 	    allocate(t_g_r(this%n_max*3, 2*this%l_max+1), t_g_i(this%n_max*3, 2*this%l_max+1))
 	    allocate(t_f_r(this%n_max*this%n_species, 2*this%l_max+1), t_f_i(this%n_max*this%n_species, 2*this%l_max+1))
 	    allocate(t_g_f_rr(this%n_max*3, this%n_max*this%n_species), t_g_f_ii(this%n_max*3, this%n_max*this%n_species))
@@ -7895,7 +7778,7 @@ total_grad_time = 0.0
                i_pow = 0
                grad_descriptor_i = 0.0_dp
 
-               !jpd47 V1 ***********************
+               !V1 ***********************
                !SPEED do ia = 1, this%n_species*this%n_max
                !SPEED    a = rs_index(1,ia)
                !SPEED    i_species = rs_index(2,ia)
@@ -7913,7 +7796,7 @@ total_grad_time = 0.0
                !SPEED enddo !ia
 
                if ((this%nu_R /= 2) .OR. (this%nu_S /=2)) then
-                  !jpd47 V2 ***********************
+                  ! V2 ***********************
                   do ia = 1, SIZE(gs_index(1)%mm(:,0))
                      a = gs_index(1)%mm(ia,2)
                      i_species = gs_index(1)%mm(ia,1)
@@ -7927,16 +7810,13 @@ total_grad_time = 0.0
                         b = gs_index(2)%mm(jb, 2)
                         j_species = gs_index(2)%mm(jb, 1)
 
-                        !jpd47 leave diagonal_radial in for backwards compatibility - not tested
                         if(this%diagonal_radial .and. a /= b) cycle
                         do l = 0, this%l_max
                            i_pow = i_pow + 1
-                           !jpd47 if a) neighbour is i_species b) neighbour has Z=0, single element case c) total density channel
                            if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0 .or. i_species==0) then
                                  grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
                                  matmul(grad_fourier_so3_r(l,a,n_i)%mm,fourier_so3_r(l,b,j_species)%m) + matmul(grad_fourier_so3_i(l,a,n_i)%mm,fourier_so3_i(l,b,j_species)%m)
                            endif
-                           !jpd47 if a) neighbour is j_species b) neighbour has Z=0, single element case c) total density channel
                            if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0 .or. j_species==0) then
                                  grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
                                  matmul(grad_fourier_so3_r(l,b,n_i)%mm,fourier_so3_r(l,a,i_species)%m) + matmul(grad_fourier_so3_i(l,b,n_i)%mm,fourier_so3_i(l,a,i_species)%m)
@@ -7950,16 +7830,15 @@ total_grad_time = 0.0
                endif
 
                if ((this%nu_R == 2) .AND. (this%nu_S == 2)) then
-                  !jpd47 V3 ****************** save
+                  !V3 ****************** save
                   do l=0, this%l_max
-                  !jpd47 flatten grad_fourier_so3 across a and ignore n_i
-                  do a = 1, this%n_max
-                     do alpha=1, 3
-                        t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                        t_g_i(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
+                     do a = 1, this%n_max
+                        do alpha=1, 3
+                           t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
+                           t_g_i(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
+                        enddo
                      enddo
-                  enddo
-                  !jpd47 flatten fourier across n_max and n_speices
+
                   do ia = 1, this%n_species*this%n_max
                      a = gs_index(1)%mm(ia, 2)
                      i_species = gs_index(1)%mm(ia, 1)
@@ -7968,7 +7847,6 @@ total_grad_time = 0.0
                      t_f_i(ia, 1:2*l+1) = fourier_so3_i(l,a,i_species)%m(-l:l)
                   enddo
 
-                  !jpd47 funky subroutines...
                   call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
                      t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
                   call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
@@ -7996,7 +7874,7 @@ total_grad_time = 0.0
                         i_pow = i_pow + this%l_max+1
                      enddo
                   enddo
-                  end do !l
+                  enddo !l
                endif
 
                grad_descriptor_i(d, 1:3) = 0.0_dp
@@ -8018,14 +7896,10 @@ total_grad_time = 0.0
 	    deallocate(t_g_r, t_g_i)
 	    deallocate(t_g_f_rr, t_g_f_ii)
 
-            !jpd47 gradient
-            call cpu_time(grad_finish)
-            !print *, "jpd47 time for gradients was", grad_finish-grad_start
-            gradient_times(i) = grad_finish-grad_start
 
-         endif !jpd47 end of huge gradient loop
+         endif
 
-      enddo ! i  jpd47 end of HUGE-loop over all atoms in the structure, this loop is OMP parallised
+      enddo ! i
 !$omp end parallel do
 
       !SPEED if(allocated(fourier_so3)) then
@@ -8039,17 +7913,7 @@ total_grad_time = 0.0
       !SPEED    deallocate(fourier_so3)
       !SPEED endif
 
-!jpd47 gradient
-do i = 0, at%N
-   total_grad_time = total_grad_time + gradient_times(i)
-enddo
-!print *, "jpd47 total gradient time was ", total_grad_time
 
-if (allocated(gradient_times)) then
-   deallocate(gradient_times)
-endif
-
-!jpd47 parallel, deallocate the memory
 !$omp parallel default(none) shared(this, max_n_neigh) private(i_species, a, l, n_i, ub)
       if(allocated(fourier_so3_r)) then
          do i_species = lbound(fourier_so3_r,3), ubound(fourier_so3_r,3)
@@ -8098,10 +7962,8 @@ endif
       !print *, "about to deallocate grad_descriptor_i"
       if(allocated(grad_descriptor_i)) deallocate(grad_descriptor_i)
 
-        !jpd47 adjust the bounds for n_max here?
         if (allocated(grad_fourier_so3_r)) then ! should really check for grad_fourier_so3_i also
             do n_i = 1, max_n_neigh
-               !jpd47 change from a=1 -> a=0
                do a = 0, this%n_max
                   do l = 0, this%l_max
                      !SPEED deallocate(grad_fourier_so3(l,a,n_i)%mm)
@@ -8116,14 +7978,10 @@ endif
         if (allocated(grad_fourier_so3_i)) deallocate(grad_fourier_so3_i)
 !$omp end parallel
 
-      !jpd47 if creating a structure-wise average soap_sizes
-      !jpd47 AVERAGE changes limits to 0-N and 0-S on coefficients
       if(this%global) then
          allocate(global_fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), global_fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), &
             descriptor_i(d) )
 
-         !jpd47 AVERAGE changed limits to account for 0-N and 0-S, rs_index already adjusted
-         !don't need rs_index here. Could loop from 0-N and 0_S instead.
          i_coeff = 0
          do ia = 1, (this%n_species+1)*(this%n_max+1)
             a = rs_index(1,ia)
@@ -8137,9 +7995,6 @@ endif
             enddo
          enddo
 
-
-
-         !jpd47 AVERAGE form up global power spectrum here - copied directly from above
          i_pow = 0
          do ia = 1, SIZE(gs_index(1)%mm(:,0))
             a = gs_index(1)%mm(ia,2)
@@ -8154,7 +8009,6 @@ endif
                b = gs_index(2)%mm(jb, 2)
                j_species = gs_index(2)%mm(jb, 1)
 
-               !jpd47 leave in for backwards compatibility with default of nu=2
                if(this%diagonal_radial .and. a /= b) cycle
 
                do l = 0, this%l_max
@@ -8169,7 +8023,7 @@ endif
             enddo !jb
          enddo !ia
 
-         !jpd47
+
          descriptor_i(d) = 0.0_dp
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
          if( norm_descriptor_i .feq. 0.0_dp ) norm_descriptor_i = tiny(1.0_dp)
@@ -8182,17 +8036,12 @@ endif
             descriptor_out%x(1)%data(d) = this%covariance_sigma0
          endif
 
-         !jpd47 gradients for the structure-wise average SOAP
-         !jpd47 compressed gradients NOT IMPLEMENTED for structure-wise average SOAP
-         !jpd47 ERROR should be raised instead. 
-         !jpd47 gradients for full SOAP should still work though... insert test date here
          if(my_do_grad_descriptor) then
 	    allocate(t_g_r(this%n_max*3, 2*this%l_max+1), t_g_i(this%n_max*3, 2*this%l_max+1))
 	    allocate(t_f_r(this%n_max*this%n_species, 2*this%l_max+1), t_f_i(this%n_max*this%n_species, 2*this%l_max+1))
 	    allocate(t_g_f_rr(this%n_max*3, this%n_max*this%n_species), t_g_f_ii(this%n_max*3, this%n_max*this%n_species))
             allocate(grad_descriptor_i(d,3))
 
-            !jpd47 loop over atoms
             i_pair = 0
             do i = 1, at%N
 
@@ -8210,7 +8059,6 @@ endif
                descriptor_out%x(1)%has_grad_data(i_pair_i) = .true.
                descriptor_out%x(1)%grad_data(:,:,i_pair_i) = 0.0_dp
 
-               !jpd47 loop over neighbour atoms
                n_i = 0
                do n = 1, n_neighbours(at,i)
                   j = neighbour(at, i, n, distance = r_ij, diff = d_ij)
@@ -8225,14 +8073,13 @@ endif
 
                   i_pow = 0
                   grad_descriptor_i = 0.0_dp
-                  
-                  !jpd47 global compressed gradients
+
                   if ((this%nu_S /= 2) .OR. (this%nu_R /= 2)) then
-                     !jpd47 V2 ***********************
+                     !V2 ***********************
                      do ia = 1, SIZE(gs_index(1)%mm(:,0))
                         a = gs_index(1)%mm(ia,2)
                         i_species = gs_index(1)%mm(ia,1)
-   
+
                         !set upper bound for the second loop
                         ub = SIZE(gs_index(2)%mm(:,0))
                         if (sym_desc) then
@@ -8241,22 +8088,19 @@ endif
                         do jb = 1, ub
                            b = gs_index(2)%mm(jb, 2)
                            j_species = gs_index(2)%mm(jb, 1)
-   
-                           !jpd47 leave diagonal_radial in for backwards compatibility - not tested
+
                            if(this%diagonal_radial .and. a /= b) cycle
                            do l = 0, this%l_max
                               i_pow = i_pow + 1
-                              !jpd47 if a) neighbour is i_species b) neighbour has Z=0, single element case c) total density channel
                               if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0 .or. i_species==0) then
                                     grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
                                     matmul(global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm,global_fourier_so3_r(l,b,j_species)%m) + matmul(global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm, global_fourier_so3_i(l,b,j_species)%m)
                               endif
-                              !jpd47 if a) neighbour is j_species b) neighbour has Z=0, single element case c) total density channel
                               if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0 .or. j_species==0) then
                                     grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
                                     matmul(global_grad_fourier_so3_r_array(i_desc_i)%x(l,b,n_i)%mm,global_fourier_so3_r(l,a,i_species)%m) + matmul(global_grad_fourier_so3_i_array(i_desc_i)%x(l,b,n_i)%mm,global_fourier_so3_i(l,a,i_species)%m)
                               endif
-   
+
                               if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
                               if( ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
                            enddo !l
@@ -8313,10 +8157,10 @@ endif
                            enddo
                         enddo
 
-                     end do !l 
+                     end do !l
                   endif !end of nu=2 radient loop
-                  
-                  
+
+
 
                   grad_descriptor_i(d, 1:3) = 0.0_dp
                   if( this%normalise ) then
@@ -8395,7 +8239,6 @@ endif
 
       if(allocated(rs_index)) deallocate(rs_index)
       if(allocated(i_desc)) deallocate(i_desc)
-      !jpd47 dealocate extra indicies
       if (allocated(gs_index)) deallocate(gs_index)
 
       call system_timer('soap_calc')
@@ -10230,7 +10073,6 @@ endif
          RAISE_ERROR("soap_dimensions: descriptor object not initialised", error)
       endif
 
-      !jpd47 diagonal radial, only couple n==n'
       if(this%diagonal_radial) then
          i = (this%l_max+1) * this%n_max * this%n_species * (this%n_species+1) / 2 + 1
       else
@@ -10239,7 +10081,6 @@ endif
          NS1 = SIZE(gs_index(1)%mm(:,0))
          NS2 = SIZE(gs_index(2)%mm(:,0))
 
-         !jpd47 check if symmetric or not
          if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
             i = NS1 * NS2 * (this%l_max + 1) +1
          else
@@ -10247,7 +10088,6 @@ endif
          endif
       endif
 
-      !jpd47 dealocate extra indicies
       if (allocated(gs_index)) deallocate(gs_index)
    endfunction soap_dimensions
 
