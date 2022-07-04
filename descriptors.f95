@@ -7689,7 +7689,6 @@ module descriptors_module
 
 
          if(this%global .and. my_do_grad_descriptor) then
-
             global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             !do n_i = lbound(grad_fourier_so3_r,3), ubound(grad_fourier_so3_r,3)
