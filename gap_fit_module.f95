@@ -890,14 +890,11 @@ contains
     type(gap_fit), intent(inout) :: this
     integer, optional, intent(out) :: error
 
-    logical :: do_filter_tasks
-
     type(inoutput) :: theta_inout
     type(descriptor_data) :: my_descriptor_data
 
     type(Atoms) :: at
-    integer :: d
-    integer :: n_con
+    integer :: d, n_con
     logical :: has_ener, has_force, has_virial, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
        has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_virial_component_sigma, has_hessian_sigma, &
        has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, exclude_atom
@@ -925,7 +922,18 @@ contains
 
     INIT_ERROR(error)
 
-    do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
+    if (this%task_manager%active) then
+      if (.not. this%task_manager%distributed) then
+         call system_abort("fit_data_from_xyz: Tasks are not distributed.")
+      end if
+
+      do n_con = 1, this%n_frame
+         if (this%task_manager%tasks(n_con)%worker_id /= this%task_manager%my_worker_id) then
+           call finalise(this%at(n_con))
+         end if
+      end do
+    end if
+
     this%my_gp%do_subY_subY = merge(gap_fit_is_root(this), .true., this%task_manager%active)
 
     my_cutoff = 0.0_dp
@@ -966,9 +974,7 @@ contains
     n_local_property_sigma = 0
 
     do n_con = 1, this%n_frame
-       if (do_filter_tasks) then
-          if (this%task_manager%tasks(n_con)%worker_id /= this%task_manager%my_worker_id) cycle
-       end if
+       if (.not. is_initialised(this%at(n_con))) cycle
 
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
