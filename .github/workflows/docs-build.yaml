@@ -1,0 +1,30 @@
+name: Sphinx & deploy - commit to gh-pages
+
+on:
+  push:
+#    branches:
+#      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: pip install markupsafe==2.0.1 sphinx==5.0.2 nbsphinx numpydoc sphinx_rtd_theme jupyterlab-pygments==0.2.2
+
+      - name: Build
+        working-directory: ${{github.workspace}}/doc_src
+        run: |
+          make html
+
+#      - name: Commit to gh-pages branch
+#        uses: peaceiris/actions-gh-pages@v3
+#        with:
+#          github_token: ${{ secrets.GITHUB_TOKEN }}
+#          publish_dir: ./docs
