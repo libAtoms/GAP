@@ -15,13 +15,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # looks like there may be some issue with a dep & pip screws with us
-      # https://github.com/sphinx-doc/sphinx/issues/10417
-      - name: Update pip
-        run: python -m pip --upgrade pip
-
       - name: Install dependencies
-        run: pip install markupsafe==2.0.1 sphinx==5.0.2 nbsphinx numpydoc sphinx_rtd_theme pygments>=2.4.1
+        run: pip install markupsafe==2.0.1 sphinx==5.0.2 nbsphinx numpydoc sphinx_rtd_theme jupyterlab-pygments==0.2.2
 
       - name: Build
         working-directory: ${{github.workspace}}/doc_src
