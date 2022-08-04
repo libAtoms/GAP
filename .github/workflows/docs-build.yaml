@@ -16,7 +16,7 @@ jobs:
           persist-credentials: false
 
       - name: Install dependencies
-        run: pip install sphinx nbsphinx numpydoc
+        run: pip install markupsafe==2.0.1 sphinx nbsphinx numpydoc
 
       - name: Build
         working-directory: ${{github.workspace}}/doc_src
