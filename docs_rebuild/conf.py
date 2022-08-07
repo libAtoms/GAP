@@ -17,7 +17,14 @@ author = "Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode"
 
 extensions = [
     "sphinx.ext.autodoc",
-    "nbsphinx"
+    "sphinx.ext.doctest",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.githubpages",
+    "nbsphinx",
+    "numpydoc",
 ]
 
 templates_path = ["_templates"]
