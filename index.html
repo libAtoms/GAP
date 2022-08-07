@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GAP and SOAP documentation &mdash; GAP  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation of QUIP, quippy and GAP" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="#" class="icon icon-home"> GAP
+            <img src="_static/hybrid.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+    
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation of QUIP, quippy and GAP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+</ul>
+
+    <p></p>
+    <ul>
+        <li><a href="genindex.html">Index</a></li>
+        <li><a href="py-modindex.html">Module Index</a></li>
+<!--        <li><a href="search.html">Search Page</a></li>-->
+<!--        <li><a href="_modules/index.html">Module Source Code</a></li>-->
+    </ul>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">GAP</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+      <li>GAP and SOAP documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="module-gap">
+<span id="gap-and-soap-documentation"></span><h1>GAP and SOAP documentation<a class="headerlink" href="#module-gap" title="Permalink to this heading"></a></h1>
+<p>These are the documentation pages for Gaussian Approximation Potential
+(GAP) code. GAP is a plugin for QUIP, which is a set of molecular simulation
+tools. QUIP itself can be used as a plugin to LAMMPS or called from ASE.</p>
+<p>The purpose of the GAP code is to fit interatomic potentials and then
+use them for molecular simulation.</p>
+<p><strong>If you use the GAP code, please cite the original GAP paper:</strong></p>
+<p>“The Accuracy of Quantum Mechanics, without the Electrons”,  Albert P. Bartók, Mike C. Payne, Risi Kondor, and Gábor Csányi. Phys. Rev. Lett. 104, 136403 (2010)
+&lt;<a class="reference external" href="https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.104.136403">https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.104.136403</a>&gt;</p>
+<p><strong>If you use the SOAP descriptor or kernel, please cite:</strong></p>
+<p>“On representing chemical environments”,  Albert P. Bartók, Risi Kondor, and Gábor Csányi, Physical Review B 87, 184115 (2013)
+&lt;<a class="reference external" href="https://journals.aps.org/prb/abstract/10.1103/PhysRevB.87.184115">https://journals.aps.org/prb/abstract/10.1103/PhysRevB.87.184115</a>&gt;</p>
+<p><strong>For a general review of using SOAP and GAP for materials modelling, start here:</strong></p>
+<p>“Gaussian Process Regression for Materials and Molecules”, Volker L. Deringer, Albert P. Bartók, Noam Bernstein, David M. Wilkins, Michele Ceriotti, and Gábor Csányi, Chem. Rev. 2021, 121, 16, 10073–10141 (2021)
+&lt;<a class="reference external" href="https://pubs.acs.org/doi/full/10.1021/acs.chemrev.1c00022">https://pubs.acs.org/doi/full/10.1021/acs.chemrev.1c00022</a>&gt;</p>
+<section id="contents">
+<h2>Contents<a class="headerlink" href="#contents" title="Permalink to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation of QUIP, quippy and GAP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="gap_fit.html#data">Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_fit.html#descriptors-and-kernels">Descriptors and Kernels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_fit.html#cutoff">cutoff</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_fit.html#global-fit-parameters">Global fit parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_fit.html#command-line-example">Command line example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_fit.html#command-line-options">Command line options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_fit.html#gap-options">GAP options</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quippy-potential-tutorial.html">Using QUIP potentials with Atomic Simulation Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quippy-descriptor-tutorial.html">Computing descriptors from python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_fitting_tutorial.html">Training a GAP model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gap_si_surface.html">The SOAP descriptor, Gaussian Approximation Potentials (GAP) and machine-learning of force fields</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#soap-vectors">SOAP vectors</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+</ul>
+</div>
+</section>
+<section id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-right" title="Installation of QUIP, quippy and GAP" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019-2022, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
