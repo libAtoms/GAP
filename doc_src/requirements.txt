@@ -1,6 +1,6 @@
-sphinx
-sphinx-rtd-theme
-nbsphinx
-pandoc
-ipython
-numpydoc
+Sphinx==5.1.1
+sphinx-rtd-theme==1.0.0
+nbsphinx==0.8.9
+pandoc==2.2
+ipython==8.4.0
+numpydoc==1.4.0
