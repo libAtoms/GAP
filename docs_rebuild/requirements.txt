@@ -1,6 +1,0 @@
-sphinx
-sphinx-rtd-theme
-nbsphinx
-pandoc
-ipython
-numpydoc
