@@ -19,7 +19,7 @@ jobs:
         run: apt-get install pandoc
 
       - name: Install dependencies
-        run: pip install markupsafe==2.0.1 sphinx==5.0.2 nbsphinx numpydoc sphinx_rtd_theme jupyterlab-pygments==0.2.2
+        run: pip install -r doc_src/requirements.txt
 
       - name: Build
         working-directory: ${{github.workspace}}/doc_src
