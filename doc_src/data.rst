@@ -1,8 +1,8 @@
-**********************
+************************
 GAP models and databases
-**********************
+************************
 
-We collect links to published GAP models and their fitting databases. 
+We collect links to published GAP models and their fitting databases.
 
 .. list-table:: GAP models
    :widths: 25 50
@@ -22,5 +22,5 @@ We collect links to published GAP models and their fitting databases.
      - `G. Sivaraman et al. Phys. Rev. Lett. 126, 156002 (2021) <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.126.156002>`_
    * - `LiCl <https://figshare.com/articles/journal_contribution/Training_Dataset_and_GAP_Model_for_Molten_LiCl_Melts/20331246>`_
      - `Sivaraman et al. J. Phys. Chem. Lett. 2021, 12, 4278−4285 <https://pubs.acs.org/doi/pdf/10.1021/acs.jpclett.1c00901>`_
-   * - `LiCl-KCl <https://acdc.alcf.anl.gov/mdf/detail/guo_gapml_model_hexrd_v1.1/>`_ 
-     - `Jicheng Guo et al. Phys. Rev. B 106, 014209 (2022) <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.106.014209>`_    
+   * - `LiCl-KCl <https://acdc.alcf.anl.gov/mdf/detail/guo_gapml_model_hexrd_v1.1/>`_
+     - `Jicheng Guo et al. Phys. Rev. B 106, 014209 (2022) <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.106.014209>`_
