@@ -25,10 +25,13 @@ We collect links to published GAP models and their fitting databases.
      - `trained mostly for crystal and amorphous, with some liquid`_
    * - `HfO2 <https://figshare.com/articles/dataset/Multiphase_GAP_Model_and_Training_Dataset_for_Hafnium_dioxide/14601579>`_
      - `G. Sivaraman et al. Phys. Rev. Lett. 126, 156002 (2021) <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.126.156002>`_
+     - ` `_
    * - `LiCl <https://figshare.com/articles/journal_contribution/Training_Dataset_and_GAP_Model_for_Molten_LiCl_Melts/20331246>`_
      - `Sivaraman et al. J. Phys. Chem. Lett. 2021, 12, 4278−4285 <https://pubs.acs.org/doi/pdf/10.1021/acs.jpclett.1c00901>`_
+     - ` `_
    * - `LiCl-KCl <https://acdc.alcf.anl.gov/mdf/detail/guo_gapml_model_hexrd_v1.1/>`_
      - `Jicheng Guo et al. Phys. Rev. B 106, 014209 (2022) <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.106.014209>`_
+     - ` `_
    * - `C <https://www.repository.cam.ac.uk/handle/1810/334766>`_
      - `Rowe et al. J. Chem. Phys. 153, 034702 (2020) <https://aip.scitation.org/doi/10.1063/5.0005084>`_
      - `An updated version of the C potential, fitted to the optB88vdW functional`_
