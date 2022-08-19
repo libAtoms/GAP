@@ -5,7 +5,7 @@ GAP models and databases
 We collect links to published GAP models and their fitting databases.
 
 .. list-table:: GAP models
-   :widths: 25 50
+   :widths: 25 50 50
    :header-rows: 1
 
    * - System
