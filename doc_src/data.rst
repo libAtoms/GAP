@@ -26,3 +26,5 @@ We collect links to published GAP models and their fitting databases.
      - `Jicheng Guo et al. Phys. Rev. B 106, 014209 (2022) <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.106.014209>`_
    * - `C <https://www.repository.cam.ac.uk/handle/1810/334766>`_
      - `Rowe et al. J. Chem. Phys. 153, 034702 (2020) <https://aip.scitation.org/doi/10.1063/5.0005084>`_
+   * - `Si:H <https://github.com/dgunruh/Si-H-GAP>`_
+     - `Unruh et al. Phys. Rev. Materials 6, 065603 (2022) <https://journals.aps.org/prmaterials/abstract/10.1103/PhysRevMaterials.6.065603>`_
