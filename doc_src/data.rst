@@ -24,3 +24,5 @@ We collect links to published GAP models and their fitting databases.
      - `Sivaraman et al. J. Phys. Chem. Lett. 2021, 12, 4278−4285 <https://pubs.acs.org/doi/pdf/10.1021/acs.jpclett.1c00901>`_
    * - `LiCl-KCl <https://acdc.alcf.anl.gov/mdf/detail/guo_gapml_model_hexrd_v1.1/>`_
      - `Jicheng Guo et al. Phys. Rev. B 106, 014209 (2022) <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.106.014209>`_
+   * - `C <https://www.repository.cam.ac.uk/handle/1810/334766>`_
+     - `Rowe et al. J. Chem. Phys. 153, 034702 (2020) <https://aip.scitation.org/doi/10.1063/5.0005084>`_
