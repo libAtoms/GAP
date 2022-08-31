@@ -7761,10 +7761,9 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
 ! soap_calc 33 takes 0.047 s
-       !jpd47 changed limits for all of these
-	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
-	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
-	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1))
+	    allocate(t_g_r(this%n_max*3, 2*this%l_max+1), t_g_i(this%n_max*3, 2*this%l_max+1))
+	    allocate(t_f_r(this%n_max*this%n_species, 2*this%l_max+1), t_f_i(this%n_max*this%n_species, 2*this%l_max+1))
+	    allocate(t_g_f_rr(this%n_max*3, this%n_max*this%n_species), t_g_f_ii(this%n_max*3, this%n_max*this%n_species))
             !do n_i = 1, n_neighbours(at,i,max_dist=this%cutoff)
 
             n_i = 0
@@ -7836,61 +7835,42 @@ module descriptors_module
                   !jpd47 do each l_block separately to use matrix multiplication
                   do l=0, this%l_max
                      !jpd47 put density gradients for neighbour atom n_i into t_g_r matrix
-                     do a = 0, this%n_max    !jpd47 changed limits to 0-N
+                     do a = 1, this%n_max
                         do alpha=1, 3
-                           !t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                           t_g_r(3*a+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                           t_g_i(3*a+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
+                           t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
+                           t_g_i(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
                         enddo
                      enddo
 
                   !jpd47 put expansion coefficients into temporary array
-                  do ia = 1, (this%n_species+1)*(this%n_max+1)   !jpd47 changed limits to cover 0-N and 0-S - use rs_index instead.
-                     a = rs_index(1,ia)
-                     i_species = rs_index(2,ia)
+                  do ia = 1, this%n_species*this%n_max
+                     a = gs_index(1)%mm(ia, 2)
+                     i_species = gs_index(1)%mm(ia, 1)
 
                      t_f_r(ia, 1:2*l+1) = fourier_so3_r(l,a,i_species)%m(-l:l)
                      t_f_i(ia, 1:2*l+1) = fourier_so3_i(l,a,i_species)%m(-l:l)
                   enddo
 
                   !jpd47 matrix multiplication - Note final matrix is of size 3N*NS, NOT 3NS*NS because we know what species the neighbour is
-                  !jpd47  changed explicit sizes in dgemm calls
-                  call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
+                  call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
                      t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
-                  call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
+                  call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
                      t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
                   !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
                   !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
 
                   !jpd47 loop over all terms in power spec with same l, add to the gardient if the neighbour atom matches i_species or j_species
                   i_pow = l+1
+                  do ia = 1, this%n_species*this%n_max
+                     a = gs_index(1)%mm(ia, 2)
+                     i_species = gs_index(1)%mm(ia, 1)
 
-                  !original
-                  !do ia = 1, this%n_species*this%n_max      !jpd47 changes limits to gs_index
-                  !   a = gs_index(1)%mm(ia, 2)
-                  !   i_species = gs_index(1)%mm(ia, 1)
-                  !
-                  !   do jb = 1, ia !this%n_species*this%n_max !ia       !jpd47 change limits to gs_index
-                  !      b = gs_index(1)%mm(jb, 2)
-                  !      j_species = gs_index(1)%mm(jb, 1)
-
-                  !jpd47 changed limits
-                  do ia = 1, SIZE(gs_index(1)%mm(:,0))
-                     a = gs_index(1)%mm(ia,2)
-                     i_species = gs_index(1)%mm(ia,1)
-
-                     !set upper bound for the second loop
-                     ub = SIZE(gs_index(2)%mm(:,0))
-                     if (sym_desc) then
-                        ub = ia
-                     endif
-                     do jb = 1, ub
-                        b = gs_index(2)%mm(jb, 2)
-                        j_species = gs_index(2)%mm(jb, 1)
+                     do jb = 1, ia !this%n_species*this%n_max !ia
+                        b = gs_index(1)%mm(jb, 2)
+                        j_species = gs_index(1)%mm(jb, 1)
 
                         if(this%diagonal_radial .and. a /= b) cycle
 
-                        !jpd47 changing the indicies in t_g_f_rr requires care...
                         if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(a-1)+1:3*a,jb) + t_g_f_ii(3*(a-1)+1:3*a,jb)
                         if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(b-1)+1:3*b,ia) + t_g_f_ii(3*(b-1)+1:3*b,ia)
 
@@ -7898,7 +7878,6 @@ module descriptors_module
                         if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
 
                         !jpd47 only store upper/lower triangular portion, multiply off diagonals by root 2 to account for this.
-                        !jpd47 TODO add in check if sym_desc
                         if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
                         i_pow = i_pow + this%l_max+1
                      enddo
