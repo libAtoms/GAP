@@ -7763,7 +7763,7 @@ module descriptors_module
        !jpd47 changed limits for all of these
 	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
 	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
-	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1))
+	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
             !do n_i = 1, n_neighbours(at,i,max_dist=this%cutoff)
 
             n_i = 0
@@ -7795,7 +7795,9 @@ module descriptors_module
                !SPEED    enddo !jb
                !SPEED enddo !ia
 
-               if ((this%nu_R /= 2) .OR. (this%nu_S /=2)) then
+               !jpd47 temporary false to always ignore this loop
+               !if ((this%nu_R /= 2) .OR. (this%nu_S /=2))then
+               if  (.false.) then
                   ! V2 ***********************
                   do ia = 1, SIZE(gs_index(1)%mm(:,0))
                      a = gs_index(1)%mm(ia,2)
@@ -7829,7 +7831,9 @@ module descriptors_module
                   enddo !ia
                endif
 
-               if ((this%nu_R == 2) .AND. (this%nu_S == 2)) then
+               !jpd47 temporary true to always do this loop
+               !if ((this%nu_R == 2) .AND. (this%nu_S == 2)) then
+                if (.true.) then
                   !V3 ****************** save
 
                   !jpd47 do each l_block separately to use matrix multiplication
@@ -7889,16 +7893,16 @@ module descriptors_module
 
                         if(this%diagonal_radial .and. a /= b) cycle
 
-                        !jpd47 changing the indicies in t_g_f_rr requires care...
-                        if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(a-1)+1:3*a,jb) + t_g_f_ii(3*(a-1)+1:3*a,jb)
-                        if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(b-1)+1:3*b,ia) + t_g_f_ii(3*(b-1)+1:3*b,ia)
+                        !jpd47 changed the indicies in t_g_f_rr
+                        if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*a+1:3*(a+1),jb) + t_g_f_ii(3*a+1:3*(a+1),jb)
+                        if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*b+1:3*(b+1),ia) + t_g_f_ii(3*b+1:3*(b+1),ia)
 
                         !jpd47 factor of root 2l+1
                         if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
 
                         !jpd47 only store upper/lower triangular portion, multiply off diagonals by root 2 to account for this.
-                        !jpd47 TODO add in check if sym_desc
-                        if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
+                        !jpd47 updated check if sym_desc
+                        if(ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
                         i_pow = i_pow + this%l_max+1
                      enddo
                   enddo
