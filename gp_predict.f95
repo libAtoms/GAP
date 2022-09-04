@@ -816,6 +816,12 @@ module gp_predict_module
       if (allocated(c_subYY_sqrtInverseLambda)) deallocate(c_subYY_sqrtInverseLambda)
 
       if (task_manager%active) then
+         if (.not. allocated(factor_c_subYsubY)) then
+            ! tks: make sure we are not passing in an unallocated array as the input to
+            ! mpi_scatterv on the processes which are receiving data. This was found to
+            ! be an issue on GCC 11 with -O2 and above.
+            allocate(factor_c_subYsubY(0, 0))
+         end if
          call scatter_shared_task(task_manager, factor_c_subYsubY, a, n_globalY, n_globalSparseX, from%do_subY_subY)
       else
          a(n_globalY+1:,:) = factor_c_subYsubY
