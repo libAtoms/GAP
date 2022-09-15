@@ -7196,7 +7196,7 @@ module descriptors_module
       logical :: my_do_descriptor, my_do_grad_descriptor, do_two_l_plus_one, sym_desc
       integer :: d, i, j, n, a, b, k, l, m, i_pow, i_coeff, l_n_neighbours, n_i, &
          n_descriptors, n_cross, i_species, j_species, ia, jb, i_desc_i, &
-         xml_version, sum_l_n_neighbours, i_pair, i_pair_i, n_index, ub, ia_rs, jb_rs
+         xml_version, sum_l_n_neighbours, i_pair, i_pair_i, n_index, ub
       integer, dimension(3) :: shift_ij
       integer, dimension(:), allocatable :: i_desc
       integer, dimension(:,:), allocatable :: rs_index
@@ -7490,7 +7490,7 @@ module descriptors_module
 
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
 !$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
-!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
+!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
 !$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
@@ -7689,6 +7689,7 @@ module descriptors_module
 
 
          if(this%global .and. my_do_grad_descriptor) then
+
             global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             !do n_i = lbound(grad_fourier_so3_r,3), ubound(grad_fourier_so3_r,3)
@@ -7717,12 +7718,12 @@ module descriptors_module
 
 
          i_pow = 0
-         do ia = 1, size(gs_index(1)%mm(:,0))
+         do ia = 1, SIZE(gs_index(1)%mm(:,0))
             a = gs_index(1)%mm(ia,2)
             i_species = gs_index(1)%mm(ia,1)
 
             !set upper bound for the second loop
-            ub = size(gs_index(2)%mm(:,0))
+            ub = SIZE(gs_index(2)%mm(:,0))
             if (sym_desc) then
                ub = ia
             endif
@@ -7760,9 +7761,9 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
 ! soap_calc 33 takes 0.047 s
-	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
-	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
-	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
+	    allocate(t_g_r(this%n_max*3, 2*this%l_max+1), t_g_i(this%n_max*3, 2*this%l_max+1))
+	    allocate(t_f_r(this%n_max*this%n_species, 2*this%l_max+1), t_f_i(this%n_max*this%n_species, 2*this%l_max+1))
+	    allocate(t_g_f_rr(this%n_max*3, this%n_max*this%n_species), t_g_f_ii(this%n_max*3, this%n_max*this%n_species))
             !do n_i = 1, n_neighbours(at,i,max_dist=this%cutoff)
 
             n_i = 0
@@ -7794,65 +7795,95 @@ module descriptors_module
                !SPEED    enddo !jb
                !SPEED enddo !ia
 
-               !V3 ****************** save
+               if ((this%nu_R /= 2) .OR. (this%nu_S /=2)) then
+                  ! V2 ***********************
+                  do ia = 1, SIZE(gs_index(1)%mm(:,0))
+                     a = gs_index(1)%mm(ia,2)
+                     i_species = gs_index(1)%mm(ia,1)
 
-               !do each l_block separately to use matrix multiplication
-               do l=0, this%l_max
-                  !put density gradients for neighbour atom n_i into t_g_r matrix
-                  do a = 0, this%n_max
-                     do alpha=1, 3
-                        !t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                        t_g_r(3*a+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                        t_g_i(3*a+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
+                     !set upper bound for the second loop
+                     ub = SIZE(gs_index(2)%mm(:,0))
+                     if (sym_desc) then
+                        ub = ia
+                     endif
+                     do jb = 1, ub
+                        b = gs_index(2)%mm(jb, 2)
+                        j_species = gs_index(2)%mm(jb, 1)
+
+                        if(this%diagonal_radial .and. a /= b) cycle
+                        do l = 0, this%l_max
+                           i_pow = i_pow + 1
+                           if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0 .or. i_species==0) then
+                                 grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
+                                 matmul(grad_fourier_so3_r(l,a,n_i)%mm,fourier_so3_r(l,b,j_species)%m) + matmul(grad_fourier_so3_i(l,a,n_i)%mm,fourier_so3_i(l,b,j_species)%m)
+                           endif
+                           if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0 .or. j_species==0) then
+                                 grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
+                                 matmul(grad_fourier_so3_r(l,b,n_i)%mm,fourier_so3_r(l,a,i_species)%m) + matmul(grad_fourier_so3_i(l,b,n_i)%mm,fourier_so3_i(l,a,i_species)%m)
+                           endif
+
+                           if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
+                           if( ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
+                        enddo !l
+                     enddo !jb
+                  enddo !ia
+               endif
+
+               if ((this%nu_R == 2) .AND. (this%nu_S == 2)) then
+                  !V3 ****************** save
+
+                  !jpd47 do each l_block separately to use matrix multiplication
+                  do l=0, this%l_max
+                     !jpd47 put density gradients for neighbour atom n_i into t_g_r matrix
+                     do a = 1, this%n_max
+                        do alpha=1, 3
+                           t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
+                           t_g_i(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
+                        enddo
+                     enddo
+
+                  !jpd47 put expansion coefficients into temporary array
+                  do ia = 1, this%n_species*this%n_max
+                     a = gs_index(1)%mm(ia, 2)
+                     i_species = gs_index(1)%mm(ia, 1)
+
+                     t_f_r(ia, 1:2*l+1) = fourier_so3_r(l,a,i_species)%m(-l:l)
+                     t_f_i(ia, 1:2*l+1) = fourier_so3_i(l,a,i_species)%m(-l:l)
+                  enddo
+
+                  !jpd47 matrix multiplication - Note final matrix is of size 3N*NS, NOT 3NS*NS because we know what species the neighbour is
+                  call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
+                     t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
+                  call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
+                     t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
+                  !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
+                  !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
+
+                  !jpd47 loop over all terms in power spec with same l, add to the gardient if the neighbour atom matches i_species or j_species
+                  i_pow = l+1
+                  do ia = 1, this%n_species*this%n_max
+                     a = gs_index(1)%mm(ia, 2)
+                     i_species = gs_index(1)%mm(ia, 1)
+
+                     do jb = 1, ia !this%n_species*this%n_max !ia
+                        b = gs_index(1)%mm(jb, 2)
+                        j_species = gs_index(1)%mm(jb, 1)
+
+                        if(this%diagonal_radial .and. a /= b) cycle
+
+                        if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(a-1)+1:3*a,jb) + t_g_f_ii(3*(a-1)+1:3*a,jb)
+                        if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(b-1)+1:3*b,ia) + t_g_f_ii(3*(b-1)+1:3*b,ia)
+
+                        !jpd47 factor of root 2l+1
+                        if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
+
+                        !jpd47 only store upper/lower triangular portion, multiply off diagonals by root 2 to account for this.
+                        if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
+                        i_pow = i_pow + this%l_max+1
                      enddo
                   enddo
-
-               !put expansion coefficients into temporary array
-               do ia = 1, (this%n_species+1)*(this%n_max+1)
-                  a = rs_index(1,ia)
-                  i_species = rs_index(2,ia)
-
-                  t_f_r(ia, 1:2*l+1) = fourier_so3_r(l,a,i_species)%m(-l:l)
-                  t_f_i(ia, 1:2*l+1) = fourier_so3_i(l,a,i_species)%m(-l:l)
-               enddo
-
-               !matrix multiplication
-               call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                  t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
-               call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                  t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
-               !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
-               !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
-
-               !loop over all terms in power spec with same l, add to the gradient if the neighbour atom matches i_species or j_species
-               i_pow = l+1
-
-               do ia = 1, size(gs_index(1)%mm(:,0))
-                  a = gs_index(1)%mm(ia,2)
-                  i_species = gs_index(1)%mm(ia,1)
-                  ia_rs = i_species*(this%n_max+1)+a+1
-
-                  !set upper bound for the second loop
-                  ub = size(gs_index(2)%mm(:,0))
-                  if (sym_desc) then
-                     ub = ia
-                  endif
-                  do jb = 1, ub
-                     b = gs_index(2)%mm(jb, 2)
-                     j_species = gs_index(2)%mm(jb, 1)
-                     jb_rs = j_species*(this%n_max+1)+b+1
-
-                     if(this%diagonal_radial .and. a /= b) cycle
-
-                     if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*a+1:3*(a+1),jb_rs) + t_g_f_ii(3*a+1:3*(a+1),jb_rs)
-                     if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*b+1:3*(b+1),ia_rs) + t_g_f_ii(3*b+1:3*(b+1),ia_rs)
-
-                     if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
-                     if(ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-                     i_pow = i_pow + this%l_max+1
-                  enddo
-               enddo
-               enddo !l
+                  enddo !l
+               endif
 
                grad_descriptor_i(d, 1:3) = 0.0_dp
 
@@ -7973,12 +8004,12 @@ module descriptors_module
          enddo
 
          i_pow = 0
-         do ia = 1, size(gs_index(1)%mm(:,0))
+         do ia = 1, SIZE(gs_index(1)%mm(:,0))
             a = gs_index(1)%mm(ia,2)
             i_species = gs_index(1)%mm(ia,1)
 
             !set upper bound for the second loop
-            ub = size(gs_index(2)%mm(:,0))
+            ub = SIZE(gs_index(2)%mm(:,0))
             if (sym_desc) then
                ub = ia
             endif
@@ -8014,9 +8045,9 @@ module descriptors_module
          endif
 
          if(my_do_grad_descriptor) then
-       allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
-	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
-	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
+	    allocate(t_g_r(this%n_max*3, 2*this%l_max+1), t_g_i(this%n_max*3, 2*this%l_max+1))
+	    allocate(t_f_r(this%n_max*this%n_species, 2*this%l_max+1), t_f_i(this%n_max*this%n_species, 2*this%l_max+1))
+	    allocate(t_g_f_rr(this%n_max*3, this%n_max*this%n_species), t_g_f_ii(this%n_max*3, this%n_max*this%n_species))
             allocate(grad_descriptor_i(d,3))
 
             i_pair = 0
@@ -8051,58 +8082,91 @@ module descriptors_module
                   i_pow = 0
                   grad_descriptor_i = 0.0_dp
 
-                  !global gradient loop
-                  do l=0, this%l_max
-                     do a = 0, this%n_max
-                        do alpha=1, 3
-                           t_g_r(3*a+alpha, 1:2*l+1) = global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
-                           t_g_i(3*a+alpha, 1:2*l+1) = global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
-                        enddo
-                     enddo
-
-                     do ia = 1, (this%n_species+1)*(this%n_max+1)
-                        a = rs_index(1,ia)
-                        i_species = rs_index(2,ia)
-
-                        t_f_r(ia, 1:2*l+1) = global_fourier_so3_r(l,a,i_species)%m(-l:l)
-                        t_f_i(ia, 1:2*l+1) = global_fourier_so3_i(l,a,i_species)%m(-l:l)
-                     enddo
-
-                     call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                     t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
-                     call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                     t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
-                     !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
-                     !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
-
-                     i_pow = l+1
-                     do ia = 1, size(gs_index(1)%mm(:,0))
+                  if ((this%nu_S /= 2) .OR. (this%nu_R /= 2)) then
+                     !V2 ***********************
+                     do ia = 1, SIZE(gs_index(1)%mm(:,0))
                         a = gs_index(1)%mm(ia,2)
                         i_species = gs_index(1)%mm(ia,1)
-                        ia_rs = i_species*(this%n_max+1)+a+1
 
                         !set upper bound for the second loop
-                        ub = size(gs_index(2)%mm(:,0))
+                        ub = SIZE(gs_index(2)%mm(:,0))
                         if (sym_desc) then
                            ub = ia
                         endif
                         do jb = 1, ub
                            b = gs_index(2)%mm(jb, 2)
                            j_species = gs_index(2)%mm(jb, 1)
-                           jb_rs = j_species*(this%n_max+1)+b+1
 
                            if(this%diagonal_radial .and. a /= b) cycle
+                           do l = 0, this%l_max
+                              i_pow = i_pow + 1
+                              if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0 .or. i_species==0) then
+                                    grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
+                                    matmul(global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm,global_fourier_so3_r(l,b,j_species)%m) + matmul(global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm, global_fourier_so3_i(l,b,j_species)%m)
+                              endif
+                              if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0 .or. j_species==0) then
+                                    grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
+                                    matmul(global_grad_fourier_so3_r_array(i_desc_i)%x(l,b,n_i)%mm,global_fourier_so3_r(l,a,i_species)%m) + matmul(global_grad_fourier_so3_i_array(i_desc_i)%x(l,b,n_i)%mm,global_fourier_so3_i(l,a,i_species)%m)
+                              endif
 
-                           if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*a+1:3*(a+1),jb_rs) + t_g_f_ii(3*a+1:3*(a+1),jb_rs)
-                           if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*b+1:3*(b+1),ia_rs) + t_g_f_ii(3*b+1:3*(b+1),ia_rs)
+                              if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
+                              if( ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
+                           enddo !l
+                        enddo !jb
+                     enddo !ia
+                  endif
 
-                           if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
-                           if(ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-                           i_pow = i_pow + this%l_max+1
+
+                  if ((this%nu_R == 2) .AND. (this%nu_S == 2)) then
+                     do l=0, this%l_max
+                        do a = 1, this%n_max
+                           do alpha=1, 3
+                              t_g_r(3*(a-1)+alpha, 1:2*l+1) = global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
+                              t_g_i(3*(a-1)+alpha, 1:2*l+1) = global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
+                           enddo
                         enddo
-                     enddo
+                        do ia = 1, this%n_species*this%n_max
+                           !a = rs_index(1,ia)
+                           !i_species = rs_index(2,ia)
+                           a = gs_index(1)%mm(ia, 2)
+                           i_species = gs_index(1)%mm(ia, 1)
 
-                  end do !l
+                           t_f_r(ia, 1:2*l+1) = global_fourier_so3_r(l,a,i_species)%m(-l:l)
+                           t_f_i(ia, 1:2*l+1) = global_fourier_so3_i(l,a,i_species)%m(-l:l)
+                        enddo
+                        call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
+                           t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
+                        call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
+                           t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
+                        !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
+                        !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
+
+                        i_pow = l+1
+                        do ia = 1, this%n_species*this%n_max
+                           !a = rs_index(1,ia)
+                           !i_species = rs_index(2,ia)
+                           a = gs_index(1)%mm(ia, 2)
+                           i_species = gs_index(1)%mm(ia, 1)
+                           do jb = 1, ia !this%n_species*this%n_max !ia
+                              !b = rs_index(1,jb)
+                              !j_species = rs_index(2,jb)
+                              b = gs_index(1)%mm(jb, 2)
+                              j_species = gs_index(1)%mm(jb, 1)
+
+                              if(this%diagonal_radial .and. a /= b) cycle
+
+                              if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(a-1)+1:3*a,jb) + t_g_f_ii(3*(a-1)+1:3*a,jb)
+                              if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(b-1)+1:3*b,ia) + t_g_f_ii(3*(b-1)+1:3*b,ia)
+
+
+                              if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
+                              if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
+                              i_pow = i_pow + this%l_max+1
+                           enddo
+                        enddo
+
+                     end do !l
+                  endif !end of nu=2 radient loop
 
 
 
@@ -10022,8 +10086,8 @@ module descriptors_module
       else
          call form_gs_index(this,gs_index, error)
 
-         NS1 = size(gs_index(1)%mm(:,0))
-         NS2 = size(gs_index(2)%mm(:,0))
+         NS1 = SIZE(gs_index(1)%mm(:,0))
+         NS2 = SIZE(gs_index(2)%mm(:,0))
 
          if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
             i = NS1 * NS2 * (this%l_max + 1) +1
