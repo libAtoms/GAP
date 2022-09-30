@@ -779,6 +779,8 @@ module gp_predict_module
       n_globalY = from%n_y + from%n_yPrime
 
 #ifdef HAVE_QR
+      call system_timer('Build linear system')
+
       allocate(c_subYY_sqrtInverseLambda(n_globalSparseX,n_globalY))
       call matrix_product_vect_asdiagonal_sub(c_subYY_sqrtInverseLambda,from%covariance_subY_y,sqrt(1.0_qp/from%lambda)) ! O(NM)
       if (allocated(from%covariance_subY_y)) deallocate(from%covariance_subY_y)  ! free input component to save memory
@@ -855,7 +857,9 @@ module gp_predict_module
 
          globalY(i_global_yPrime) = from%yPrime(i_yPrime)*sqrt(1.0_qp/from%lambda(i_global_yPrime))
       enddo
+      call system_timer('Build linear system')
 
+      call system_timer('Solve linear system')
       if (task_manager%active) then
          call print("Using ScaLAPACK to solve QR")
          call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%ScaLAPACK_obj, mb_A, nb_A)
@@ -865,6 +869,7 @@ module gp_predict_module
          call LA_Matrix_QR_Solve_Vector(LA_q_subYsubY, globalY, alpha)
          call finalise(LA_q_subYsubY)
       end if
+      call system_timer('Solve linear system')
 
       do i_coordinate = 1, from%n_coordinate
          do i_sparseX = 1, from%coordinate(i_coordinate)%n_sparseX
