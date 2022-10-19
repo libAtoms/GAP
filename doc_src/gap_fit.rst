@@ -243,3 +243,21 @@ This does not exist any more: `quippy.gap_fit_parse_gap_str`.
  - INDEX_FILE: reads indices of sparse points from a file
  - CUR_COVARIANCE: CUR, based on the full covariance matrix
  - CUR_POINTS: CUR, based on the datapoints
+
+Running with MPI
+################
+
+In order to run `gap_fit` with MPI, you need to configure and compile it
+accordingly, see the (QUIP Readme)[http://github.com/QUIP] for more details.
+
+Choosing the sparse points is not parallelised, therefore you have to provide
+the sparse points for each descriptor in a separate file. The main workflow is:
+
+1. Calculate without MPI to get the sparseX output files.
+    * Use `sparsify_only_no_fit=T` to just create the sparseX files (less memory needed).
+2. Convert output files to input files (`$QUIP_ROOT/bin/gap_prepare_sparsex_input.py gp.xml`).
+    * Optional: Rename them to something shorter (e.g. `1.input`, `2.input` etc.).
+3. Change input method (`sparse_method=FILE sparse_file=1.input`).
+    * For more than one species use `add_species=F` and explicit input.
+    * Check the number of braces (`gap={{$gap1}:{$gap2}:{$gap3}}`).
+4. Run with `mpirun -np …`  (or `srun …` for Slurm).
