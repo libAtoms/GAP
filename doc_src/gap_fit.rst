@@ -129,12 +129,6 @@ energy (either via a configuration, preferred, or on the command
 line), otherwise the interatomic potential might (depending on the
 descriptor) not formally be zero for isolated atoms.
 
-
-
-Descriptors and Kernels
-***********************
-
-
 SOAP hyperparameters
 ########################
 
@@ -152,16 +146,6 @@ between them.  When we approximate a quantum mechanical potential
 energy (which is not formally local) using a local site energy with
 cut-off radius, the error we necessarily incur can be
 characterised in theform of a force variance.
-
-
-
-
-Global fit parameters
-*********************
-
-blah blah
-
-blah blah
 
 Command line example
 ********************
