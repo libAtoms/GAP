@@ -48,17 +48,16 @@
 <li class="toctree-l2"><a class="reference internal" href="#data">Data</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#data-field-names">Data field names</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#isolated-atom">Isolated atom</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#descriptors-and-kernels">Descriptors and Kernels</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#soap-hyperparameters">SOAP hyperparameters</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#cutoff">cutoff</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#global-fit-parameters">Global fit parameters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#command-line-example">Command line example</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#command-line-options">Command line options</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#gap-options">GAP options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#gap-options">GAP options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#running-with-mpi">Running with MPI</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
@@ -235,9 +234,6 @@ energy (either via a configuration, preferred, or on the command
 line), otherwise the interatomic potential might (depending on the
 descriptor) not formally be zero for isolated atoms.</p>
 </section>
-</section>
-<section id="descriptors-and-kernels">
-<h2>Descriptors and Kernels<a class="headerlink" href="#descriptors-and-kernels" title="Permalink to this heading"></a></h2>
 <section id="soap-hyperparameters">
 <h3>SOAP hyperparameters<a class="headerlink" href="#soap-hyperparameters" title="Permalink to this heading"></a></h3>
 <p>This section contains notes about choosing hyperparameters for the SOAP descriptor.</p>
@@ -254,11 +250,6 @@ between them.  When we approximate a quantum mechanical potential
 energy (which is not formally local) using a local site energy with
 cut-off radius, the error we necessarily incur can be
 characterised in theform of a force variance.</p>
-</section>
-<section id="global-fit-parameters">
-<h2>Global fit parameters<a class="headerlink" href="#global-fit-parameters" title="Permalink to this heading"></a></h2>
-<p>blah blah</p>
-<p>blah blah</p>
 </section>
 <section id="command-line-example">
 <h2>Command line example<a class="headerlink" href="#command-line-example" title="Permalink to this heading"></a></h2>
@@ -338,6 +329,38 @@ characterised in theform of a force variance.</p>
 </ul>
 </dd>
 </dl>
+<section id="running-with-mpi">
+<h3>Running with MPI<a class="headerlink" href="#running-with-mpi" title="Permalink to this heading"></a></h3>
+<p>In order to run <cite>gap_fit</cite> with MPI, you need to configure and compile it
+accordingly, see the (QUIP Readme)[<a class="reference external" href="http://github.com/QUIP">http://github.com/QUIP</a>] for more details.</p>
+<p>Choosing the sparse points is not parallelised, therefore you have to provide
+the sparse points for each descriptor in a separate file. The main workflow is:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>Calculate without MPI to get the sparseX output files.</dt><dd><ul class="simple">
+<li><p>Use <cite>sparsify_only_no_fit=T</cite> to just create the sparseX files (less memory needed).</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Convert output files to input files (<cite>$QUIP_ROOT/bin/gap_prepare_sparsex_input.py gp.xml</cite>).</dt><dd><ul class="simple">
+<li><p>Optional: Rename them to something shorter (e.g. <cite>1.input</cite>, <cite>2.input</cite> etc.).</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Change input method (<cite>sparse_method=FILE sparse_file=1.input</cite>).</dt><dd><ul class="simple">
+<li><p>For more than one species use <cite>add_species=F</cite> and explicit input.</p></li>
+<li><p>Check the number of braces (<cite>gap={{$gap1}:{$gap2}:{$gap3}}</cite>).</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Run with <cite>mpirun -np …</cite>  (or <cite>srun …</cite> for Slurm).</p></li>
+</ol>
+</section>
 </section>
 </section>
 
