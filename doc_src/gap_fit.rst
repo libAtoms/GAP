@@ -232,7 +232,7 @@ Running with MPI
 ################
 
 In order to run `gap_fit` with MPI, you need to configure and compile it
-accordingly, see the (QUIP Readme)[http://github.com/QUIP] for more details.
+accordingly, see the `QUIP Readme <http://github.com/libAtoms/QUIP>`_ for more details.
 
 Choosing the sparse points is not parallelised, therefore you have to provide
 the sparse points for each descriptor in a separate file. The main workflow is:
