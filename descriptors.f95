@@ -7535,7 +7535,8 @@ module descriptors_module
          do i_species = 0, this%n_species
             do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
-               if (i_species == 0 .or. this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
+
+               if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
                   if (a == 0) then
                      fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
                      fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
