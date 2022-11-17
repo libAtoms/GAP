@@ -7167,17 +7167,17 @@ module descriptors_module
    endsubroutine form_gs_index
 
 
-   subroutine form_WQ(this, W, sym_desc, error)
+   subroutine form_W(this, W, sym_desc, error)
       !replacement for the old rs_index
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
-      integer :: K, nu_R, nu_S, imax, i, dn, ds, ir, ic, n, s, s2, n2
+      integer :: K, nu_R, nu_S, i, dn, ds, ir, ic, n, s, s2, n2
       type(real_2d), dimension(:), allocatable :: W
 
       INIT_ERROR(error)
 
       if(.not. this%initialised) then
-         RAISE_ERROR("form_WQ: descriptor object not initialised", error)
+         RAISE_ERROR("form_W: descriptor object not initialised", error)
       endif
 
       if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
@@ -7191,17 +7191,15 @@ module descriptors_module
       ! decide if the l-slices are symmetric matricies
       if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
          sym_desc = .false.
-         imax = 2
       else
          sym_desc = .true.
-         imax = 1
       endif
-      allocate(W(imax))
+      allocate(W(2))
 
       ! construct W(i) as required
       nu_R = this%nu_R
       nu_S = this%nu_S
-      do i = 1,imax
+      do i = 1,2
          ! determine size of W(i) and allocate
          K = 1
          ds = 0
@@ -7824,14 +7822,22 @@ module descriptors_module
          !jpd47 new power spectrum calculation
          K1 = size(W(1)%mm(0,:))
          K2 = size(W(2)%mm(0,:))
-         allocate(T(K1, K2))
+         allocate(Pl(K1, K2))
          i_pow = 0
+
          do l = 0, this%l_max
-            T = matmul(transpose(matmul(X_r(l)%mm, W(1))), matmul(X_r(l)%mm, W(2))) + matmul(transpose(matmul(X_i(l)%mm, W(1))), matmul(X_i(l)%mm, W(2)))
+            Pl = matmul(transpose(matmul(X_r(l)%mm, W(1))), matmul(X_r(l)%mm, W(2))) + matmul(transpose(matmul(X_i(l)%mm, W(1))), matmul(X_i(l)%mm, W(2)))
             do ia = 1, K1
-               do jb = 1, K2
+               ub = K2
+               if (sym_desc) then
+                  ub = ia
+               endif
+               do jb = 1, ub
                   i_pow = i_pow + 1
-                  descriptor_i(i_pow) = T(ia, jb)
+                  descriptor_i(i_pow) = Pl(ia, jb)
+                  if( ia /= jb .and. sym_desc) then
+                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  endif
                enddo
             enddo
          enddo
