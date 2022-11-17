@@ -7287,6 +7287,7 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable :: X_r, X_i, W
+      integer :: ic
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
@@ -7410,6 +7411,13 @@ module descriptors_module
       allocate(radial_fun(0:this%l_max, this%n_max), radial_coefficient(0:this%l_max, this%n_max))
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
       allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
+      allocate(X_r(0:this%l_max), X_i(0:this%l_max))
+      do l = 0, this%l_max
+         allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max), X_i(l)%mm(2*l+1, this%n_species*this%n_max))
+         !jpd47 no need to zero these here? they get zero'd per atom in loop later on...
+         X_r(l) = 0.0_dp
+         X_i(l) = 0.0_dp
+      enddo
 
       if(my_do_grad_descriptor) then
          allocate(grad_radial_fun(0:this%l_max, this%n_max), grad_radial_coefficient(0:this%l_max, this%n_max))
@@ -7608,10 +7616,22 @@ module descriptors_module
          radial_fun(0,1) = 1.0_dp
          radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
 
+         !jpd47 zero the coefficients and initialise counter
+         ic = 0
+         do l = 1, this%l_max
+            X_r(l)%mm(:,:) = 0
+            X_i(l)%mm(:,:) = 0
+         enddo
 
          do i_species = 0, this%n_species
             do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
+
+               if (this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0 .and. i_species > 0 .and a > 0) then
+                  ic = ic + 1
+                  X_r(0)%mm(ic, 0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
+                  X_i(0)%mm(ic, 0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
+               endif
 
                if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
                   if (a == 0) then
@@ -7743,6 +7763,12 @@ module descriptors_module
                      fourier_so3_r(l,a,0)%m(m) = fourier_so3_r(l,a,0)%m(m) + real(c_tmp(1))
                      fourier_so3_i(l,a,0)%m(m) = fourier_so3_i(l,a,0)%m(m) + aimag(c_tmp(1))
 
+                     !jpd47 new
+                     if (a > 0) then
+                        ic = 1 + (i_species-1) * this%n_max + (a-1)
+                        X_r(l)%mm(ic, m +l) = X_r(l)%mm(ic, m +l) + real(c_tmp(1))
+                        X_i(l)%mm(ic, m +l) = X_i(l)%mm(ic, m +l) + aimag(c_tmp(1))
+                     endif
 
                      if(my_do_grad_descriptor) then
                         if (a==0) then
