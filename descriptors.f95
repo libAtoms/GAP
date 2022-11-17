@@ -7173,6 +7173,7 @@ module descriptors_module
       integer, optional, intent(out) :: error
       integer :: K, nu_R, nu_S, i, dn, ds, ir, ic, n, s, s2, n2
       type(real_2d), dimension(:), allocatable :: W
+      logical  :: sym_desc
 
       INIT_ERROR(error)
 
@@ -7209,7 +7210,7 @@ module descriptors_module
             nu_R = nu_R -1
             dn = 1
          endif
-         if (nu_S) > 0 then
+         if (nu_S > 0) then
             K = K * this%n_species
             nu_S = nu_S -1
             ds = 1
@@ -7231,7 +7232,7 @@ module descriptors_module
          enddo
 
       enddo
-   endsubroutine form_WQ
+   endsubroutine form_W
 
 
 
@@ -7284,13 +7285,13 @@ module descriptors_module
       integer :: max_n_neigh
 
       ! jpd47 new variables
-      type(real_2d), dimension(:), allocatable :: X_r, X_i, W
-      real(dp), dimension(:, :), allocatable :: Pl
-      integer :: ic
+      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W
+      real(dp), dimension(:, :), allocatable, save :: Pl
+      integer :: ic, K1, K2
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
-!$omp threadprivate(fourier_so3_r, fourier_so3_i)
+!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
@@ -7414,8 +7415,8 @@ module descriptors_module
       do l = 0, this%l_max
          allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max), X_i(l)%mm(2*l+1, this%n_species*this%n_max))
          !jpd47 no need to zero these here? they get zero'd per atom in loop later on...
-         X_r(l) = 0.0_dp
-         X_i(l) = 0.0_dp
+         !X_r(l) = 0.0_dp
+         !X_i(l) = 0.0_dp
       enddo
 
       if(my_do_grad_descriptor) then
@@ -7573,9 +7574,9 @@ module descriptors_module
       endif ! this%global
 
 
-!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
+!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc, W) &
 !$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
-!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
+!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs, K1, K2, ic) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
 !$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
@@ -7626,7 +7627,7 @@ module descriptors_module
             do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
 
-               if (this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0 .and. i_species > 0 .and a > 0) then
+               if (this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0 .and. i_species > 0 .and. a > 0) then
                   ic = ic + 1
                   X_r(0)%mm(ic, 0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
                   X_i(0)%mm(ic, 0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
@@ -7826,7 +7827,7 @@ module descriptors_module
          i_pow = 0
 
          do l = 0, this%l_max
-            Pl = matmul(transpose(matmul(X_r(l)%mm, W(1))), matmul(X_r(l)%mm, W(2))) + matmul(transpose(matmul(X_i(l)%mm, W(1))), matmul(X_i(l)%mm, W(2)))
+            Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
             do ia = 1, K1
                ub = K2
                if (sym_desc) then
@@ -7841,6 +7842,7 @@ module descriptors_module
                enddo
             enddo
          enddo
+         deallocate(Pl)
 
          ! i_pow = 0
          ! do ia = 1, size(gs_index(1)%mm(:,0))
@@ -10147,10 +10149,10 @@ module descriptors_module
       call form_W(this, W, sym_desc, error)
 
       NS1 = size(W(1)%mm(0,:))
+      NS2 = size(W(2)%mm(0,:))
       if (sym_desc) then
          i = (this%l_max+1) * (NS1 * (NS1+1)) /2 + 1
       else
-         NS2 = size(W(2)%mm(0,:))
          i = (this%l_max+1) * NS1 * NS2 + 1
       endif
 
