@@ -10087,7 +10087,7 @@ module descriptors_module
       integer, optional, intent(out) :: error
       integer :: i, NS1, NS2
       logical :: sym_desc
-      type(int_2d), dimension(:), allocatable :: gs_index
+      type(real_2d), dimension(:), allocatable :: W
 
       INIT_ERROR(error)
 
@@ -10095,22 +10095,18 @@ module descriptors_module
          RAISE_ERROR("soap_dimensions: descriptor object not initialised", error)
       endif
 
-      if(this%diagonal_radial) then
-         i = (this%l_max+1) * this%n_max * this%n_species * (this%n_species+1) / 2 + 1
+      ! jpd47 TODO update this to depend on the coupling + reimplement diagonal_radial
+      call form_W(this, W, sym_desc, error)
+
+      NS1 = size(W(1)%mm(0,:))
+      if (sym_desc) then
+         i = (this%l_max+1) * (NS1 * (NS1+1)) /2 + 1
       else
-         call form_gs_index(this,gs_index, error)
-
-         NS1 = size(gs_index(1)%mm(:,0))
-         NS2 = size(gs_index(2)%mm(:,0))
-
-         if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
-            i = NS1 * NS2 * (this%l_max + 1) +1
-         else
-            i = NS1 * (NS1+1) * (this%l_max +1) /2 +1
-         endif
+         NS2 = size(W(2)%mm(0,:))
+         i = (this%l_max+1) * NS1 * NS2 + 1
       endif
 
-      if (allocated(gs_index)) deallocate(gs_index)
+      if (allocated(W)) deallocate(W)
    endfunction soap_dimensions
 
 
