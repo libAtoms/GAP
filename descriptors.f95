@@ -5421,6 +5421,7 @@ module descriptors_module
       endif
 
       species_map = 0
+      print*, "jpd47", this%species_Z, size(this%species_Z)
       do i = 1, size(this%species_Z)
          if(this%species_Z(i) == 0) then
             species_map = 1
@@ -7166,6 +7167,76 @@ module descriptors_module
    endsubroutine form_gs_index
 
 
+   subroutine form_WQ(this, W, sym_desc, error)
+      !replacement for the old rs_index
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      integer :: K, nu_R, nu_S, imax, i, dn, ds, ir, ic, n, s, s2, n2
+      type(real_2d), dimension(:), allocatable :: W
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("form_WQ: descriptor object not initialised", error)
+      endif
+
+      if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
+         RAISE_ERROR("nu_R outside allowed range of 0-2", error)
+      endif
+
+      if (( this%nu_S > 2) .OR. (this%nu_S < 0)) then
+         RAISE_ERROR("nu_S outside allowed range of 0-2", error)
+      endif
+
+      ! decide if the l-slices are symmetric matricies
+      if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
+         sym_desc = .false.
+         imax = 2
+      else
+         sym_desc = .true.
+         imax = 1
+      endif
+      allocate(W(imax))
+
+      ! construct W(i) as required
+      nu_R = this%nu_R
+      nu_S = this%nu_S
+      do i = 1,imax
+         ! determine size of W(i) and allocate
+         K = 1
+         ds = 0
+         dn = 0
+         if (nu_R > 0) then
+            K = K * this%n_max
+            nu_R = nu_R -1
+            dn = 1
+         endif
+         if (nu_S) > 0 then
+            K = K * this%n_species
+            nu_S = nu_S -1
+            ds = 1
+         endif
+         allocate(W(i)%mm(this%n_max * this%n_species, K))
+
+         !loop over S and N, populating W
+         ir = 0
+         do s = 1, this%n_species
+            do n = 1, this%n_max
+               ir = ir + 1       ! row index in W
+               do s2 = 1, this%n_species
+                  do n2 = 1, this%n_max
+                     ic = 1 + (s2-1)*ds*dn + (n2-1)*dn
+                     W(i)%mm(ir, ic) = 1.0
+                  enddo
+               enddo
+            enddo
+         enddo
+
+      enddo
+   endsubroutine form_WQ
+
+
+
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 
       type real_2d_array
@@ -7214,6 +7285,9 @@ module descriptors_module
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
 
+      ! jpd47 new variables
+      type(real_2d), dimension(:), allocatable :: X_r, X_i, W
+
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i)
@@ -7237,6 +7311,9 @@ module descriptors_module
          RAISE_ERROR("nu_S outside allowed range of 0-2", error)
       endif
 
+
+      !jpd47 TODO replace this with form_WQ
+      call form_W(this, W, sym_desc, error)
       call form_gs_index(this, gs_index, error)
       if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
          sym_desc = .false.
@@ -7309,7 +7386,7 @@ module descriptors_module
 
       call finalise(descriptor_out)
 
-      d = soap_dimensions(this,error)
+      d = soap_dimensions(this, error)
 
       if(associated(atom_mask_pointer)) then
          call descriptor_sizes(this,at,n_descriptors,n_cross, &
