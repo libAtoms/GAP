@@ -7287,6 +7287,7 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable :: X_r, X_i, W
+      real(dp), dimension(:, :), allocatable :: Pl
       integer :: ic
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
@@ -7820,33 +7821,48 @@ module descriptors_module
          endif
 
 
+         !jpd47 new power spectrum calculation
+         K1 = size(W(1)%mm(0,:))
+         K2 = size(W(2)%mm(0,:))
+         allocate(T(K1, K2))
          i_pow = 0
-         do ia = 1, size(gs_index(1)%mm(:,0))
-            a = gs_index(1)%mm(ia,2)
-            i_species = gs_index(1)%mm(ia,1)
-
-            !set upper bound for the second loop
-            ub = size(gs_index(2)%mm(:,0))
-            if (sym_desc) then
-               ub = ia
-            endif
-            do jb = 1, ub
-               b = gs_index(2)%mm(jb, 2)
-               j_species = gs_index(2)%mm(jb, 1)
-
-               if(this%diagonal_radial .and. a /= b) cycle
-
-               do l = 0, this%l_max
+         do l = 0, this%l_max
+            T = matmul(transpose(matmul(X_r(l)%mm, W(1))), matmul(X_r(l)%mm, W(2))) + matmul(transpose(matmul(X_i(l)%mm, W(1))), matmul(X_i(l)%mm, W(2)))
+            do ia = 1, K1
+               do jb = 1, K2
                   i_pow = i_pow + 1
-                  !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
-                  descriptor_i(i_pow) = dot_product(fourier_so3_r(l,a,i_species)%m, fourier_so3_r(l,b,j_species)%m) + dot_product(fourier_so3_i(l,a,i_species)%m, fourier_so3_i(l,b,j_species)%m)
-                  if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
-                  if( ia /= jb .and. sym_desc) then
-                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
-                  endif
-               enddo !l
-            enddo !jb
-         enddo !ia
+                  descriptor_i(i_pow) = T(ia, jb)
+               enddo
+            enddo
+         enddo
+
+         ! i_pow = 0
+         ! do ia = 1, size(gs_index(1)%mm(:,0))
+         !    a = gs_index(1)%mm(ia,2)
+         !    i_species = gs_index(1)%mm(ia,1)
+
+         !    !set upper bound for the second loop
+         !    ub = size(gs_index(2)%mm(:,0))
+         !    if (sym_desc) then
+         !       ub = ia
+         !    endif
+         !    do jb = 1, ub
+         !       b = gs_index(2)%mm(jb, 2)
+         !       j_species = gs_index(2)%mm(jb, 1)
+
+         !       if(this%diagonal_radial .and. a /= b) cycle
+
+         !       do l = 0, this%l_max
+         !          i_pow = i_pow + 1
+         !          !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
+         !          descriptor_i(i_pow) = dot_product(fourier_so3_r(l,a,i_species)%m, fourier_so3_r(l,b,j_species)%m) + dot_product(fourier_so3_i(l,a,i_species)%m, fourier_so3_i(l,b,j_species)%m)
+         !          if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
+         !          if( ia /= jb .and. sym_desc) then
+         !             descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+         !          endif
+         !       enddo !l
+         !    enddo !jb
+         ! enddo !ia
 
          descriptor_i(d) = 0.0_dp
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
