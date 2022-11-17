@@ -7171,7 +7171,7 @@ module descriptors_module
       !replacement for the old rs_index
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
-      integer :: K, nu_R, nu_S, i, dn, ds, ir, ic, n, s, s2, n2
+      integer :: K, nu_R, nu_S, i, dn, ds, ir, ic, n, s, s2, n2, n2_max, s2_max
       type(real_2d), dimension(:), allocatable :: W
       logical  :: sym_desc
 
@@ -7205,27 +7205,34 @@ module descriptors_module
          K = 1
          ds = 0
          dn = 0
+         n2_max = 1
+         s2_max = 1
+
          if (nu_R > 0) then
             K = K * this%n_max
             nu_R = nu_R -1
             dn = 1
+            n2_max = this%n_max
          endif
          if (nu_S > 0) then
             K = K * this%n_species
             nu_S = nu_S -1
             ds = 1
+            s2_max = this%n_species
          endif
          allocate(W(i)%mm(this%n_max * this%n_species, K))
-
-         !loop over S and N, populating W
+         W(i)%mm(:,:) = 0.0_dp
+         !loop over S and N, populating W TODO this is defintely wrong atm!!
          ir = 0
          do s = 1, this%n_species
             do n = 1, this%n_max
                ir = ir + 1       ! row index in W
-               do s2 = 1, this%n_species
-                  do n2 = 1, this%n_max
-                     ic = 1 + (s2-1)*ds*dn + (n2-1)*dn
-                     W(i)%mm(ir, ic) = 1.0
+               do s2 = 1, s2_max
+                  do n2 = 1, n2_max
+                     if (ds*s == ds*s2 .and. dn*n == dn*n2) then
+                        ic = 1 + (s2-1)*ds*n2_max + (n2-1)*dn
+                        W(i)%mm(ir, ic) = 1.0
+                     endif
                   enddo
                enddo
             enddo
@@ -7286,12 +7293,12 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W
-      real(dp), dimension(:, :), allocatable, save :: Pl
+      real(dp), dimension(:, :), allocatable, save :: Pl, Pl_i, Yl, Zl
       integer :: ic, K1, K2
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
-!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl)
+!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Yl, Zl, Pl_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
@@ -7315,6 +7322,22 @@ module descriptors_module
 
       !jpd47 TODO replace this with form_WQ
       call form_W(this, W, sym_desc, error)
+      ! print*, "shape of W(1) is", SHAPE(W(1)%mm), W(1)%mm(1,1)
+      ! do ia = 1, SIZE(W(1)%mm(:,1))
+      !    do jb = 1, SIZE(W(1)%mm(1,:))
+      !       print*,"W is", ia, jb, W(1)%mm(ia, jb)
+      !    enddo
+      ! enddo
+
+      ! print*, "shape of W(2) is", SHAPE(W(2)%mm), W(2)%mm(1,1)
+      ! do ia = 1, SIZE(W(2)%mm(:,1))
+      !    do jb = 1, SIZE(W(2)%mm(1,:))
+      !       print*,"W is", ia, jb, W(2)%mm(ia, jb)
+      !    enddo
+      ! enddo
+
+
+
       call form_gs_index(this, gs_index, error)
       if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
          sym_desc = .false.
@@ -7418,6 +7441,8 @@ module descriptors_module
          !X_r(l) = 0.0_dp
          !X_i(l) = 0.0_dp
       enddo
+      !print*, "n_max and n_species are", this%n_max, this%n_species
+      !print*, "size of X_r(0) is", SIZE(X_r(0)%mm), "shape is", SHAPE(X_r(0)%mm)
 
       if(my_do_grad_descriptor) then
          allocate(grad_radial_fun(0:this%l_max, this%n_max), grad_radial_coefficient(0:this%l_max, this%n_max))
@@ -7618,19 +7643,19 @@ module descriptors_module
 
          !jpd47 zero the coefficients and initialise counter
          ic = 0
-         do l = 1, this%l_max
-            X_r(l)%mm(:,:) = 0
-            X_i(l)%mm(:,:) = 0
+         do l = 0, this%l_max
+            X_r(l)%mm(:,:) = 0.0_dp
+            X_i(l)%mm(:,:) = 0.0_dp
          enddo
 
          do i_species = 0, this%n_species
             do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
 
-               if (this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0 .and. i_species > 0 .and. a > 0) then
+               if ((this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) .and. i_species > 0 .and. a > 0) then
                   ic = ic + 1
-                  X_r(0)%mm(ic, 0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
-                  X_i(0)%mm(ic, 0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
+                  X_r(0)%mm(1, ic) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
+                  X_i(0)%mm(1, ic) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
                endif
 
                if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
@@ -7766,8 +7791,8 @@ module descriptors_module
                      !jpd47 new
                      if (a > 0) then
                         ic = 1 + (i_species-1) * this%n_max + (a-1)
-                        X_r(l)%mm(ic, m +l) = X_r(l)%mm(ic, m +l) + real(c_tmp(1))
-                        X_i(l)%mm(ic, m +l) = X_i(l)%mm(ic, m +l) + aimag(c_tmp(1))
+                        X_r(l)%mm(m+l+1, ic) = X_r(l)%mm(m+l+1, ic ) + real(c_tmp(1))
+                        X_i(l)%mm(m+l+1, ic) = X_i(l)%mm(m+l+1, ic) + aimag(c_tmp(1))
                      endif
 
                      if(my_do_grad_descriptor) then
@@ -7824,9 +7849,38 @@ module descriptors_module
          K1 = size(W(1)%mm(0,:))
          K2 = size(W(2)%mm(0,:))
          allocate(Pl(K1, K2))
+         !allocate(Pl_i(K1, K2))
+
          i_pow = 0
 
          do l = 0, this%l_max
+            ! jpd47 X_r is all finite but Pl is not... something going wrong with the matmuls
+            !  print*, "X_r and X_i are"
+            !  do m = -l, l
+            !     do ia = 1, this%n_species*this%n_max
+            !        print*, l, m, ia, X_r(l)%mm(m+l+1, ia),  X_i(l)%mm(m+l+1, ia)
+            !     enddo
+            !  enddo
+            ! print*, "shapes are", shape(X_r(l)%mm), shape(W(1)%mm), shape(W(2)%mm)
+            ! jpd47 TODO optimise this and tidy it up - A LOT!!
+            ! allocate(Yl(2*l+1, K1))
+            ! allocate(Zl(2*l+1, K2))
+            ! Yl(:,:) = 0.0_dp
+            ! Zl(:,:) = 0.0_dp
+            ! Yl = matmul(X_r(l)%mm(:,:), W(1)%mm(:,:))
+            ! Zl = matmul(X_r(l)%mm(:,:), W(2)%mm(:,:))
+            ! Pl = matmul(transpose(Yl), Zl)
+
+
+            ! Yl(:,:) = 0.0_dp
+            ! Zl(:,:) = 0.0_dp
+            ! Yl = matmul(X_i(l)%mm(:,:), W(1)%mm(:,:))
+            ! Zl = matmul(X_i(l)%mm(:,:), W(2)%mm(:,:))
+            ! Pl_i = matmul(transpose(Yl), Zl)
+            ! Pl = Pl + Pl_i
+            ! if (allocated(Yl)) deallocate(Yl)
+            ! if (allocated(Zl)) deallocate(Zl)
+            Pl = 0.0_dp
             Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
             do ia = 1, K1
                ub = K2
@@ -7836,6 +7890,7 @@ module descriptors_module
                do jb = 1, ub
                   i_pow = i_pow + 1
                   descriptor_i(i_pow) = Pl(ia, jb)
+                  !print*, "i_pow and element is", i_pow, Pl(ia, jb)
                   if( ia /= jb .and. sym_desc) then
                      descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
                   endif
@@ -7843,6 +7898,7 @@ module descriptors_module
             enddo
          enddo
          deallocate(Pl)
+         !deallocate(Pl_i)
 
          ! i_pow = 0
          ! do ia = 1, size(gs_index(1)%mm(:,0))
@@ -10147,6 +10203,7 @@ module descriptors_module
 
       ! jpd47 TODO update this to depend on the coupling + reimplement diagonal_radial
       call form_W(this, W, sym_desc, error)
+
 
       NS1 = size(W(1)%mm(0,:))
       NS2 = size(W(2)%mm(0,:))
