@@ -94,7 +94,7 @@ module gap_fit_module
      integer :: min_save
      integer :: mpi_blocksize_rows = 0
      integer :: mpi_blocksize_cols = 0
-     type(extendable_str) :: quip_string
+     type(extendable_str) :: quip_string, config_string
      type(Potential) :: core_pot
 
      type(gpFull) :: my_gp
@@ -116,7 +116,7 @@ module gap_fit_module
 
      logical :: sparseX_separate_file
      logical :: sparse_use_actual_gpcov
-     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset, has_linear_system_dump_file
+     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset, has_linear_system_dump_file, has_config_file
 
   endtype gap_fit
      
@@ -159,7 +159,6 @@ contains
      type(gap_fit), intent(inout), target :: this
 
      type(Dictionary) :: params
-     type(extendable_str) :: config_str
 
      character(len=STRING_LENGTH), pointer :: at_file, e0_str, local_property0_str, &
           core_param_file, core_ip_args, &
@@ -229,10 +228,11 @@ contains
         if (has_config_file) then
            inquire(file=config_file, exist=file_exists)
            if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
-           call read(config_str, config_file, keep_lf=.false., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
+           call read(this%config_string, config_file, keep_lf=.false., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
         end if
      end if
-     if (.not. has_config_file) config_str = this%command_line
+     if (.not. has_config_file) this%config_string = this%command_line
+     this%has_config_file = has_config_file
 
      call param_register(params, 'atoms_filename', '//MANDATORY//', at_file, has_value_target = has_at_file, help_string="XYZ file with fitting configurations", altkey="at_file")
      call param_register(params, 'gap', '//MANDATORY//', gap_str, has_value_target = has_gap, help_string="Initialisation string for GAPs")
@@ -358,10 +358,10 @@ contains
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
 
-     if (.not. param_read_line(params, string(config_str))) then
+     if (.not. param_read_line(params, string(this%config_string))) then
         call system_abort('Exit: Mandatory argument(s) missing...')
      endif
-     call finalise(config_str)
+
      call print_title("Input parameters")
      call param_print(params)
      call print_title("")
@@ -1615,6 +1615,13 @@ contains
         call xml_NewElement(xf,"command_line")
         call xml_AddCharacters(xf,trim(this%command_line),parsed=.false.)
         call xml_EndElement(xf,"command_line")
+     endif
+
+     ! Print config file content
+     if (this%has_config_file) then
+        call xml_NewElement(xf,"config_string")
+        call xml_AddCharacters(xf,string(this%config_string),parsed=.false.)
+        call xml_EndElement(xf,"config_string")
      endif
 
      if(this%do_copy_at_file) then
