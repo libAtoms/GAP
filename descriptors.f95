@@ -7292,16 +7292,17 @@ module descriptors_module
       integer :: max_n_neigh
 
       ! jpd47 new variables
-      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W
+      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dY_r, dY_i, dZ_r, dZ_i
       real(dp), dimension(:, :), allocatable, save :: Pl, Pl_i, Yl, Zl
       integer :: ic, K1, K2
+      integer, dimension(:, :), allocatable, save :: neighbour_list
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Yl, Zl, Pl_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
-!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
+!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i)
 
       INIT_ERROR(error)
 
@@ -7322,6 +7323,8 @@ module descriptors_module
 
       !jpd47 TODO replace this with form_WQ
       call form_W(this, W, sym_desc, error)
+      K1 = size(W(1)%mm(0,:))
+      K2 = size(W(2)%mm(0,:))
       ! print*, "shape of W(1) is", SHAPE(W(1)%mm), W(1)%mm(1,1)
       ! do ia = 1, SIZE(W(1)%mm(:,1))
       !    do jb = 1, SIZE(W(1)%mm(1,:))
@@ -7427,7 +7430,23 @@ module descriptors_module
          max_n_neigh = max(max_n_neigh, n_neighbours(at, n_i))
       end do
 
-!$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh) private(i_species, a, l, n_i, ub)
+      !jpd47 allocate and construct neighbour_list
+      allocate(neighbour_list(at%N, max_n_neigh+1))
+      neighbour_list = 0
+      do i = 1, at%N
+         n_i = 0
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij)
+            if( r_ij < this%cutoff ) then
+               n_i = n_i + 1
+               neighbour_list(i, n_i + 1) = n   !  (i, j+1) is index of jth neighbour within cutoff
+            endif
+         enddo
+         neighbour_list(i, 1) = n_i          !(i,1) is number of neighbours of atom i within cutoff
+      enddo
+
+
+!$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh) private(i_species, a, l, n_i, ub, K1, K2)
       allocate(descriptor_i(d))
       if(my_do_grad_descriptor) allocate(grad_descriptor_i(d,3))
 
@@ -7487,6 +7506,17 @@ module descriptors_module
                   end do
               end do
           end do
+
+          ! jpd47 allocate new grad storage
+          do l = 0, this%l_max
+            allocate(dY_r(l), dY_i(l))
+            allocate(dY_r(l)%mm(2*l+1, 3*max_n_neigh*K1))
+            allocate(dY_i(l)%mm(2*l+1, 3*max_n_neigh*K1))
+            allocate(dZ_r(l), dZ_i(l))
+            allocate(dZ_r(l)%mm(2*l+1, 3*max_n_neigh*K2))
+            allocate(dZ_i(l)%mm(2*l+1, 3*max_n_neigh*K2))
+          enddo
+
       endif
 !$omp end parallel
 
@@ -7599,9 +7629,9 @@ module descriptors_module
       endif ! this%global
 
 
-!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc, W) &
+!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc, W, K1, K2, neighbour_list) &
 !$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
-!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs, K1, K2, ic) &
+!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs, ic) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
 !$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
@@ -7809,6 +7839,17 @@ module descriptors_module
 
                         grad_fourier_so3_r(l,a,n_i)%mm(:,m) = real(c_tmp)
                         grad_fourier_so3_i(l,a,n_i)%mm(:,m) = aimag(c_tmp)
+                        if (a == 0) then
+                           !id = (n_i-1) * 3 * this%n_max + 1
+                           !dX_r(l)%mm(m+l+1,id:id+3) = real(c_tmp)
+                           !dX_i(l)%mm(m+l+1,id:id+3) = aimag(c_tmp)
+                           ! jpd47 effectively doing dY = dX.W and dZ = dX.Q here rather than later on as it would be a very sparse matmul
+                           dY_r(l)%mm(m+l+1, :) = dY_r(l)%mm(m+l+1, :) + real(c_tmp) * W(1)%mm(ic,:)
+                           dY_i(l)%mm(m+l+1, :) = dY_i(l)%mm(m+l+1, :) + aimag(c_tmp) * W(1)%mm(ic,:)
+                           dZ_r(l)%mm(m+l+1, :) = dZ_r(l)%mm(m+l+1, :) + real(c_tmp) * W(2)%mm(ic,:)
+                           dZ_i(l)%mm(m+l+1, :) = dZ_i(l)%mm(m+l+1, :) + aimag(c_tmp) * W(2)%mm(ic,:)
+
+                        endif
                      endif ! my_do_grad_descriptor
                   enddo ! m
                enddo ! l
@@ -7846,8 +7887,6 @@ module descriptors_module
 
 
          !jpd47 new power spectrum calculation
-         K1 = size(W(1)%mm(0,:))
-         K2 = size(W(2)%mm(0,:))
          allocate(Pl(K1, K2))
          !allocate(Pl_i(K1, K2))
 
@@ -7882,6 +7921,8 @@ module descriptors_module
             ! if (allocated(Zl)) deallocate(Zl)
             Pl = 0.0_dp
             Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
+
+            ! jpd47 unpack l-slice
             do ia = 1, K1
                ub = K2
                if (sym_desc) then
@@ -7939,6 +7980,15 @@ module descriptors_module
             endif
 
             descriptor_out%x(i_desc_i)%data(d) = this%covariance_sigma0
+         endif
+
+         ! jpd47 new gradients calcuation
+         if (my_do_grad_descriptor) then
+
+            !do l = 0, this%l_max
+            !
+            !enddo
+
          endif
 
 
