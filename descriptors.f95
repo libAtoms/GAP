@@ -2510,8 +2510,9 @@ module descriptors_module
       ! backwards compatibility: the default used to be different before this version number
       if( xml_version < 1426512068 ) this%central_reference_all_species = .true.
 
-      allocate(this%species_Z(this%n_species))
+      allocate(this%species_Z(0:this%n_species))
       allocate(this%Z(this%n_Z))
+      this%species_Z(0)=0
 
       if( has_species_Z .and. .not. has_n_species ) then
          RAISE_ERROR("soap_initialise: is species_Z is present, n_species must be present, too.",error)
@@ -2535,7 +2536,7 @@ module descriptors_module
          if(this%n_species == 1) then
             call param_register(params, 'species_Z', '0', this%species_Z(1), help_string="Atomic number of species")
          else
-            call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z, help_string="Atomic number of species")
+            call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z(1:this%n_species), help_string="Atomic number of species")
          endif
       else
          call param_register(params, 'species_Z', '0', this%species_Z(1), help_string="Atomic number of species")
