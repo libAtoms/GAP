@@ -7861,7 +7861,7 @@ module descriptors_module
                         if (a > 0) then
                            ! jpd47 effectively doing dY = dX.W and dZ = dX.Q here rather than later on as it would be a very sparse matmul later on
                            ! jpd47 TODO this is hideous and likely wrong because of that... improve later
-                           ic = 1 + (i_species-1) * this%n_max + (a-1)
+                           ic = (i_species-1) * this%n_max + a
                            do ik = 1, K1
                               ir = (n_i-1) * 3 * K1 + (ik-1)*3
                               dY_r(l)%mm(m+l+1, ir+1:ir+3) = dY_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(1)%mm(ic,ik)
@@ -7966,9 +7966,7 @@ module descriptors_module
                do jb = 1, ub
                   descriptor_i(i_pow) = Pl(ia, jb)
                   !print*, "i_pow and element is", i_pow, Pl(ia, jb)
-                  if( ia /= jb .and. sym_desc) then
-                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
-                  endif
+                  if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
                   i_pow = i_pow + this%l_max+1
                enddo
             enddo
@@ -8027,17 +8025,14 @@ module descriptors_module
          !jpd47 new gradients calcuation
          if (my_do_grad_descriptor) then
             allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
-            !n = neighbour_list(i, 1)
-            !#print*, "atom", i, "has", n, "neighbours within the cutoff"
             do l = 0, this%l_max
+               !Pl_g1 = 0.0_dp   not needed
+               !Pl_g2 = 0.0_dp
                Pl_g1 = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), dZ_r(l)%mm) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), dZ_i(l)%mm)
                Pl_g2 = matmul(transpose(dY_r(l)%mm), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(dY_i(l)%mm), matmul(X_i(l)%mm, W(2)%mm))
-
                if(do_two_l_plus_one) Pl_g1 = Pl_g1 / sqrt(2.0_dp * l + 1.0_dp)
                if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
 
-               ! jpd47 TODO indexing of gradients JOY OH JOY haha
-               print*, "l is", l, "and gradient shapes are", shape(Pl_g1), shape(Pl_g2)
 
                ! jpd47 loop over neighbour atoms "unravelling" matrix form of gradients
                n_i = 0
@@ -8052,13 +8047,10 @@ module descriptors_module
                   i_pow = l + 1
                   do ia = 1, K1
                      ub = K2
-                     if (sym_desc) then
-                        ub = ia
-                     endif
+                     if (sym_desc) ub = ia
                      do jb = 1, ub
-                        ic = 3*(n_i-1)*K2
-                        ir = 3*(n_i-1)*K1
-                        !print*, shape(grad_descriptor_i(i_pow, 1:3)), shape(Pl_g1(ia, ic+1:ic+3)), shape(Pl_g2(ir+1:ir+3, jb))
+                        ic = (n_i-1) * K2 * 3
+                        ir = (n_i-1) * K1 * 3
                         r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
                         if(ia /= jb .and. sym_desc ) r_tmp = r_tmp * SQRT_TWO
                         descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp
@@ -8084,8 +8076,6 @@ module descriptors_module
                   do k = 1, 3
                      descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) - descriptor_i * dot_product(descriptor_i,grad_descriptor_i(:,k)) / norm_descriptor_i**3
                   enddo
-               else
-                  descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i
                endif
 
                descriptor_out%x(i_desc_i)%grad_data(:,:,0) = descriptor_out%x(i_desc_i)%grad_data(:,:,0) - descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
