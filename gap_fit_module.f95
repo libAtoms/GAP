@@ -1610,18 +1610,12 @@ contains
         call gp_printXML(this%gp_sp,xf,label=gp_label)
      endif
 
-     ! Print the command line used for the fitting
-     if(len(trim(this%command_line))> 0 ) then
+     ! Print the config string (from command line or config file) used for the fitting
+     ! Keep <command_line> for backwards compatibility
+     if(this%config_string%len > 0) then
         call xml_NewElement(xf,"command_line")
-        call xml_AddCharacters(xf,trim(this%command_line),parsed=.false.)
+        call xml_AddCharacters(xf,trim(string(this%config_string)),parsed=.false.)
         call xml_EndElement(xf,"command_line")
-     endif
-
-     ! Print config file content
-     if (this%has_config_file) then
-        call xml_NewElement(xf,"config_string")
-        call xml_AddCharacters(xf,string(this%config_string),parsed=.false.)
-        call xml_EndElement(xf,"config_string")
      endif
 
      if(this%do_copy_at_file) then
