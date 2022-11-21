@@ -7281,7 +7281,7 @@ module descriptors_module
       real(dp) :: r_ij, arg_bess, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, mo_spher_bess_fi_ki_lp, &
          exp_p, exp_m, f_cut, df_cut, norm_descriptor_i, radial_decay, dradial_decay, norm_radial_decay
       real(dp), dimension(3) :: u_ij, d_ij
-      real(dp), dimension(:,:), allocatable, save :: radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient, grad_descriptor_i
+      real(dp), dimension(:,:), allocatable, save :: radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient, grad_descriptor_i, grad_descriptor_i2
       real(dp), dimension(:), allocatable, save :: descriptor_i, descriptor_i2
       real(dp), dimension(:), allocatable :: global_fourier_so3_r_array, global_fourier_so3_i_array
       type(real_2d_array), dimension(:), allocatable :: global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array
@@ -7303,7 +7303,7 @@ module descriptors_module
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Yl, Zl)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
-!$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2)
+!$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2, grad_descriptor_i2)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2)
 
       INIT_ERROR(error)
@@ -7328,20 +7328,20 @@ module descriptors_module
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
       ic = K1 + K2
-      print*, "K1 and K2 are", K1, K2
-      print*, "shape of W(1) is", SHAPE(W(1)%mm), W(1)%mm(1,1)
-      do ia = 1, SIZE(W(1)%mm(:,1))
-         do jb = 1, SIZE(W(1)%mm(1,:))
-            print*,"W is", ia, jb, W(1)%mm(ia, jb)
-         enddo
-      enddo
+      ! print*, "K1 and K2 are", K1, K2
+      ! print*, "shape of W(1) is", SHAPE(W(1)%mm), W(1)%mm(1,1)
+      ! do ia = 1, SIZE(W(1)%mm(:,1))
+      !    do jb = 1, SIZE(W(1)%mm(1,:))
+      !       print*,"W is", ia, jb, W(1)%mm(ia, jb)
+      !    enddo
+      ! enddo
 
-      print*, "shape of W(2) is", SHAPE(W(2)%mm), W(2)%mm(1,1)
-      do ia = 1, SIZE(W(2)%mm(:,1))
-         do jb = 1, SIZE(W(2)%mm(1,:))
-            print*,"W is", ia, jb, W(2)%mm(ia, jb)
-         enddo
-      enddo
+      ! print*, "shape of W(2) is", SHAPE(W(2)%mm), W(2)%mm(1,1)
+      ! do ia = 1, SIZE(W(2)%mm(:,1))
+      !    do jb = 1, SIZE(W(2)%mm(1,:))
+      !       print*,"W is", ia, jb, W(2)%mm(ia, jb)
+      !    enddo
+      ! enddo
 
 
 
@@ -7993,24 +7993,24 @@ module descriptors_module
          !       do l = 0, this%l_max
          !          i_pow = i_pow + 1
          !          !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
-         !          descriptor_i(i_pow) = dot_product(fourier_so3_r(l,a,i_species)%m, fourier_so3_r(l,b,j_species)%m) + dot_product(fourier_so3_i(l,a,i_species)%m, fourier_so3_i(l,b,j_species)%m)
-         !          if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
+         !          descriptor_i2(i_pow) = dot_product(fourier_so3_r(l,a,i_species)%m, fourier_so3_r(l,b,j_species)%m) + dot_product(fourier_so3_i(l,a,i_species)%m, fourier_so3_i(l,b,j_species)%m)
+         !          if(do_two_l_plus_one) descriptor_i2(i_pow) = descriptor_i2(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
          !          if( ia /= jb .and. sym_desc) then
-         !             descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+         !             descriptor_i2(i_pow) = descriptor_i2(i_pow) * SQRT_TWO
          !          endif
          !       enddo !l
          !    enddo !jb
          ! enddo !ia
+         ! descriptor_i2(d) = 0.0_dp
 
-         ! descriptor_i(d) = 0.0_dp
 
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
-         !norm_descriptor_i2 = sqrt(dot_product(descriptor_i2,descriptor_i2))
+         norm_descriptor_i2 = sqrt(dot_product(descriptor_i2,descriptor_i2))
 
-         !print*, "norms are", norm_descriptor_i, norm_descriptor_i2
-         !do i_pow = 1, d
+         ! print*, "norms are", norm_descriptor_i, norm_descriptor_i2
+         ! do i_pow = 1, d
          !   print*, "descs are", i_pow, descriptor_i(i_pow)/norm_descriptor_i, descriptor_i2(i_pow)/norm_descriptor_i2
-         !enddo
+         ! enddo
 
          if(.not. this%global .and. my_do_descriptor) then
             if(this%normalise) then
@@ -8063,13 +8063,14 @@ module descriptors_module
             deallocate(Pl_g1, Pl_g2)
 
             !jpd47 now normalise at the end
+            descriptor_out%x(i_desc_i)%grad_data(d,:,:) = 0.0_dp
             n_i = 0
             do n = 1, n_neighbours(at,i)
                j = neighbour(at, i, n, distance = r_ij)
                if( r_ij >= this%cutoff ) cycle
                n_i = n_i + 1
                if( species_map(at%Z(j)) == 0 ) cycle
-               descriptor_out%x(i_desc_i)%grad_data(d,:,:) = 0.0_dp
+
                grad_descriptor_i = descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
                if( this%normalise ) then
                   descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i / norm_descriptor_i
@@ -8084,7 +8085,7 @@ module descriptors_module
          endif
 
 
-         if(my_do_grad_descriptor .and. .false.) then
+         if(my_do_grad_descriptor .and. .true.) then
 ! soap_calc 33 takes 0.047 s
 	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
 	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
@@ -8184,15 +8185,28 @@ module descriptors_module
 
                if(.not. this%global) then
                   if( this%normalise ) then
-                     descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i / norm_descriptor_i
-                     do k = 1, 3
-                        descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) - descriptor_i * dot_product(descriptor_i,grad_descriptor_i(:,k)) / norm_descriptor_i**3
-                     enddo
+                     if (i == 1 .and. n_i == 1) then
+                        print*, "gradients for n_i=", n_i, "are"
+                        allocate(grad_descriptor_i2(d, 3))
+                        grad_descriptor_i2 = grad_descriptor_i / norm_descriptor_i
+                        do k = 1, 3
+                           grad_descriptor_i2(:, k) = grad_descriptor_i2(:, k) - descriptor_i * dot_product(descriptor_i,grad_descriptor_i(:,k)) / norm_descriptor_i**3
+                        enddo
+
+                        do i_pow = 1, d
+                           print*, "i_pow is", i_pow, grad_descriptor_i2(i_pow, 1), descriptor_out%x(i_desc_i)%grad_data(i_pow, 1, n_i)
+                        enddo
+                        deallocate(grad_descriptor_i2)
+                     endif
+                     !descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i / norm_descriptor_i
+                     !do k = 1, 3
+                     !   descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) - descriptor_i * dot_product(descriptor_i,grad_descriptor_i(:,k)) / norm_descriptor_i**3
+                     !enddo
                   else
                      descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i
                   endif
 
-                  descriptor_out%x(i_desc_i)%grad_data(:,:,0) = descriptor_out%x(i_desc_i)%grad_data(:,:,0) - descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
+                  !descriptor_out%x(i_desc_i)%grad_data(:,:,0) = descriptor_out%x(i_desc_i)%grad_data(:,:,0) - descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
                endif
             enddo !ni
 	    deallocate(t_f_r, t_f_i)
@@ -8341,7 +8355,7 @@ module descriptors_module
             descriptor_out%x(1)%data(d) = this%covariance_sigma0
          endif
 
-         if(my_do_grad_descriptor) then
+         if(my_do_grad_descriptor .and. .false.) then
        allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
 	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
 	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
@@ -8515,8 +8529,11 @@ module descriptors_module
       !jpd47 trsoap
       if (allocated(W)) deallocate(W)
       if (allocated(neighbour_list)) deallocate(neighbour_list)
-      if (allocated(X_r)) deallocate(X_r)
-      if (allocated(X_i)) deallocate(X_i)
+
+      do l = 0, this%l_max
+         deallocate(X_r(l)%mm, X_i(l)%mm)
+      enddo
+      deallocate(X_r, X_i)
       if (allocated(dY_i)) then
          deallocate(dY_r, dY_i, dZ_i, dZ_r)
       endif
