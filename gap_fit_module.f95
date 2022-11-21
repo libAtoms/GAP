@@ -228,7 +228,7 @@ contains
         if (has_config_file) then
            inquire(file=config_file, exist=file_exists)
            if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
-           call read(this%config_string, config_file, keep_lf=.false., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
+           call read(this%config_string, config_file, keep_lf=.true., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
         end if
      end if
      if (.not. has_config_file) this%config_string = this%command_line
@@ -358,7 +358,7 @@ contains
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
 
-     if (.not. param_read_line(params, string(this%config_string))) then
+     if (.not. param_read_line(params, replace(string(this%config_string), quip_new_line, ' '))) then
         call system_abort('Exit: Mandatory argument(s) missing...')
      endif
 
