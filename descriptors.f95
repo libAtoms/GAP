@@ -8101,7 +8101,7 @@ module descriptors_module
          endif
 
 
-         if(my_do_grad_descriptor .and. .true.) then
+         if(my_do_grad_descriptor .and. .false.) then
 ! soap_calc 33 takes 0.047 s
 	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
 	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
