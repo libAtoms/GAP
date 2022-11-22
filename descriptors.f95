@@ -399,6 +399,7 @@ module descriptors_module
       logical :: R_mix = .false.
       logical :: sym_mix = .false.
       logical :: coupling = .false.
+      integer :: K
    endtype soap
 
 
@@ -7263,9 +7264,73 @@ module descriptors_module
 
       INIT_ERROR(error)
 
-      if (this%R_mix .and. this% Z_mix):
-         allocate(R(this%n_species*this%n_max, this%k))
-         call random_number(R)
+      allocate(W(2))
+      if (this%R_mix .and. this%Z_mix) then
+         do j = 1, 2
+            allocate(W(j)%mm(this%n_species*this%n_max, this%K))
+            if (this%sym_mix .and. j == 2) then
+               W(2)%mm = W(1)%mm
+            else
+               call random_number(W(j)%mm)
+            endif
+         enddo
+
+      elseif (this%Z_mix) then
+         do j = 1, 2
+            allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_max))
+            if (this%sym_mix .and. j == 2) then
+               W(2)%mm = W(1)%mm
+            else
+               allocate(R(this%n_species, this%K))
+               call random_number(R)
+               ir = 0
+               do is = 1, this%n_species
+                  do in = 1, this%n_max
+                     ir = ir + 1
+                     do ik = 1, this%k
+                        ic = (ik-1)*this%n_max + in
+                        W(j)%mm(ir, ic) = R(is, ik)
+                     enddo
+                  enddo
+               enddo
+               deallocate(R)
+            endif
+         enddo
+
+      elseif (this%R_mix) then
+         do j = 1, 2
+            allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_species))
+            if (this%sym_mix .and. j == 2) then
+               W(2)%mm = W(1)%mm
+            else
+               allocate(R(this%n_max, this%K))
+               call random_number(R)
+               ir = 0
+               do is = 1, this%n_species
+                  do in = 1, this%n_max
+                     ir = ir + 1
+                     do ik = 1, this%k
+                        ic = (is-1)*this%K + ik
+                        W(j)%mm(ir, ic) = R(in, ik)
+                     enddo
+                  enddo
+               enddo
+               deallocate(R)
+            endif
+         enddo
+
+      else
+         RAISE_ERROR("form_mix_W: not mixing anything", error)
+      endif
+
+      !jpd47 center the uniform random numbers on zero
+      do j = 1, 2
+         W(j)%mm = W(j)%mm - 0.5
+      enddo
+   endsubroutine form_mix_W
+
+
+
 
    subroutine form_W(this, W, sym_desc, error)
       !replacement for the old rs_index
