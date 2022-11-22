@@ -7293,15 +7293,15 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dY_r, dY_i, dZ_r, dZ_i
-      real(dp), dimension(:, :), allocatable, save :: Pl, Yl, Zl, Pl_g1, Pl_g2
+      real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2 !Yl, Zl
       integer :: ic, K1, K2, ir, ig, ik
-      integer, dimension(:, :), allocatable, save :: neighbour_list
+      !integer, dimension(:, :), allocatable, save :: neighbour_list
       real(dp) :: norm_descriptor_i2
       real(dp) :: r_tmp(3)
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
-!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Yl, Zl)
+!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2, grad_descriptor_i2)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2)
@@ -7327,14 +7327,15 @@ module descriptors_module
       call form_W(this, W, sym_desc, error)
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
-      ic = K1 + K2
-      ! print*, "K1 and K2 are", K1, K2
-      ! print*, "shape of W(1) is", SHAPE(W(1)%mm), W(1)%mm(1,1)
-      ! do ia = 1, SIZE(W(1)%mm(:,1))
-      !    do jb = 1, SIZE(W(1)%mm(1,:))
-      !       print*,"W is", ia, jb, W(1)%mm(ia, jb)
-      !    enddo
-      ! enddo
+
+      print*, "K1 and K2 are", K1, K2
+      print*, "K1 and K2 are", K1, K2
+      print*, "shape of W(1) is", SHAPE(W(1)%mm), W(1)%mm(1,1)
+      do ia = 1, SIZE(W(1)%mm(:,1))
+         do jb = 1, SIZE(W(1)%mm(1,:))
+            if (W(1)%mm(ia, jb) > 0.1 ) print*,"W is", ia, jb, W(1)%mm(ia, jb)
+         enddo
+      enddo
 
       ! print*, "shape of W(2) is", SHAPE(W(2)%mm), W(2)%mm(1,1)
       ! do ia = 1, SIZE(W(2)%mm(:,1))
@@ -7435,19 +7436,19 @@ module descriptors_module
       end do
 
       !jpd47 allocate and construct neighbour_list
-      allocate(neighbour_list(at%N, max_n_neigh+1))
-      neighbour_list = 0
-      do i = 1, at%N
-         n_i = 0
-         do n = 1, n_neighbours(at,i)
-            j = neighbour(at, i, n, distance = r_ij)
-            if( r_ij < this%cutoff ) then
-               n_i = n_i + 1
-               neighbour_list(i, n_i + 1) = n   !  (i, j+1) is index of jth neighbour within cutoff
-            endif
-         enddo
-         neighbour_list(i, 1) = n_i          !(i,1) is number of neighbours of atom i within cutoff
-      enddo
+      ! allocate(neighbour_list(at%N, max_n_neigh+1))
+      ! neighbour_list = 0
+      ! do i = 1, at%N
+      !    n_i = 0
+      !    do n = 1, n_neighbours(at,i)
+      !       j = neighbour(at, i, n, distance = r_ij)
+      !       if( r_ij < this%cutoff ) then
+      !          n_i = n_i + 1
+      !          neighbour_list(i, n_i + 1) = n   !  (i, j+1) is index of jth neighbour within cutoff
+      !       endif
+      !    enddo
+      !    neighbour_list(i, 1) = n_i          !(i,1) is number of neighbours of atom i within cutoff
+      ! enddo
 
 
 !$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh, K1, K2) private(i_species, a, l, n_i, ub, ik)
@@ -7460,10 +7461,8 @@ module descriptors_module
       allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
       allocate(X_r(0:this%l_max), X_i(0:this%l_max))
       do l = 0, this%l_max
-         allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max), X_i(l)%mm(2*l+1, this%n_species*this%n_max))
-         !jpd47 no need to zero these here? they get zero'd per atom in loop later on...
-         !X_r(l) = 0.0_dp
-         !X_i(l) = 0.0_dp
+         allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max))
+         allocate(X_i(l)%mm(2*l+1, this%n_species*this%n_max))
       enddo
       !print*, "n_max and n_species are", this%n_max, this%n_species
       !print*, "size of X_r(0) is", SIZE(X_r(0)%mm), "shape is", SHAPE(X_r(0)%mm)
@@ -7640,7 +7639,7 @@ module descriptors_module
       endif ! this%global
 
 
-!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc, W, K1, K2, neighbour_list, max_n_neigh) &
+!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc, W, K1, K2, max_n_neigh) &
 !$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs, ic, ir, ig, ik) &
 !$omp private(c_tmp, r_tmp) &
@@ -7692,8 +7691,8 @@ module descriptors_module
 
          !jpd47 zero the coefficients and initialise counter
          do l = 0, this%l_max
-            X_r(l)%mm(:,:) = 0.0_dp
-            X_i(l)%mm(:,:) = 0.0_dp
+            X_r(l)%mm = 0.0_dp
+            X_i(l)%mm = 0.0_dp
          enddo
 
          do i_species = 0, this%n_species
@@ -7887,9 +7886,26 @@ module descriptors_module
                   enddo ! m
                enddo ! l
             enddo ! a
-
          enddo ! n
 
+         !jpd47 testing loop, should only match up for nu_R=nu_S=2, matches up exactly
+         ! if (i == 1) then
+         !    n_i = 1
+         !    do l = 0, this%l_max
+         !       do ic = 1, this%n_species
+         !          do a = 1, this%n_max
+         !             ik = (ic-1)*this%n_max + a
+         !             do m = -l, l
+         !                do k = 1,3
+         !                   ir = (n_i-1)*3*(this%n_species*this%n_max) + (ik-1)*3
+         !                   !print*, "dX_r", grad_fourier_so3_r(l,a,n_i)%mm(k,m), X_r(l)%mm(m+l+1, ir+k)
+         !                   print*, "dY_r", l, ic, a, m, k, ir+k, grad_fourier_so3_r(l,a,n_i)%mm(k,m), dY_r(l)%mm(m+l+1, ir+k), dZ_r(l)%mm(m+l+1, ir+k)
+         !                enddo
+         !             enddo
+         !          enddo
+         !       enddo
+         !    enddo
+         ! endif
 
          if(this%global .and. my_do_grad_descriptor) then
             global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
@@ -8026,8 +8042,8 @@ module descriptors_module
          if (my_do_grad_descriptor) then
             allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
             do l = 0, this%l_max
-               !Pl_g1 = 0.0_dp   not needed
-               !Pl_g2 = 0.0_dp
+               Pl_g1 = 0.0_dp
+               Pl_g2 = 0.0_dp
                Pl_g1 = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), dZ_r(l)%mm) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), dZ_i(l)%mm)
                Pl_g2 = matmul(transpose(dY_r(l)%mm), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(dY_i(l)%mm), matmul(X_i(l)%mm, W(2)%mm))
                if(do_two_l_plus_one) Pl_g1 = Pl_g1 / sqrt(2.0_dp * l + 1.0_dp)
@@ -8049,8 +8065,8 @@ module descriptors_module
                      ub = K2
                      if (sym_desc) ub = ia
                      do jb = 1, ub
-                        ic = (n_i-1) * K2 * 3
-                        ir = (n_i-1) * K1 * 3
+                        ic = (n_i-1) * K2 * 3 + (jb-1) * 3
+                        ir = (n_i-1) * K1 * 3 + (ia-1) * 3
                         r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
                         if(ia /= jb .and. sym_desc ) r_tmp = r_tmp * SQRT_TWO
                         descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp
@@ -8188,13 +8204,15 @@ module descriptors_module
                      if (i == 1 .and. n_i == 1) then
                         print*, "gradients for n_i=", n_i, "are"
                         allocate(grad_descriptor_i2(d, 3))
+                        grad_descriptor_i2 = 0.0_dp
                         grad_descriptor_i2 = grad_descriptor_i / norm_descriptor_i
                         do k = 1, 3
                            grad_descriptor_i2(:, k) = grad_descriptor_i2(:, k) - descriptor_i * dot_product(descriptor_i,grad_descriptor_i(:,k)) / norm_descriptor_i**3
                         enddo
 
                         do i_pow = 1, d
-                           print*, "i_pow is", i_pow, grad_descriptor_i2(i_pow, 1), descriptor_out%x(i_desc_i)%grad_data(i_pow, 1, n_i)
+                           ! jpd47 %grad_data goes (i_pow, k, n_i)
+                           print*, "i_pow is", i_pow, grad_descriptor_i2(i_pow, 3), descriptor_out%x(i_desc_i)%grad_data(i_pow, 3, 1)
                         enddo
                         deallocate(grad_descriptor_i2)
                      endif
@@ -8295,7 +8313,33 @@ module descriptors_module
         !SPEED deallocate(grad_fourier_so3)
         if (allocated(grad_fourier_so3_r)) deallocate(grad_fourier_so3_r)
         if (allocated(grad_fourier_so3_i)) deallocate(grad_fourier_so3_i)
+
+         !jpd47 trsoap make this parallel in the future
+      if (allocated(X_r)) then
+         do l = 0, this%l_max
+            if (allocated(X_r(l)%mm)) deallocate(X_r(l)%mm)
+            if (allocated(X_i(l)%mm)) deallocate(X_i(l)%mm)
+         enddo
+         if (allocated(X_r)) deallocate(X_r)
+         if (allocated(X_i)) deallocate(X_i)
+      endif
+      if (allocated(dY_i)) then
+         do l = 0, this%l_max
+            if (allocated(dY_i(l)%mm)) deallocate(dY_i(l)%mm)
+            if (allocated(dY_r(l)%mm)) deallocate(dY_r(l)%mm)
+            if (allocated(dZ_i(l)%mm)) deallocate(dZ_i(l)%mm)
+            if (allocated(dZ_r(l)%mm)) deallocate(dZ_r(l)%mm)
+         enddo
+         if (allocated(dY_i)) deallocate(dY_i)
+         if (allocated(dY_r)) deallocate(dY_r)
+         if (allocated(dZ_i)) deallocate(dZ_i)
+         if (allocated(dZ_r)) deallocate(dZ_r)
+      endif
+
+
 !$omp end parallel
+      if (allocated(W)) deallocate(W)
+
 
       if(this%global) then
          allocate(global_fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), global_fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), &
@@ -8526,17 +8570,7 @@ module descriptors_module
       if(allocated(rs_index)) deallocate(rs_index)
       if(allocated(i_desc)) deallocate(i_desc)
       if (allocated(gs_index)) deallocate(gs_index)
-      !jpd47 trsoap
-      if (allocated(W)) deallocate(W)
-      if (allocated(neighbour_list)) deallocate(neighbour_list)
 
-      do l = 0, this%l_max
-         deallocate(X_r(l)%mm, X_i(l)%mm)
-      enddo
-      deallocate(X_r, X_i)
-      if (allocated(dY_i)) then
-         deallocate(dY_r, dY_i, dZ_i, dZ_r)
-      endif
 
 
       call system_timer('soap_calc')
