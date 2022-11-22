@@ -2510,6 +2510,7 @@ module descriptors_module
       call param_register(params, 'R_mix', 'F', this%R_mix, help_string="mix radial channels together")
       call param_register(params, 'sym_mix', 'F', this%sym_mix, help_string="symmetric mixing")
       call param_register(params, 'coupling', 'T', this%coupling, help_string="Full tensor product(=T) or Elementwise product(=F) between density channels")
+      call param_register(params, 'K', '0', this%K, help_string="Number of mixing channels to create")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -7251,6 +7252,21 @@ module descriptors_module
       enddo
    endsubroutine form_nu_W
 
+   subroutine form_mix_W(this, W, sym_desc, error)
+      !replacement for the old rs_index
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      type(real_2d), dimension(:), allocatable :: W
+      logical  :: sym_desc
+      integer  :: ik, in, ik, ic, ir, j
+      real(dp), dimension(:,:), allocatable :: R
+
+      INIT_ERROR(error)
+
+      if (this%R_mix .and. this% Z_mix):
+         allocate(R(this%n_species*this%n_max, this%k))
+         call random_number(R)
+
    subroutine form_W(this, W, sym_desc, error)
       !replacement for the old rs_index
       type(soap), intent(in) :: this
@@ -7269,8 +7285,7 @@ module descriptors_module
       endif
 
       if (this%R_mix .or. this%Z_mix .or. this%sym_mix) then
-         RAISE_ERROR("nu_mix_W routine not written yet", error)
-         !call form_mix_W(this, W, sym_desc, error)
+         call form_mix_W(this, W, sym_desc, error)
       else
          call form_nu_W(this, W, sym_desc, error)
       endif
