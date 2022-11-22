@@ -7181,7 +7181,7 @@ module descriptors_module
    endsubroutine form_gs_index
 
 
-   subroutine form_W(this, W, sym_desc, error)
+   subroutine form_nu_W(this, W, sym_desc, error)
       !replacement for the old rs_index
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
@@ -7190,10 +7190,6 @@ module descriptors_module
       logical  :: sym_desc
 
       INIT_ERROR(error)
-
-      if(.not. this%initialised) then
-         RAISE_ERROR("form_W: descriptor object not initialised", error)
-      endif
 
       if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
          RAISE_ERROR("nu_R outside allowed range of 0-2", error)
@@ -7236,7 +7232,7 @@ module descriptors_module
          endif
          allocate(W(i)%mm(this%n_max * this%n_species, K))
          W(i)%mm(:,:) = 0.0_dp
-         !loop over S and N, populating W TODO this is defintely wrong atm!!
+         !loop over S and N, populating W. 4 Loops but just looping over rows and columns of matrix
          ir = 0
          do s = 1, this%n_species
             do n = 1, this%n_max
@@ -7253,7 +7249,35 @@ module descriptors_module
          enddo
 
       enddo
+   endsubroutine form_nu_W
+
+   subroutine form_W(this, W, sym_desc, error)
+      !replacement for the old rs_index
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      type(real_2d), dimension(:), allocatable :: W
+      logical  :: sym_desc
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("form_W: descriptor object not initialised", error)
+      endif
+
+      if ((this%nu_R /= 2 .OR. this%nu_R /= 2) .and. (this%R_mix .or. this%Z_mix .or. this%sym_mix)) then
+         RAISE_ERROR("(nu_R, nu_S) = (2,2) required to use channel mixing", error)
+      endif
+
+      if (this%R_mix .or. this%Z_mix .or. this%sym_mix) then
+         RAISE_ERROR("nu_mix_W routine not written yet", error)
+         !call form_mix_W(this, W, sym_desc, error)
+      else
+         call form_nu_W(this, W, sym_desc, error)
+      endif
+
    endsubroutine form_W
+
+
 
 
 
