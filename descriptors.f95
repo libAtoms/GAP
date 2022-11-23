@@ -8158,7 +8158,10 @@ module descriptors_module
                      do ia = 1, K1
                         ub = K2
                         if (sym_desc) ub = ia
+                        a = modulo(ia, this%n_max)
                         do jb = 1, ub
+                           b = modulo(jb, this%n_max)
+                           if (this%diagonal_radial .and. a /= b) cycle
                            ic = (n_i-1) * K2 * 3 + (jb-1) * 3
                            ir = (n_i-1) * K1 * 3 + (ia-1) * 3
                            r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
