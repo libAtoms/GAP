@@ -7279,9 +7279,9 @@ module descriptors_module
             else
                do is = 1, this%n_species
                   seed = this%species_Z(is)
-                  ir = (is-1)*this%n_max+1
+                  ir = (is-1)*this%n_max
                   call random_seed(put=seed)
-                  call random_number(W(j)%mm(ir:ir+this%n_max, :))
+                  call random_number(W(j)%mm(ir+1:ir+this%n_max, :))
                enddo
             endif
          enddo
@@ -8075,6 +8075,7 @@ module descriptors_module
          if (this%coupling) then
             !jpd47 standard full tensor product coupling between density channels.
             i_pow = 0
+            allocate(Pl(K1, K2))
             do l = 0, this%l_max
                Pl = 0.0_dp
                Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
@@ -8098,7 +8099,6 @@ module descriptors_module
             deallocate(Pl)
          else
             !jpd74 elementwise coupling between density channels. For use with tensor-reduced compression.
-            i_pow = 1
             do l = 0, this%l_max
                Y_r(l)%mm = matmul(X_r(l)%mm, W(1)%mm)
                Y_i(l)%mm = matmul(X_i(l)%mm, W(1)%mm)
@@ -8109,10 +8109,10 @@ module descriptors_module
                   Z_r(l)%mm = matmul(X_r(l)%mm, W(2)%mm)
                   Z_i(l)%mm = matmul(X_i(l)%mm, W(2)%mm)
                endif
-
+               i_pow = l + 1
                do ik = 1, K1
-                  descriptor_i(i_pow) = descriptor_i(i_pow) + dot_product(Y_r(l)%mm(:, ik), Z_r(l)%mm(:, ik)) + dot_product(Y_i(l)%mm(:, ik), Z_i(l)%mm(:, ik))
-                  i_pow = i_pow + 1    !jpd47 new option so order this differently.
+                  descriptor_i(i_pow) =  dot_product(Y_r(l)%mm(:, ik), Z_r(l)%mm(:, ik)) + dot_product(Y_i(l)%mm(:, ik), Z_i(l)%mm(:, ik))
+                  i_pow = i_pow + this%l_max + 1
                enddo
             enddo
          endif
@@ -8131,43 +8131,70 @@ module descriptors_module
 
          !jpd47 new gradients calcuation
          if (my_do_grad_descriptor) then
-            allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
-            do l = 0, this%l_max
-               Pl_g1 = 0.0_dp
-               Pl_g2 = 0.0_dp
-               Pl_g1 = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), dZ_r(l)%mm) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), dZ_i(l)%mm)
-               Pl_g2 = matmul(transpose(dY_r(l)%mm), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(dY_i(l)%mm), matmul(X_i(l)%mm, W(2)%mm))
-               if(do_two_l_plus_one) Pl_g1 = Pl_g1 / sqrt(2.0_dp * l + 1.0_dp)
-               if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
+            if (this%coupling) then
+               !jpd47 gradients for full tensor product coupling
+               allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
+               do l = 0, this%l_max
+                  Pl_g1 = 0.0_dp
+                  Pl_g2 = 0.0_dp
+                  Pl_g1 = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), dZ_r(l)%mm) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), dZ_i(l)%mm)
+                  Pl_g2 = matmul(transpose(dY_r(l)%mm), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(dY_i(l)%mm), matmul(X_i(l)%mm, W(2)%mm))
+                  if(do_two_l_plus_one) Pl_g1 = Pl_g1 / sqrt(2.0_dp * l + 1.0_dp)
+                  if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
 
 
-               ! jpd47 loop over neighbour atoms "unravelling" matrix form of gradients
-               n_i = 0
-               do n = 1, n_neighbours(at,i)
-                  j = neighbour(at, i, n, distance = r_ij)
-                  if( r_ij >= this%cutoff ) cycle
-                  n_i = n_i + 1
-                  if( species_map(at%Z(j)) == 0 ) cycle
+                  ! jpd47 loop over neighbour atoms "unravelling" matrix form of gradients
+                  n_i = 0
+                  do n = 1, n_neighbours(at,i)
+                     j = neighbour(at, i, n, distance = r_ij)
+                     if( r_ij >= this%cutoff ) cycle
+                     n_i = n_i + 1
+                     if( species_map(at%Z(j)) == 0 ) cycle
 
-                  grad_descriptor_i = 0.0_dp
+                     !grad_descriptor_i = 0.0_dp
 
-                  i_pow = l + 1
-                  do ia = 1, K1
-                     ub = K2
-                     if (sym_desc) ub = ia
-                     do jb = 1, ub
-                        ic = (n_i-1) * K2 * 3 + (jb-1) * 3
-                        ir = (n_i-1) * K1 * 3 + (ia-1) * 3
-                        r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
-                        if(ia /= jb .and. sym_desc ) r_tmp = r_tmp * SQRT_TWO
+                     i_pow = l + 1
+                     do ia = 1, K1
+                        ub = K2
+                        if (sym_desc) ub = ia
+                        do jb = 1, ub
+                           ic = (n_i-1) * K2 * 3 + (jb-1) * 3
+                           ir = (n_i-1) * K1 * 3 + (ia-1) * 3
+                           r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
+                           if(ia /= jb .and. sym_desc ) r_tmp = r_tmp * SQRT_TWO
+                           descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp
+                           i_pow = i_pow + this%l_max+1
+                        enddo
+                     enddo
+                  enddo !n_i
+               enddo !l
+
+               deallocate(Pl_g1, Pl_g2)
+
+            else
+               ! jpd47 gradients for elementwise product
+
+               do l = 0, this%l_max
+                  n_i = 0
+                  do n = 1, n_neighbours(at,i)
+                     j = neighbour(at, i, n, distance = r_ij)
+                     if( r_ij >= this%cutoff ) cycle
+                     n_i = n_i + 1
+                     if( species_map(at%Z(j)) == 0 ) cycle
+
+                     i_pow = l + 1
+                     do ik = 1, K1
+                        ir = (n_i - 1) * K1 * 3 + (ik-1) * 3
+                        !jpd47 doing 3 gradient directions in one shot via matmul
+                        r_tmp = matmul(transpose(dY_r(l)%mm(:, ir+1:ir+3)), Z_r(l)%mm(:, ik)) + matmul(transpose(dY_i(l)%mm(:, ir+1:ir+3)), Z_i(l)%mm(:, ik) )
+                        r_tmp = r_tmp + matmul(transpose(dZ_r(l)%mm(:, ir+1:ir+3)), Y_r(l)%mm(:, ik) ) + matmul(transpose(dZ_i(l)%mm(:, ir+1:ir+3)), Y_i(l)%mm(:, ik) )
                         descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp
-                        i_pow = i_pow + this%l_max+1
+                        i_pow = i_pow + this%l_max + 1
                      enddo
                   enddo
-               enddo !n_i
-            enddo !l
+               enddo
 
-            deallocate(Pl_g1, Pl_g2)
+            endif
 
             !jpd47 now normalise at the end
             descriptor_out%x(i_desc_i)%grad_data(d,:,:) = 0.0_dp
@@ -8280,6 +8307,21 @@ module descriptors_module
          if (allocated(X_r)) deallocate(X_r)
          if (allocated(X_i)) deallocate(X_i)
       endif
+
+      if (allocated(Y_r)) then
+         do l = 0, this%l_max
+            if (allocated(Y_r(l)%mm)) deallocate(Y_r(l)%mm)
+            if (allocated(Y_i(l)%mm)) deallocate(Y_i(l)%mm)
+            if (allocated(Z_r(l)%mm)) deallocate(Z_r(l)%mm)
+            if (allocated(Z_i(l)%mm)) deallocate(Z_i(l)%mm)
+         enddo
+         if (allocated(Y_r)) deallocate(Y_r)
+         if (allocated(Y_i)) deallocate(Y_i)
+         if (allocated(Z_r)) deallocate(Z_r)
+         if (allocated(Z_i)) deallocate(Z_i)
+      endif
+
+
       if (allocated(dY_i)) then
          do l = 0, this%l_max
             if (allocated(dY_i(l)%mm)) deallocate(dY_i(l)%mm)
