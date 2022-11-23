@@ -2662,6 +2662,7 @@ module descriptors_module
       this%R_mix = .false.
       this%sym_mix = .false.
       this%coupling = .false.
+      this%K = 0
 
       if(allocated(this%r_basis)) deallocate(this%r_basis)
       if(allocated(this%transform_basis)) deallocate(this%transform_basis)
@@ -8061,11 +8062,7 @@ module descriptors_module
 
 
          !jpd47 new power spectrum calculation
-         allocate(Pl(K1, K2))
-         !allocate(Pl_i(K1, K2))
-
          i_pow = 0
-
          do l = 0, this%l_max
             Pl = 0.0_dp
             Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
@@ -8090,7 +8087,6 @@ module descriptors_module
          descriptor_i(d) = 0.0_dp
 
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
-         norm_descriptor_i2 = sqrt(dot_product(descriptor_i2,descriptor_i2))
 
          if(.not. this%global .and. my_do_descriptor) then
             if(this%normalise) then
@@ -8098,7 +8094,6 @@ module descriptors_module
             else
                descriptor_out%x(i_desc_i)%data = descriptor_i
             endif
-
             descriptor_out%x(i_desc_i)%data(d) = this%covariance_sigma0
          endif
 
@@ -10325,7 +10320,7 @@ module descriptors_module
    function soap_dimensions(this,error) result(i)
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
-      integer :: i, NS1, NS2
+      integer :: i, K1, K2
       logical :: sym_desc
       type(real_2d), dimension(:), allocatable :: W
 
@@ -10335,16 +10330,21 @@ module descriptors_module
          RAISE_ERROR("soap_dimensions: descriptor object not initialised", error)
       endif
 
-      ! jpd47 TODO update this to depend on the coupling + reimplement diagonal_radial
       call form_W(this, W, sym_desc, error)
+      K1 = size(W(1)%mm(0,:))
+      K2 = size(W(2)%mm(0,:))
 
-
-      NS1 = size(W(1)%mm(0,:))
-      NS2 = size(W(2)%mm(0,:))
-      if (sym_desc) then
-         i = (this%l_max+1) * (NS1 * (NS1+1)) /2 + 1
+      if (this%coupling) then
+         if (sym_desc) then
+            i = (this%l_max+1) * (K1 * (K1+1)) /2 + 1
+         else
+            i = (this%l_max+1) * K1 * K2 + 1
+         endif
       else
-         i = (this%l_max+1) * NS1 * NS2 + 1
+         if (K1 /= K2) then
+            RAISE_ERROR("require K1=K2 to use elementwise coupling", error)
+         endif
+         i = K1 * (this%l_max + 1)
       endif
 
       if (allocated(W)) deallocate(W)
