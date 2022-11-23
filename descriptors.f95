@@ -7259,8 +7259,13 @@ module descriptors_module
       integer, optional, intent(out) :: error
       type(real_2d), dimension(:), allocatable :: W
       logical  :: sym_desc
-      integer  :: ik, in, ik, ic, ir, j
+      integer  :: ik, in, is, ic, ir, j, n_seed
       real(dp), dimension(:,:), allocatable :: R
+      integer, dimension(:), allocatable  :: seed
+
+      call random_seed(size=n_seed)
+      allocate(seed(n_seed))
+      seed = 0
 
       INIT_ERROR(error)
 
@@ -7271,7 +7276,12 @@ module descriptors_module
             if (this%sym_mix .and. j == 2) then
                W(2)%mm = W(1)%mm
             else
-               call random_number(W(j)%mm)
+               do is = 1, this%n_species
+                  seed = this%species_Z(is)
+                  ir = (is-1)*this%n_max+1
+                  call random_seed(put=seed)
+                  call random_number(W(j)%mm(ir:ir+this%n_max, :))
+               enddo
             endif
          enddo
 
@@ -7282,7 +7292,12 @@ module descriptors_module
                W(2)%mm = W(1)%mm
             else
                allocate(R(this%n_species, this%K))
-               call random_number(R)
+               do is = 1, this%n_species
+                  seed = this%species_Z(is)
+                  call random_seed(put=seed)
+                  call random_number(R(is,:))
+               enddo
+
                ir = 0
                do is = 1, this%n_species
                   do in = 1, this%n_max
@@ -7304,6 +7319,8 @@ module descriptors_module
                W(2)%mm = W(1)%mm
             else
                allocate(R(this%n_max, this%K))
+               seed = this%n_max
+               call random_seed(put=seed)
                call random_number(R)
                ir = 0
                do is = 1, this%n_species
