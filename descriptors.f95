@@ -7429,7 +7429,8 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dY_r, dY_i, dZ_r, dZ_i
-      real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2 !Yl, Zl
+      type(real_2d), dimension(:), allocatable, save :: Y_r, Y_i, Z_r, Z_i
+      real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
       integer :: ic, K1, K2, ir, ig, ik
       !integer, dimension(:, :), allocatable, save :: neighbour_list
       real(dp) :: norm_descriptor_i2
@@ -7437,7 +7438,7 @@ module descriptors_module
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
-!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl)
+!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i, Z_r, Z_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2, grad_descriptor_i2)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2)
@@ -7598,6 +7599,15 @@ module descriptors_module
          allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max))
          allocate(X_i(l)%mm(2*l+1, this%n_species*this%n_max))
       enddo
+      if (.not. this%coupling) then
+         allocate(Y_r(0:this%l_max), Y_i(0:this%l_max), Z_r(0:this%l_max), Z_i(0:this%l_max))
+         do l = 0, this%l_max
+            allocate(Y_r(l)%mm(2*l+1, K1))
+            allocate(Y_i(l)%mm(2*l+1, K1))
+            allocate(Z_r(l)%mm(2*l+1, K2))
+            allocate(Z_i(l)%mm(2*l+1, K2))
+         enddo
+      endif
       !print*, "n_max and n_species are", this%n_max, this%n_species
       !print*, "size of X_r(0) is", SIZE(X_r(0)%mm), "shape is", SHAPE(X_r(0)%mm)
 
@@ -8062,28 +8072,50 @@ module descriptors_module
 
 
          !jpd47 new power spectrum calculation
-         i_pow = 0
-         do l = 0, this%l_max
-            Pl = 0.0_dp
-            Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
-            if(do_two_l_plus_one) Pl = Pl / sqrt(2.0_dp * l + 1.0_dp)
+         if (this%coupling) then
+            !jpd47 standard full tensor product coupling between density channels.
+            i_pow = 0
+            do l = 0, this%l_max
+               Pl = 0.0_dp
+               Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
+               if(do_two_l_plus_one) Pl = Pl / sqrt(2.0_dp * l + 1.0_dp)
 
-            ! jpd47 unpack l-slice
-            i_pow = l + 1
-            do ia = 1, K1
-               ub = K2
-               if (sym_desc) then
-                  ub = ia
-               endif
-               do jb = 1, ub
-                  descriptor_i(i_pow) = Pl(ia, jb)
-                  !print*, "i_pow and element is", i_pow, Pl(ia, jb)
-                  if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
-                  i_pow = i_pow + this%l_max+1
+               ! jpd47 unpack l-slice
+               i_pow = l + 1
+               do ia = 1, K1
+                  ub = K2
+                  if (sym_desc) then
+                     ub = ia
+                  endif
+                  do jb = 1, ub
+                     descriptor_i(i_pow) = Pl(ia, jb)
+                     !print*, "i_pow and element is", i_pow, Pl(ia, jb)
+                     if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                     i_pow = i_pow + this%l_max+1
+                  enddo
                enddo
             enddo
-         enddo
-         deallocate(Pl)
+            deallocate(Pl)
+         else
+            !jpd74 elementwise coupling between density channels. For use with tensor-reduced compression.
+            i_pow = 1
+            do l = 0, this%l_max
+               Y_r(l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+               Y_i(l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+               if (this%sym_mix) then
+                  Z_r(l)%mm = Y_r(l)%mm
+                  Z_i(l)%mm = Y_i(l)%mm
+               else
+                  Z_r(l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                  Z_i(l)%mm = matmul(X_i(l)%mm, W(2)%mm)
+               endif
+
+               do ik = 1, K1
+                  descriptor_i(i_pow) = descriptor_i(i_pow) + dot_product(Y_r(l)%mm(:, ik), Z_r(l)%mm(:, ik)) + dot_product(Y_i(l)%mm(:, ik), Z_i(l)%mm(:, ik))
+                  i_pow = i_pow + 1    !jpd47 new option so order this differently.
+               enddo
+            enddo
+         endif
          descriptor_i(d) = 0.0_dp
 
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
@@ -10344,7 +10376,7 @@ module descriptors_module
          if (K1 /= K2) then
             RAISE_ERROR("require K1=K2 to use elementwise coupling", error)
          endif
-         i = K1 * (this%l_max + 1)
+         i = K1 * (this%l_max + 1) + 1
       endif
 
       if (allocated(W)) deallocate(W)
