@@ -8088,13 +8088,16 @@ module descriptors_module
                   if (sym_desc) then
                      ub = ia
                   endif
+                  a = modulo(ia, this%n_max)
                   do jb = 1, ub
+                     b = modulo(jb, this%n_max)
+                     if (this%diagonal_radial .and. a /= b) cycle
                      descriptor_i(i_pow) = Pl(ia, jb)
-                     !print*, "i_pow and element is", i_pow, Pl(ia, jb)
                      if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
                      i_pow = i_pow + this%l_max+1
                   enddo
                enddo
+
             enddo
             deallocate(Pl)
          else
@@ -8150,8 +8153,6 @@ module descriptors_module
                      if( r_ij >= this%cutoff ) cycle
                      n_i = n_i + 1
                      if( species_map(at%Z(j)) == 0 ) cycle
-
-                     !grad_descriptor_i = 0.0_dp
 
                      i_pow = l + 1
                      do ia = 1, K1
@@ -10408,7 +10409,12 @@ module descriptors_module
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
 
-      if (this%coupling) then
+      if (this%diagonal_radial) then
+         if (this%Z_mix .or. this%R_mix .or. this%nu_R /= 2 .or. this%nu_S /= 2 .or. (.not. this%coupling)) then
+            RAISE_ERROR("soap_dimensions: can't combine diagonal radial with any other compression strategies", error)
+         endif
+         i = (this%l_max+1) * this%n_max * this%n_species * (this%n_species+1) / 2 + 1
+      elseif (this%coupling) then
          if (sym_desc) then
             i = (this%l_max+1) * (K1 * (K1+1)) /2 + 1
          else
