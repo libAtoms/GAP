@@ -7976,66 +7976,38 @@ module descriptors_module
                enddo
             enddo
 
+            ! jpd47 This is massive bottlneck in code ~93% of time is spent here for nu_r, nu_S = 1,1 Grad=T
+            ! 94% for nu_R, nu_S = 0,0, down to 50% for nu_r, nu_S = (2,2) (because forming power spec gradients takes sooo much longer)
+            ! 90% for K=50 coupling=F. FOCUS ON THIS FIRST!!
             call cpu_time(sc_times(12))
-
-            do a = 0, this%n_max
+            do a = 1, this%n_max
                do l = 0, this%l_max
                   do m = -l, l
-                     !SPEED fourier_so3(l,a,i_species)%m(m) = fourier_so3(l,a,i_species)%m(m) + radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
-                     !SPEED if(my_do_grad_descriptor) grad_fourier_so3(l,a,n_i)%mm(:,m) = grad_fourier_so3(l,a,n_i)%mm(:,m) + &
-                     !SPEED    grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
+                     c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
+                     ic = (i_species-1) * this%n_max + a
+                     X_r(l)%mm(m+l+1, ic) = X_r(l)%mm(m+l+1, ic ) + real(c_tmp(1))
+                     X_i(l)%mm(m+l+1, ic) = X_i(l)%mm(m+l+1, ic) + aimag(c_tmp(1))
 
-                     if (a==0) then
-                        c_tmp(1) = f_cut * SphericalY_ij(l)%m(m)
-                     else
-                        c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
-
-                     endif
-
-                     fourier_so3_r(l,a,i_species)%m(m) = fourier_so3_r(l,a,i_species)%m(m) + real(c_tmp(1))
-                     fourier_so3_i(l,a,i_species)%m(m) = fourier_so3_i(l,a,i_species)%m(m) + aimag(c_tmp(1))
-                     fourier_so3_r(l,a,0)%m(m) = fourier_so3_r(l,a,0)%m(m) + real(c_tmp(1))
-                     fourier_so3_i(l,a,0)%m(m) = fourier_so3_i(l,a,0)%m(m) + aimag(c_tmp(1))
-
-                     !jpd47 new
-                     if (a > 0) then
-                        ic = (i_species-1) * this%n_max + a
-                        X_r(l)%mm(m+l+1, ic) = X_r(l)%mm(m+l+1, ic ) + real(c_tmp(1))
-                        X_i(l)%mm(m+l+1, ic) = X_i(l)%mm(m+l+1, ic) + aimag(c_tmp(1))
-                     endif
-
+                     !jpd47 this bit is 150x slower than the top bit for K=50 (150=3*50...)
+                     !jpd47 K=100 with sym_mix=T, takes 5.41s, above takes 2.05 * 1e-2
+                     !jpd47 2.06 seconds for regular nu_R, nu_S = 2 with total soap_calc taking 3.92s
                      if(my_do_grad_descriptor) then
-                        if (a==0) then
-                           c_tmp(:) = df_cut * SphericalY_ij(l)%m(m) * u_ij(:) + &
-                                       f_cut * grad_SphericalY_ij(l)%mm(:,m)
+                        c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + &
+                                 radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
 
-                        else
-                           c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + &
-                                   radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
-                        endif
-                        ! grad_fourier_so3_r(l,a,n_i)%mm(:,m) = grad_fourier_so3_r(l,a,n_i)%mm(:,m) + real(c_tmp)
-                        ! grad_fourier_so3_i(l,a,n_i)%mm(:,m) = grad_fourier_so3_i(l,a,n_i)%mm(:,m) + imag(c_tmp)
-
-                        grad_fourier_so3_r(l,a,n_i)%mm(:,m) = real(c_tmp)
-                        grad_fourier_so3_i(l,a,n_i)%mm(:,m) = aimag(c_tmp)
-                        if (a > 0) then
-                           ! jpd47 effectively doing dY = dX.W and dZ = dX.Q here rather than later on as it would be a very sparse matmul later on
-                           ! jpd47 TODO can this be improved in a neat/clean way??
-                           ! re-order loops to cast this as a matmul somehow??
-                           ic = (i_species-1) * this%n_max + a
-                           do ik = 1, K1
-                              ir = (n_i-1) * 3 * K1 + (ik-1)*3
-                              dY_r(l)%mm(m+l+1, ir+1:ir+3) = dY_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(1)%mm(ic,ik)
-                              dY_i(l)%mm(m+l+1, ir+1:ir+3) = dY_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(1)%mm(ic,ik)
-                           enddo
-                           do ik = 1, K2
-                              ir = (n_i-1) * 3 * K2 + (ik-1)*3
-                              dZ_r(l)%mm(m+l+1, ir+1:ir+3) = dZ_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(2)%mm(ic,ik)
-                              dZ_i(l)%mm(m+l+1, ir+1:ir+3) = dZ_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(2)%mm(ic,ik)
-                           enddo
-
-                        endif
+                        ic = (i_species-1) * this%n_max + a
+                        do ik = 1, K1
+                           ir = (n_i-1) * 3 * K1 + (ik-1)*3
+                           dY_r(l)%mm(m+l+1, ir+1:ir+3) = dY_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(1)%mm(ic,ik)
+                           dY_i(l)%mm(m+l+1, ir+1:ir+3) = dY_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(1)%mm(ic,ik)
+                        enddo
+                        do ik = 1, K2
+                           ir = (n_i-1) * 3 * K2 + (ik-1)*3
+                           dZ_r(l)%mm(m+l+1, ir+1:ir+3) = dZ_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(2)%mm(ic,ik)
+                           dZ_i(l)%mm(m+l+1, ir+1:ir+3) = dZ_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(2)%mm(ic,ik)
+                        enddo
                      endif ! my_do_grad_descriptor
+
                   enddo ! m
                enddo ! l
             enddo ! a
