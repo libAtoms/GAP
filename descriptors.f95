@@ -7214,6 +7214,8 @@ module descriptors_module
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
 
+      real, dimension(0:20) :: sc_times
+
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i)
@@ -7222,6 +7224,8 @@ module descriptors_module
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
 
       INIT_ERROR(error)
+      sc_times = 0.0
+      call cpu_time(sc_times(0))
 
       call system_timer('soap_calc')
 
@@ -7489,6 +7493,7 @@ module descriptors_module
       endif ! this%global
 
 
+      call cpu_time(sc_times(1))
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
 !$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
@@ -7502,7 +7507,7 @@ module descriptors_module
 
 
       do i = 1, at%N
-
+         call cpu_time(sc_times(3))
          if(i_desc(i) == 0) then
             cycle
          else
@@ -7569,6 +7574,8 @@ module descriptors_module
 
             i_species = species_map(at%Z(j))
             if( i_species == 0 ) cycle
+
+            call cpu_time(sc_times(11))
 
             if(.not. this%global .and. my_do_grad_descriptor) then
                descriptor_out%x(i_desc_i)%ii(n_i) = j
@@ -7646,7 +7653,7 @@ module descriptors_module
                enddo
             enddo
 
-
+            call cpu_time(sc_times(12))
             do a = 0, this%n_max
                do l = 0, this%l_max
                   do m = -l, l
@@ -7685,7 +7692,9 @@ module descriptors_module
                   enddo ! m
                enddo ! l
             enddo ! a
-
+            call cpu_time(sc_times(13))
+            sc_times(14) = sc_times(14) + sc_times(12) - sc_times(11)
+            sc_times(15) = sc_times(15) + sc_times(13) - sc_times(12)
          enddo ! n
 
 
@@ -7716,7 +7725,9 @@ module descriptors_module
             enddo
          endif
 
-
+         call cpu_time(sc_times(4))
+         sc_times(5) = sc_times(5) + sc_times(4) - sc_times(3)
+         call cpu_time(sc_times(6))
          i_pow = 0
          do ia = 1, size(gs_index(1)%mm(:,0))
             a = gs_index(1)%mm(ia,2)
@@ -7758,7 +7769,7 @@ module descriptors_module
             descriptor_out%x(i_desc_i)%data(d) = this%covariance_sigma0
          endif
 
-
+         call cpu_time(sc_times(7))
          if(my_do_grad_descriptor) then
 ! soap_calc 33 takes 0.047 s
 	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
@@ -7877,9 +7888,23 @@ module descriptors_module
 
          endif
 
+         call cpu_time(sc_times(8))
+         sc_times(9) = sc_times(9) + sc_times(7)-sc_times(6)
+         sc_times(10) = sc_times(10) + sc_times(8) - sc_times(7)
+
       enddo ! i
 !$omp end parallel do
 
+      print*, "jpd47_timings: (5) total coefficients and gradients took", sc_times(5)
+      print*, "jpd47_timings: (14) geometry for coefs and gradients took", sc_times(14)
+      print*, "jpd47_timings: (15) packing and operating on coefs and gradients took", sc_times(15)
+      print*, "jpd47_timings: (9) assembling power spectrum took", sc_times(9)
+      print*, "jpd47_timings: (10) assembling gradients took", sc_times(10)
+
+
+      call cpu_time(sc_times(2))
+      print*, "jpd47_timings: (2-1) looping over atoms took", sc_times(2)-sc_times(1)
+      sc_times(1) = sc_times(2)
       !SPEED if(allocated(fourier_so3)) then
       !SPEED    do i_species = 1, this%n_species
       !SPEED       do a = lbound(fourier_so3,2), ubound(fourier_so3,2)
@@ -8187,6 +8212,9 @@ module descriptors_module
       if (allocated(gs_index)) deallocate(gs_index)
 
       call system_timer('soap_calc')
+
+      call cpu_time(sc_times(2))
+      print*, "jpd47_timings: in total soap_calc took", sc_times(2)-sc_times(0)
 
    endsubroutine soap_calc
 
