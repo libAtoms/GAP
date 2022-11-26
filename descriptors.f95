@@ -7466,7 +7466,7 @@ module descriptors_module
       call cpu_time(sc_times(1))
       call form_W(this, W, sym_desc, error)
       call cpu_time(sc_times(2))
-      print*, "jpd47_timings: form_W took", sc_times(2)-sc_times(1)
+      !print*, "jpd47_timings: form_W took", sc_times(2)-sc_times(1)
 
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
@@ -7592,7 +7592,7 @@ module descriptors_module
       ! enddo
 
       call cpu_time(sc_times(2))
-      print*, "jpd47_timings: pre allocation has taken", sc_times(2)-sc_times(0)
+      !print*, "jpd47_timings: pre allocation has taken", sc_times(2)-sc_times(0)
       sc_times(1) = sc_times(2)
 
 !$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh, K1, K2) private(i_species, a, l, n_i, ub, ik)
@@ -7683,7 +7683,7 @@ module descriptors_module
       endif
 !$omp end parallel
       call cpu_time(sc_times(2))
-      print*, "jpd47_timings: initial allocation took", sc_times(2)-sc_times(1)
+      !print*, "jpd47_timings: initial allocation took", sc_times(2)-sc_times(1)
       sc_times(1) = sc_times(2)
 
       i_desc = 0
@@ -7794,7 +7794,7 @@ module descriptors_module
          global_fourier_so3_i_array = 0.0_dp
       endif ! this%global
       call cpu_time(sc_times(2))
-      print*, "jpd47_timings: second round of allocations took", sc_times(2)-sc_times(1)
+      !print*, "jpd47_timings: second round of allocations took", sc_times(2)-sc_times(1)
       sc_times(1) = sc_times(2)
 
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc, W, K1, K2, max_n_neigh) &
@@ -8074,6 +8074,9 @@ module descriptors_module
             allocate(Pl(K1, K2))
             do l = 0, this%l_max
                Pl = 0.0_dp
+               !jpd47 TODO
+               !1- store XW(1) and XW(2), if (2) is required here. Can be used later on
+               !2 - could use a BLAS call here if required but leave that for later.
                Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
                if(do_two_l_plus_one) Pl = Pl / sqrt(2.0_dp * l + 1.0_dp)
 
