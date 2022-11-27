@@ -7429,7 +7429,7 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dY_r, dY_i, dZ_r, dZ_i
-      type(real_2d), dimension(:), allocatable, save :: Y_r, Y_i, Z_r, Z_i
+      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i
       real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
       integer :: ic, K1, K2, ir, ig, ik
       !integer, dimension(:, :), allocatable, save :: neighbour_list
@@ -7439,7 +7439,7 @@ module descriptors_module
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
-!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i, Z_r, Z_i)
+!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2, grad_descriptor_i2)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2)
@@ -7608,15 +7608,16 @@ module descriptors_module
          allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max))
          allocate(X_i(l)%mm(2*l+1, this%n_species*this%n_max))
       enddo
-      if (.not. this%coupling) then
-         allocate(Y_r(0:this%l_max), Y_i(0:this%l_max), Z_r(0:this%l_max), Z_i(0:this%l_max))
-         do l = 0, this%l_max
-            allocate(Y_r(l)%mm(2*l+1, K1))
-            allocate(Y_i(l)%mm(2*l+1, K1))
-            allocate(Z_r(l)%mm(2*l+1, K2))
-            allocate(Z_i(l)%mm(2*l+1, K2))
-         enddo
-      endif
+
+
+      allocate(Y_r(2, 0:this%l_max), Y_i(2, 0:this%l_max))
+      do l = 0, this%l_max
+         allocate(Y_r(1, l)%mm(2*l+1, K1))
+         allocate(Y_i(1, l)%mm(2*l+1, K1))
+         allocate(Y_r(2, l)%mm(2*l+1, K2))
+         allocate(Y_i(2, l)%mm(2*l+1, K2))
+      enddo
+
       !print*, "n_max and n_species are", this%n_max, this%n_species
       !print*, "size of X_r(0) is", SIZE(X_r(0)%mm), "shape is", SHAPE(X_r(0)%mm)
 
@@ -8077,7 +8078,17 @@ module descriptors_module
                !jpd47 TODO
                !1- store XW(1) and XW(2), if (2) is required here. Can be used later on
                !2 - could use a BLAS call here if required but leave that for later.
-               Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
+               Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+               Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+               if (sym_desc) then
+                  Y_r(2, l)%mm = Y_r(1, l)%mm
+                  Y_i(2, l)%mm = Y_i(1, l)%mm
+               else
+                  Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                  Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
+               endif
+               !Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
+               Pl = matmul(transpose(Y_r(1, l)%mm), Y_r(2, l)%mm) + matmul(transpose(Y_i(1, l)%mm), Y_i(2, l)%mm)
                if(do_two_l_plus_one) Pl = Pl / sqrt(2.0_dp * l + 1.0_dp)
 
                ! jpd47 unpack l-slice
@@ -8102,18 +8113,18 @@ module descriptors_module
          else
             !jpd74 elementwise coupling between density channels. For use with tensor-reduced compression.
             do l = 0, this%l_max
-               Y_r(l)%mm = matmul(X_r(l)%mm, W(1)%mm)
-               Y_i(l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+               Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+               Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
                if (this%sym_mix) then
-                  Z_r(l)%mm = Y_r(l)%mm
-                  Z_i(l)%mm = Y_i(l)%mm
+                  Y_r(2, l)%mm = Y_r(1, l)%mm
+                  Y_i(2, l)%mm = Y_i(2, l)%mm
                else
-                  Z_r(l)%mm = matmul(X_r(l)%mm, W(2)%mm)
-                  Z_i(l)%mm = matmul(X_i(l)%mm, W(2)%mm)
+                  Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                  Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
                endif
                i_pow = l + 1
                do ik = 1, K1
-                  descriptor_i(i_pow) =  dot_product(Y_r(l)%mm(:, ik), Z_r(l)%mm(:, ik)) + dot_product(Y_i(l)%mm(:, ik), Z_i(l)%mm(:, ik))
+                  descriptor_i(i_pow) =  dot_product(Y_r(1, l)%mm(:, ik), Y_r(2, l)%mm(:, ik)) + dot_product(Y_i(1, l)%mm(:, ik), Y_i(2, l)%mm(:, ik))
                   i_pow = i_pow + this%l_max + 1
                enddo
             enddo
@@ -8140,12 +8151,18 @@ module descriptors_module
                do l = 0, this%l_max
                   Pl_g1 = 0.0_dp
                   Pl_g2 = 0.0_dp
-                  Pl_g1 = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), dZ_r(l)%mm) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), dZ_i(l)%mm)
-                  Pl_g2 = matmul(transpose(dY_r(l)%mm), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(dY_i(l)%mm), matmul(X_i(l)%mm, W(2)%mm))
+                  !Pl_g1 = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), dZ_r(l)%mm) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), dZ_i(l)%mm)
+                  !Pl_g2 = matmul(transpose(dY_r(l)%mm), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(dY_i(l)%mm), matmul(X_i(l)%mm, W(2)%mm))
+                  Pl_g1 = matmul(transpose(Y_r(1, l)%mm), dZ_r(l)%mm) + matmul(transpose(Y_i(1,l)%mm), dZ_i(l)%mm)
+                  if (sym_desc) then
+                     Pl_g2 = transpose(Pl_g1)
+                  else
+                     Pl_g2 = matmul(transpose(dY_r(l)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(l)%mm), Y_i(2,l)%mm)
+                  endif
                   if(do_two_l_plus_one) Pl_g1 = Pl_g1 / sqrt(2.0_dp * l + 1.0_dp)
                   if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
 
-
+                  call cpu_time(sc_times(18))
                   ! jpd47 loop over neighbour atoms "unravelling" matrix form of gradients
                   n_i = 0
                   do n = 1, n_neighbours(at,i)
@@ -8171,6 +8188,8 @@ module descriptors_module
                         enddo
                      enddo
                   enddo !n_i
+                  call cpu_time(sc_times(19))
+                  sc_times(20) = sc_times(20) + sc_times(19) - sc_times(18)
                enddo !l
 
                deallocate(Pl_g1, Pl_g2)
@@ -8190,8 +8209,8 @@ module descriptors_module
                      do ik = 1, K1
                         ir = (n_i - 1) * K1 * 3 + (ik-1) * 3
                         !jpd47 doing 3 gradient directions in one shot via matmul
-                        r_tmp = matmul(transpose(dY_r(l)%mm(:, ir+1:ir+3)), Z_r(l)%mm(:, ik)) + matmul(transpose(dY_i(l)%mm(:, ir+1:ir+3)), Z_i(l)%mm(:, ik) )
-                        r_tmp = r_tmp + matmul(transpose(dZ_r(l)%mm(:, ir+1:ir+3)), Y_r(l)%mm(:, ik) ) + matmul(transpose(dZ_i(l)%mm(:, ir+1:ir+3)), Y_i(l)%mm(:, ik) )
+                        r_tmp = matmul(transpose(dY_r(l)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik)) + matmul(transpose(dY_i(l)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
+                        r_tmp = r_tmp + matmul(transpose(dZ_r(l)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik) ) + matmul(transpose(dZ_i(l)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
                         descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp
                         i_pow = i_pow + this%l_max + 1
                      enddo
@@ -8234,7 +8253,7 @@ module descriptors_module
       print*, "jpd47_timings: (15) packing and operating on coefs and gradients took", sc_times(15)
       print*, "jpd47_timings: (9) assembling power spectrum took", sc_times(9)
       print*, "jpd47_timings: (10) assembling gradients took", sc_times(10)
-
+      print*, "jpd47_timings: (20) unpacking gradients took", sc_times(20)
 
       call cpu_time(sc_times(2))
       print*, "jpd47_timings: (2-1) looping over atoms took", sc_times(2)-sc_times(1)
@@ -8249,7 +8268,6 @@ module descriptors_module
       !SPEED    enddo
       !SPEED    deallocate(fourier_so3)
       !SPEED endif
-
 
 !$omp parallel default(none) shared(this, max_n_neigh) private(i_species, a, l, n_i, ub)
       if(allocated(fourier_so3_r)) then
@@ -8327,16 +8345,14 @@ module descriptors_module
       endif
 
       if (allocated(Y_r)) then
-         do l = 0, this%l_max
-            if (allocated(Y_r(l)%mm)) deallocate(Y_r(l)%mm)
-            if (allocated(Y_i(l)%mm)) deallocate(Y_i(l)%mm)
-            if (allocated(Z_r(l)%mm)) deallocate(Z_r(l)%mm)
-            if (allocated(Z_i(l)%mm)) deallocate(Z_i(l)%mm)
+         do k = 1, 2
+            do l = 0, this%l_max
+               if (allocated(Y_r(k, l)%mm)) deallocate(Y_r(k, l)%mm)
+               if (allocated(Y_i(k, l)%mm)) deallocate(Y_i(k, l)%mm)
+            enddo
          enddo
          if (allocated(Y_r)) deallocate(Y_r)
          if (allocated(Y_i)) deallocate(Y_i)
-         if (allocated(Z_r)) deallocate(Z_r)
-         if (allocated(Z_i)) deallocate(Z_i)
       endif
 
 
