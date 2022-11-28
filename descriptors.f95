@@ -7429,20 +7429,21 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dY_r, dY_i, dZ_r, dZ_i
-      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i
+      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dX_i, dX_r
       real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
       integer :: ic, K1, K2, ir, ig, ik
       !integer, dimension(:, :), allocatable, save :: neighbour_list
       real(dp) :: norm_descriptor_i2, tlpo
       real(dp) :: r_tmp(3)
       real, dimension(0:20) :: sc_times
+      complex(dp), dimension(:), allocatable, save :: l_tmp
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2, grad_descriptor_i2)
-!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2)
+!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2, l_tmp)
 
       INIT_ERROR(error)
       sc_times = 0.0
@@ -7470,6 +7471,7 @@ module descriptors_module
 
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
+
 
       ! print*, "K1 and K2 are", K1, K2
       ! print*, "K1 and K2 are", K1, K2
@@ -7604,6 +7606,7 @@ module descriptors_module
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
       allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
       allocate(X_r(0:this%l_max), X_i(0:this%l_max))
+      allocate(l_tmp(1:2*this%l_max + 1))
       do l = 0, this%l_max
          allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max))
          allocate(X_i(l)%mm(2*l+1, this%n_species*this%n_max))
@@ -7651,26 +7654,10 @@ module descriptors_module
       enddo
 
       if (my_do_grad_descriptor) then
-          !SPEED allocate( grad_fourier_so3(0:this%l_max,this%n_max,n_neighbours(at,i,max_dist=this%cutoff)) )
-         !  allocate( grad_fourier_so3_r(0:this%l_max,0:this%n_max,max_n_neigh) )
-         !  allocate( grad_fourier_so3_i(0:this%l_max,0:this%n_max,max_n_neigh) )
-         !  do n_i=1, max_n_neigh
-         !      do a = 0, this%n_max
-         !          do l = 0, this%l_max
-         !             !SPEED allocate(grad_fourier_so3(l,a,n_i)%mm(3,-l:l))
-         !             !SPEED grad_fourier_so3(l,a,n_i)%mm(:,:) = CPLX_ZERO
-         !             allocate(grad_fourier_so3_r(l,a,n_i)%mm(3,-l:l))
-         !             allocate(grad_fourier_so3_i(l,a,n_i)%mm(3,-l:l))
-         !          end do
-         !      end do
-         !  end do
          allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
 
           ! jpd47 allocate new grad storage
           allocate(dY_r(0:this%l_max), dY_i(0:this%l_max), dZ_r(0:this%l_max), dZ_i(0:this%l_max) )
-          !print*, "allocating gradients, max_n_neigh is", max_n_neigh
-          !l = K1 + K2
-          !print*, "K1 and K2 are", K1, K2
           do l = 0, this%l_max
             allocate(dY_r(l)%mm(2*l+1, 3*max_n_neigh*K1))
             allocate(dY_i(l)%mm(2*l+1, 3*max_n_neigh*K1))
@@ -7678,9 +7665,12 @@ module descriptors_module
             allocate(dZ_i(l)%mm(2*l+1, 3*max_n_neigh*K2))
           enddo
 
-          !do l = 0, this%l_max
-          !  print*, "shape of gradients is", SHAPE(dY_r(l)%mm)
-          !enddo
+          allocate(dX_r(0:2, 0:this%l_max), dX_i(0:2, 0:this%l_max))
+          do l = 0, this%l_max
+            allocate(dX_r(0, l)%mm(2*l+1, this%n_max), dX_i(0, l)%mm(2*l+1, this%n_max))
+            allocate(dX_r(1, l)%mm(2*l+1, K1), dX_i(1, l)%mm(2*l+1, K1))
+            allocate(dX_r(2, l)%mm(2*l+1, K2), dX_i(2, l)%mm(2*l+1, K2))
+          enddo
 
       endif
 !$omp end parallel
@@ -7982,37 +7972,88 @@ module descriptors_module
             ! 94% for nu_R, nu_S = 0,0, down to 50% for nu_r, nu_S = (2,2) (because forming power spec gradients takes sooo much longer)
             ! 90% for K=50 coupling=F. FOCUS ON THIS FIRST!!
             call cpu_time(sc_times(12))
-            do a = 1, this%n_max
-               do l = 0, this%l_max
-                  do m = -l, l
-                     c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
-                     ic = (i_species-1) * this%n_max + a
-                     X_r(l)%mm(m+l+1, ic) = X_r(l)%mm(m+l+1, ic ) + real(c_tmp(1))
-                     X_i(l)%mm(m+l+1, ic) = X_i(l)%mm(m+l+1, ic) + aimag(c_tmp(1))
+            ! do a = 1, this%n_max
+            !    do l = 0, this%l_max
+            !       do m = -l, l
+            !          c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
+            !          ic = (i_species-1) * this%n_max + a
+            !          X_r(l)%mm(m+l+1, ic) = X_r(l)%mm(m+l+1, ic ) + real(c_tmp(1))
+            !          X_i(l)%mm(m+l+1, ic) = X_i(l)%mm(m+l+1, ic) + aimag(c_tmp(1))
 
-                     !jpd47 this bit is 150x slower than the top bit for K=50 (150=3*50...)
-                     !jpd47 K=100 with sym_mix=T, takes 5.41s, above takes 2.05 * 1e-2
-                     !jpd47 2.06 seconds for regular nu_R, nu_S = 2 with total soap_calc taking 3.92s
-                     if(my_do_grad_descriptor) then
-                        c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + &
-                                 radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
+            !          !jpd47 this bit is 150x slower than the top bit for K=50 (150=3*50...)
+            !          !jpd47 K=100 with sym_mix=T, takes 5.41s, above takes 2.05 * 1e-2
+            !          !jpd47 2.06 seconds for regular nu_R, nu_S = 2 with total soap_calc taking 3.92s
+            !          if(my_do_grad_descriptor) then
+            !             c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + &
+            !                      radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
 
-                        ic = (i_species-1) * this%n_max + a
+            !             ic = (i_species-1) * this%n_max + a
+            !             do ik = 1, K1
+            !                ir = (n_i-1) * 3 * K1 + (ik-1)*3
+            !                dY_r(l)%mm(m+l+1, ir+1:ir+3) = dY_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(1)%mm(ic,ik)
+            !                dY_i(l)%mm(m+l+1, ir+1:ir+3) = dY_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(1)%mm(ic,ik)
+            !             enddo
+            !             do ik = 1, K2
+            !                ir = (n_i-1) * 3 * K2 + (ik-1)*3
+            !                dZ_r(l)%mm(m+l+1, ir+1:ir+3) = dZ_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(2)%mm(ic,ik)
+            !                dZ_i(l)%mm(m+l+1, ir+1:ir+3) = dZ_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(2)%mm(ic,ik)
+            !             enddo
+            !          endif ! my_do_grad_descriptor
+
+            !       enddo ! m
+            !    enddo ! l
+            ! enddo ! a
+
+            do l = 0, this%l_max
+               do a = 1, this%n_max
+                  !do m = -l, l
+                  ic = (i_species-1) * this%n_max + a
+                  l_tmp(1:2*l+1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(:)
+                  X_r(l)%mm(:, ic) = X_r(l)%mm(:, ic ) + real(l_tmp(1:2*l+1))
+                  X_i(l)%mm(:, ic) = X_i(l)%mm(:, ic) + aimag(l_tmp(1:2*l+1))
+               enddo ! a
+            enddo ! l
+
+
+            if(my_do_grad_descriptor) then
+               do k = 1, 3
+                  do l = 0, this%l_max
+                     !jpd47 this could be updated with a BLAS dger
+                     do a = 1, this%n_max
+                        l_tmp(1:2*l+1) =  grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(:) * u_ij(k) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(k,:)
+                        dX_r(0, l)%mm(:, a) =  real(l_tmp(1:2*l+1))
+                        dX_i(0, l)%mm(:, a) = aimag(l_tmp(1:2*l+1))
+                     enddo ! a
+
+                     ! jpd47 TODO must repeat next two sections IF not symmetric
+                     ! jpd47 could be replaced with BLAS dgemm
+                     ic = (i_species-1) * this%n_max
+                     do ia = 1, 2
+                        if (sym_desc .and. ia == 1) cycle
+                        dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                     enddo
+                     ! jpd47 package coefficients
+                     do ik = 1, K2
+                        ir = (n_i-1) * 3 * K2 + (ik-1)*3 + k
+                        dZ_r(l)%mm(:, ir) = dX_r(2, l)%mm(:, ik)
+                        dZ_i(l)%mm(:, ir) = dX_i(2, l)%mm(:, ik)
+                     enddo
+
+                     ! jpd47 package coefficients
+                     if (.not. sym_desc) then
                         do ik = 1, K1
-                           ir = (n_i-1) * 3 * K1 + (ik-1)*3
-                           dY_r(l)%mm(m+l+1, ir+1:ir+3) = dY_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(1)%mm(ic,ik)
-                           dY_i(l)%mm(m+l+1, ir+1:ir+3) = dY_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(1)%mm(ic,ik)
+                           ir = (n_i-1) * 3 * K1 + (ik-1)*3 + k
+                           dY_r(l)%mm(:, ir) = dX_r(1, l)%mm(:, ik)
+                           dY_i(l)%mm(:, ir) = dX_i(1, l)%mm(:, ik)
                         enddo
-                        do ik = 1, K2
-                           ir = (n_i-1) * 3 * K2 + (ik-1)*3
-                           dZ_r(l)%mm(m+l+1, ir+1:ir+3) = dZ_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(2)%mm(ic,ik)
-                           dZ_i(l)%mm(m+l+1, ir+1:ir+3) = dZ_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(2)%mm(ic,ik)
-                        enddo
-                     endif ! my_do_grad_descriptor
+                     endif
 
-                  enddo ! m
-               enddo ! l
-            enddo ! a
+                  enddo ! l
+               enddo ! k
+            endif ! my_do_grad_descriptor
+
+
             call cpu_time(sc_times(13))
             sc_times(14) = sc_times(14) + sc_times(12) - sc_times(11)
             sc_times(15) = sc_times(15) + sc_times(13) - sc_times(12)
@@ -8156,16 +8197,11 @@ module descriptors_module
                   if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                   call dgemm('T','N', K1, 3 * max_n_neigh * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dZ_r(l)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
                   call dgemm('T','N', K1, 3 * max_n_neigh * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dZ_i(l)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
-                  !if (sym_desc) then
-                  !   Pl_g2 = transpose(Pl_g1)
-                  !else
-                  !   Pl_g2 = matmul(transpose(dY_r(l)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(l)%mm), Y_i(2,l)%mm)
-                  !endif
+
                   if (.not. sym_desc) then
                      Pl_g2 = matmul(transpose(dY_r(l)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(l)%mm), Y_i(2,l)%mm)
                      if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
                   endif
-                  !if(do_two_l_plus_one) Pl_g1 = Pl_g1 / sqrt(2.0_dp * l + 1.0_dp)
 
 
                   call cpu_time(sc_times(18))
@@ -8187,7 +8223,6 @@ module descriptors_module
                            if (this%diagonal_radial .and. a /= b) cycle
                            ic = (n_i-1) * K2 * 3 + (jb-1) * 3
                            ir = (n_i-1) * K1 * 3 + (ia-1) * 3
-                           !r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
                            if (sym_desc) then
                               r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g1(jb, ir+1:ir+3)
                            else
@@ -8381,10 +8416,22 @@ module descriptors_module
          if (allocated(dZ_r)) deallocate(dZ_r)
       endif
 
+      if (allocated(dX_r)) then
+         do k = 0, 2
+            do l = 0, this%l_max
+               deallocate(dX_r(k, l)%mm, dX_i(k, l)%mm)
+            enddo
+         enddo
+         deallocate(dX_r, dX_i)
+      endif
+
+
       if (allocated(Pl_g1)) deallocate(Pl_g1, Pl_g2)
+      if (allocated(l_tmp)) deallocate(l_tmp)
 
 !$omp end parallel
       if (allocated(W)) deallocate(W)
+
 
 
       if(this%global) then
