@@ -7429,13 +7429,13 @@ module descriptors_module
 
       ! jpd47 new variables
       type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dY_r, dY_i, dZ_r, dZ_i
-      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dX_i, dX_r
+      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dX_i, dX_r, Wz
       real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
       integer :: ic, K1, K2, ir, ig, ik
       !integer, dimension(:, :), allocatable, save :: neighbour_list
       real(dp) :: norm_descriptor_i2, tlpo
       real(dp) :: r_tmp(3)
-      real, dimension(0:20) :: sc_times
+      real, dimension(0:50) :: sc_times
       complex(dp), dimension(:), allocatable, save :: l_tmp
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
@@ -7471,6 +7471,15 @@ module descriptors_module
 
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
+
+      allocate(Wz(2, this%n_species))
+      do ik = 1, 2
+         do i_species = 1, this%n_species
+            ic = (i_species-1)*this%n_max
+            allocate(Wz(ik, i_species)%mm(this%n_max, size(W(ik)%mm(0,:))))
+            Wz(ik, i_species)%mm = W(ik)%mm(ic+1:ic+this%n_max, :)
+         enddo
+      enddo
 
 
       ! print*, "K1 and K2 are", K1, K2
@@ -7972,37 +7981,6 @@ module descriptors_module
             ! 94% for nu_R, nu_S = 0,0, down to 50% for nu_r, nu_S = (2,2) (because forming power spec gradients takes sooo much longer)
             ! 90% for K=50 coupling=F. FOCUS ON THIS FIRST!!
             call cpu_time(sc_times(12))
-            ! do a = 1, this%n_max
-            !    do l = 0, this%l_max
-            !       do m = -l, l
-            !          c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
-            !          ic = (i_species-1) * this%n_max + a
-            !          X_r(l)%mm(m+l+1, ic) = X_r(l)%mm(m+l+1, ic ) + real(c_tmp(1))
-            !          X_i(l)%mm(m+l+1, ic) = X_i(l)%mm(m+l+1, ic) + aimag(c_tmp(1))
-
-            !          !jpd47 this bit is 150x slower than the top bit for K=50 (150=3*50...)
-            !          !jpd47 K=100 with sym_mix=T, takes 5.41s, above takes 2.05 * 1e-2
-            !          !jpd47 2.06 seconds for regular nu_R, nu_S = 2 with total soap_calc taking 3.92s
-            !          if(my_do_grad_descriptor) then
-            !             c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + &
-            !                      radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
-
-            !             ic = (i_species-1) * this%n_max + a
-            !             do ik = 1, K1
-            !                ir = (n_i-1) * 3 * K1 + (ik-1)*3
-            !                dY_r(l)%mm(m+l+1, ir+1:ir+3) = dY_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(1)%mm(ic,ik)
-            !                dY_i(l)%mm(m+l+1, ir+1:ir+3) = dY_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(1)%mm(ic,ik)
-            !             enddo
-            !             do ik = 1, K2
-            !                ir = (n_i-1) * 3 * K2 + (ik-1)*3
-            !                dZ_r(l)%mm(m+l+1, ir+1:ir+3) = dZ_r(l)%mm(m+l+1, ir+1:ir+3) + real(c_tmp(:)) * W(2)%mm(ic,ik)
-            !                dZ_i(l)%mm(m+l+1, ir+1:ir+3) = dZ_i(l)%mm(m+l+1, ir+1:ir+3) + aimag(c_tmp(:)) * W(2)%mm(ic,ik)
-            !             enddo
-            !          endif ! my_do_grad_descriptor
-
-            !       enddo ! m
-            !    enddo ! l
-            ! enddo ! a
 
             do l = 0, this%l_max
                do a = 1, this%n_max
@@ -8013,7 +7991,6 @@ module descriptors_module
                   X_i(l)%mm(:, ic) = X_i(l)%mm(:, ic) + aimag(l_tmp(1:2*l+1))
                enddo ! a
             enddo ! l
-
 
             if(my_do_grad_descriptor) then
                do k = 1, 3
@@ -8030,9 +8007,13 @@ module descriptors_module
                      ic = (i_species-1) * this%n_max
                      do ia = 1, 2
                         if (sym_desc .and. ia == 1) cycle
-                        dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
-                        dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        !dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        !dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        ! jpd47 VERY minimal gains from using BLAS here...
+                        call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_r(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_r(ia, l)%mm, 2*l+1)
+                        call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_i(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_i(ia, l)%mm, 2*l+1)
                      enddo
+
                      ! jpd47 package coefficients
                      do ik = 1, K2
                         ir = (n_i-1) * 3 * K2 + (ik-1)*3 + k
@@ -8043,12 +8024,11 @@ module descriptors_module
                      ! jpd47 package coefficients
                      if (.not. sym_desc) then
                         do ik = 1, K1
-                           ir = (n_i-1) * 3 * K1 + (ik-1)*3 + k
+                           ir = (n_i-1) * 3 * K1 + (ik-1)*3 + k      !jpd47 IDEA, change order here? would avoid the loops...
                            dY_r(l)%mm(:, ir) = dX_r(1, l)%mm(:, ik)
                            dY_i(l)%mm(:, ir) = dX_i(1, l)%mm(:, ik)
                         enddo
                      endif
-
                   enddo ! l
                enddo ! k
             endif ! my_do_grad_descriptor
@@ -8266,6 +8246,7 @@ module descriptors_module
 
             endif
 
+            call cpu_time(sc_times(24))
             !jpd47 now normalise at the end
             descriptor_out%x(i_desc_i)%grad_data(d,:,:) = 0.0_dp
             n_i = 0
@@ -8284,8 +8265,9 @@ module descriptors_module
                endif
 
                descriptor_out%x(i_desc_i)%grad_data(:,:,0) = descriptor_out%x(i_desc_i)%grad_data(:,:,0) - descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
-
             enddo
+            call cpu_time(sc_times(25))
+            sc_times(26) = sc_times(26) + sc_times(25) - sc_times(24)
          endif
          call cpu_time(sc_times(8))
          sc_times(9) = sc_times(9) + sc_times(7)-sc_times(6)
@@ -8294,13 +8276,15 @@ module descriptors_module
 
       enddo ! i
 !$omp end parallel do
-
+      print*, "jpd47_timings"
       print*, "jpd47_timings: (5) total coefficients and gradients took", sc_times(5)
       print*, "jpd47_timings: (14) geometry for coefs and gradients took", sc_times(14)
       print*, "jpd47_timings: (15) packing and operating on coefs and gradients took", sc_times(15)
+      print*, "jpd47_timings: (23) packing gradients took", sc_times(23)
       print*, "jpd47_timings: (9) assembling power spectrum took", sc_times(9)
       print*, "jpd47_timings: (10) assembling gradients took", sc_times(10)
-      print*, "jpd47_timings: (20) unpacking gradients took", sc_times(20)
+      print*, "jpd47_timings: (20) unpacking  gradients took", sc_times(20)
+      print*, "jpd47_timings: (26) normalising gradients took", sc_times(26)
 
       call cpu_time(sc_times(2))
       print*, "jpd47_timings: (2-1) looping over atoms took", sc_times(2)-sc_times(1)
@@ -8431,6 +8415,15 @@ module descriptors_module
 
 !$omp end parallel
       if (allocated(W)) deallocate(W)
+      if (allocated(Wz)) then
+         do k = 1,2
+            do i_species = 1, this%n_species
+               if (allocated(Wz(k, i_species)%mm)) deallocate(Wz(k, i_species)%mm)
+            enddo
+         enddo
+         deallocate(Wz)
+      endif
+
 
 
 
