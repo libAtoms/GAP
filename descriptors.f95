@@ -7471,6 +7471,7 @@ module descriptors_module
 
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
+      allocate(Pl(K1, K2))
 
       allocate(Wz(2, this%n_species))
       do ik = 1, 2
@@ -8094,9 +8095,9 @@ module descriptors_module
          if (this%coupling) then
             !jpd47 standard full tensor product coupling between density channels.
             i_pow = 0
-            allocate(Pl(K1, K2))
+            ! allocate(Pl(K1, K2))    !jpd47 TODO don't allocate here, don't zero and use dgemm
             do l = 0, this%l_max
-               Pl = 0.0_dp
+               !Pl = 0.0_dp
                !jpd47 TODO
                !1- store XW(1) and XW(2), if (2) is required here. Can be used later on
                !2 - could use a BLAS call here if required but leave that for later.
@@ -8131,7 +8132,7 @@ module descriptors_module
                enddo
 
             enddo
-            deallocate(Pl)
+            ! deallocate(Pl)
          else
             !jpd74 elementwise coupling between density channels. For use with tensor-reduced compression.
             do l = 0, this%l_max
@@ -8423,6 +8424,7 @@ module descriptors_module
          enddo
          deallocate(Wz)
       endif
+      if (allocated(Pl)) deallocate(Pl)
 
 
 
