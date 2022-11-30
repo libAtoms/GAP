@@ -7857,33 +7857,12 @@ module descriptors_module
 
          do i_species = 0, this%n_species
             do a = 0, this%n_max
-               !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
-
 
                if ((this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) .and. i_species > 0 .and. a > 0) then
                   ic = (i_species-1) * this%n_max + a
                   X_r(0)%mm(1, ic) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
                   X_i(0)%mm(1, ic) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
                endif
-
-               if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
-                  if (a == 0) then
-                     fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
-                     fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
-                  else
-                     fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
-                     fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
-                  endif
-               else
-                  fourier_so3_i(0,a,i_species)%m(0) = 0.0_dp
-                  fourier_so3_r(0,a,i_species)%m(0) = 0.0_dp
-               endif
-
-               do l = 1, this%l_max
-                  !SPEED fourier_so3(l,a,i_species)%m(:) = CPLX_ZERO
-                  fourier_so3_r(l,a,i_species)%m(:) = 0.0_dp
-                  fourier_so3_i(l,a,i_species)%m(:) = 0.0_dp
-               enddo
             enddo
          enddo
 
@@ -7968,7 +7947,6 @@ module descriptors_module
             if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
             radial_coefficient = radial_coefficient * f_cut
 
-
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
             if(my_do_grad_descriptor) gradsphericalycartesian_all_t = GradSphericalYCartesian_all(this%l_max, d_ij)
             do l = 0, this%l_max
@@ -7978,18 +7956,13 @@ module descriptors_module
                enddo
             enddo
 
-            ! jpd47 This is massive bottlneck in code ~93% of time is spent here for nu_r, nu_S = 1,1 Grad=T
-            ! 94% for nu_R, nu_S = 0,0, down to 50% for nu_r, nu_S = (2,2) (because forming power spec gradients takes sooo much longer)
-            ! 90% for K=50 coupling=F. FOCUS ON THIS FIRST!!
             call cpu_time(sc_times(12))
 
             do l = 0, this%l_max
                do a = 1, this%n_max
-                  !do m = -l, l
                   ic = (i_species-1) * this%n_max + a
-                  l_tmp(1:2*l+1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(:)
-                  X_r(l)%mm(:, ic) = X_r(l)%mm(:, ic ) + real(l_tmp(1:2*l+1))
-                  X_i(l)%mm(:, ic) = X_i(l)%mm(:, ic) + aimag(l_tmp(1:2*l+1))
+                  X_r(l)%mm(:, ic) = X_r(l)%mm(:, ic)  + radial_coefficient(l,a) * real(SphericalY_ij(l)%m(:))
+                  X_i(l)%mm(:, ic) = X_i(l)%mm(:, ic)  + radial_coefficient(l,a) * aimag(SphericalY_ij(l)%m(:))
                enddo ! a
             enddo ! l
 
@@ -8008,11 +7981,11 @@ module descriptors_module
                      ic = (i_species-1) * this%n_max
                      do ia = 1, 2
                         if (sym_desc .and. ia == 1) cycle
-                        !dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
-                        !dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
                         ! jpd47 VERY minimal gains from using BLAS here...
-                        call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_r(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_r(ia, l)%mm, 2*l+1)
-                        call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_i(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_i(ia, l)%mm, 2*l+1)
+                        !call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_r(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_r(ia, l)%mm, 2*l+1)
+                        !call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_i(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_i(ia, l)%mm, 2*l+1)
                      enddo
 
                      ! jpd47 package coefficients
@@ -8021,8 +7994,6 @@ module descriptors_module
                         dZ_r(l)%mm(:, ir) = dX_r(2, l)%mm(:, ik)
                         dZ_i(l)%mm(:, ir) = dX_i(2, l)%mm(:, ik)
                      enddo
-
-                     ! jpd47 package coefficients
                      if (.not. sym_desc) then
                         do ik = 1, K1
                            ir = (n_i-1) * 3 * K1 + (ik-1)*3 + k      !jpd47 IDEA, change order here? would avoid the loops...
@@ -8030,6 +8001,12 @@ module descriptors_module
                            dY_i(l)%mm(:, ir) = dX_i(1, l)%mm(:, ik)
                         enddo
                      endif
+
+                     !test of different order - didn't help at all.
+                     ! ir = (n_i-1) * 3 * K2
+                     ! dZ_r(l)%mm(:,ir+1:ir+K2) = dX_r(2, l)%mm
+                     ! dZ_i(l)%mm(:,ir+1:ir+K2) = dX_i(2, l)%mm
+
                   enddo ! l
                enddo ! k
             endif ! my_do_grad_descriptor
@@ -8092,27 +8069,35 @@ module descriptors_module
 
          !jpd47 new power spectrum calculation
          call cpu_time(sc_times(6))
+
          if (this%coupling) then
             !jpd47 standard full tensor product coupling between density channels.
             i_pow = 0
-            ! allocate(Pl(K1, K2))    !jpd47 TODO don't allocate here, don't zero and use dgemm
             do l = 0, this%l_max
-               !Pl = 0.0_dp
-               !jpd47 TODO
-               !1- store XW(1) and XW(2), if (2) is required here. Can be used later on
-               !2 - could use a BLAS call here if required but leave that for later.
-               Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
-               Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
-               if (sym_desc) then
-                  Y_r(2, l)%mm = Y_r(1, l)%mm
-                  Y_i(2, l)%mm = Y_i(1, l)%mm
+               tlpo = 1.0_dp
+               if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+               if (this%nu_R == 2 .and. this%nu_S == 2 .and. .not. (this%R_mix .or. this%Z_mix)) then
+                  call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, X_r(l)%mm, 2*l+1, 0.0_dp, Pl, K1)
+                  call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, X_i(l)%mm, 2*l+1, 1.0_dp, Pl, K1)
                else
-                  Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
-                  Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
+                  !Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+                  !Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+                  call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
+                  call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
+
+                  !skipping this for regular power spec saves 1e-3
+                  if (sym_desc) then
+                     Y_r(2, l)%mm = Y_r(1, l)%mm
+                     Y_i(2, l)%mm = Y_i(1, l)%mm
+                  else
+                     Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                     Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
+                  endif
+
+                  !Pl = matmul(transpose(Y_r(1, l)%mm), Y_r(2, l)%mm) + matmul(transpose(Y_i(1, l)%mm), Y_i(2, l)%mm)
+                  call dgemm('T', 'N', K1, K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, Y_r(2, l)%mm, 2*l+1, 0.0_dp, Pl, K1)
+                  call dgemm('T', 'N', K1, K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, Y_i(2, l)%mm, 2*l+1, 1.0_dp, Pl, K1)
                endif
-               !Pl = matmul(transpose(matmul(X_r(l)%mm, W(1)%mm)), matmul(X_r(l)%mm, W(2)%mm)) + matmul(transpose(matmul(X_i(l)%mm, W(1)%mm)), matmul(X_i(l)%mm, W(2)%mm))
-               Pl = matmul(transpose(Y_r(1, l)%mm), Y_r(2, l)%mm) + matmul(transpose(Y_i(1, l)%mm), Y_i(2, l)%mm)
-               if(do_two_l_plus_one) Pl = Pl / sqrt(2.0_dp * l + 1.0_dp)
 
                ! jpd47 unpack l-slice
                i_pow = l + 1
