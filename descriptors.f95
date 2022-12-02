@@ -8260,7 +8260,6 @@ module descriptors_module
 
                   call cpu_time(sc_times(18))
                   ! jpd47 loop over neighbour atoms "unravelling" matrix form of gradients
-                  grad_descriptor_i = 0.0_dp
                   i_pow = l + 1
                   do ia = 1, K1
                      a = rs_index(1,ia)
@@ -8284,14 +8283,14 @@ module descriptors_module
                   enddo !ia
                enddo !l
 
-               !jpd47 now normalise the gradients
+               !jpd47 now normalise the gradients - checked this bit
                grad_descriptor_i(d, 1:3) = 0.0_dp
                if(.not. this%global) then
                   if( this%normalise ) then
                      grad_descriptor_i = grad_descriptor_i / norm_descriptor_i
                      c_tmp = matmul(descriptor_i,grad_descriptor_i) / norm_descriptor_i**2
-                      do k = 1, 3
-                       descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = grad_descriptor_i(:,k) - descriptor_i * c_tmp(k)
+                     do k = 1, 3
+                      descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = grad_descriptor_i(:,k) - descriptor_i * c_tmp(k)
                      enddo
                   else
                      descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i
