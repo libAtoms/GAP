@@ -8115,7 +8115,7 @@ module descriptors_module
                Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
                if (this%sym_mix) then
                   Y_r(2, l)%mm = Y_r(1, l)%mm
-                  Y_i(2, l)%mm = Y_i(2, l)%mm
+                  Y_i(2, l)%mm = Y_i(1, l)%mm
                else
                   Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
                   Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
@@ -8129,10 +8129,10 @@ module descriptors_module
                enddo
             enddo
          endif
+
+         !jpd47 normalise the descriptor
          descriptor_i(d) = 0.0_dp
-
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
-
          if(.not. this%global .and. my_do_descriptor) then
             if(this%normalise) then
                descriptor_out%x(i_desc_i)%data = descriptor_i / norm_descriptor_i
@@ -8207,8 +8207,8 @@ module descriptors_module
                      !jpd47 doing 3 gradient directions in one shot via matmul
                      r_tmp = matmul(transpose(dY_r(1, l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik)) + matmul(transpose(dY_i(1, l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
                      r_tmp = r_tmp + matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik) ) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
-                     !descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp * tlpo
-                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo
+                     ! jpd47 TODO check why this factor of 2 is there!! added it on train without paper to check algebra
+                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo * 2
                      i_pow = i_pow + this%l_max + 1
                   enddo
                enddo
