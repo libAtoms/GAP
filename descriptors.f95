@@ -7417,8 +7417,8 @@ module descriptors_module
       real(dp) :: r_ij, arg_bess, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, mo_spher_bess_fi_ki_lp, &
          exp_p, exp_m, f_cut, df_cut, norm_descriptor_i, radial_decay, dradial_decay, norm_radial_decay
       real(dp), dimension(3) :: u_ij, d_ij
-      real(dp), dimension(:,:), allocatable, save :: radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient, grad_descriptor_i, grad_descriptor_i2
-      real(dp), dimension(:), allocatable, save :: descriptor_i, descriptor_i2
+      real(dp), dimension(:,:), allocatable, save :: radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient, grad_descriptor_i
+      real(dp), dimension(:), allocatable, save :: descriptor_i
       real(dp), dimension(:), allocatable :: global_fourier_so3_r_array, global_fourier_so3_i_array
       type(real_2d_array), dimension(:), allocatable :: global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array
       integer, dimension(total_elements) :: species_map
@@ -7434,7 +7434,7 @@ module descriptors_module
       real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
       integer :: ic, K1, K2, ir, ig, ik
       !integer, dimension(:, :), allocatable, save :: neighbour_list
-      real(dp) :: norm_descriptor_i2, tlpo
+      real(dp) ::  tlpo
       real(dp) :: r_tmp(3)
       real, dimension(0:50) :: sc_times
       complex(dp), dimension(:), allocatable, save :: l_tmp
@@ -7444,7 +7444,7 @@ module descriptors_module
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
-!$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2, grad_descriptor_i2)
+!$omp threadprivate(descriptor_i, grad_descriptor_i)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2, l_tmp, dV_r, dV_i)
 
       INIT_ERROR(error)
@@ -7593,40 +7593,24 @@ module descriptors_module
          max_n_neigh = max(max_n_neigh, n_neighbours(at, n_i))
       end do
 
-      !jpd47 allocate and construct neighbour_list
-      ! allocate(neighbour_list(at%N, max_n_neigh+1))
-      ! neighbour_list = 0
-      ! do i = 1, at%N
-      !    n_i = 0
-      !    do n = 1, n_neighbours(at,i)
-      !       j = neighbour(at, i, n, distance = r_ij)
-      !       if( r_ij < this%cutoff ) then
-      !          n_i = n_i + 1
-      !          neighbour_list(i, n_i + 1) = n   !  (i, j+1) is index of jth neighbour within cutoff
-      !       endif
-      !    enddo
-      !    neighbour_list(i, 1) = n_i          !(i,1) is number of neighbours of atom i within cutoff
-      ! enddo
-
       call cpu_time(sc_times(2))
       !print*, "jpd47_timings: pre allocation has taken", sc_times(2)-sc_times(0)
       sc_times(1) = sc_times(2)
 
 !$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh, K1, K2) private(i_species, a, l, n_i, ub, ik)
       allocate(descriptor_i(d))
-      allocate(descriptor_i2(d))
       if(my_do_grad_descriptor) allocate(grad_descriptor_i(d,3))
 
       allocate(radial_fun(0:this%l_max, this%n_max), radial_coefficient(0:this%l_max, this%n_max))
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
-      allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
+      !allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species))
+      allocate(SphericalY_ij(0:this%l_max))
       allocate(X_r(0:this%l_max), X_i(0:this%l_max))
       allocate(l_tmp(1:2*this%l_max + 1))
       do l = 0, this%l_max
          allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max))
          allocate(X_i(l)%mm(2*l+1, this%n_species*this%n_max))
       enddo
-
 
       allocate(Y_r(2, 0:this%l_max), Y_i(2, 0:this%l_max))
       do l = 0, this%l_max
@@ -7636,8 +7620,6 @@ module descriptors_module
          allocate(Y_i(2, l)%mm(2*l+1, K2))
       enddo
 
-      !print*, "n_max and n_species are", this%n_max, this%n_species
-      !print*, "size of X_r(0) is", SIZE(X_r(0)%mm), "shape is", SHAPE(X_r(0)%mm)
 
       if(my_do_grad_descriptor) then
          allocate(grad_radial_fun(0:this%l_max, this%n_max), grad_radial_coefficient(0:this%l_max, this%n_max))
@@ -7649,19 +7631,6 @@ module descriptors_module
           allocate(gradsphericalycartesian_all_t(0:this%l_max, -this%l_max:this%l_max, 3))
       end if
 
-      do i_species = 0, this%n_species
-         do a = 0, this%n_max
-            do l = 0, this%l_max
-               !SPEED allocate(fourier_so3(l,a,i_species)%m(-l:l))
-               !SPEED fourier_so3(l,a,i_species)%m(:) = CPLX_ZERO
-               allocate(fourier_so3_r(l,a,i_species)%m(-l:l))
-               allocate(fourier_so3_i(l,a,i_species)%m(-l:l))
-               fourier_so3_r(l,a,i_species)%m(:) = 0.0_dp
-               fourier_so3_i(l,a,i_species)%m(:) = 0.0_dp
-            enddo
-         enddo
-      enddo
-
 
       do l = 0, this%l_max
          allocate(SphericalY_ij(l)%m(-l:l))
@@ -7669,16 +7638,16 @@ module descriptors_module
       enddo
 
       if (my_do_grad_descriptor) then
+         !jpd47 update general method to same form as original then this could be much neater
          if (original) then
-            ! jpd47 exploit sparsity of gradients
             allocate(Pl_g1(K1, 3*this%n_max))
          else
             allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
          endif
 
           ! jpd47 allocate new grad storage
+         ! original only
          if (original) then
-            !allocate(dY_r(1, 0:this%l_max), dY_i(1, 0:this%l_max))
             allocate(dV_r(0:this%l_max, max_n_neigh), dV_i(0:this%l_max, max_n_neigh))
             do l = 0, this%l_max
                do n_i = 1, max_n_neigh
@@ -7686,6 +7655,7 @@ module descriptors_module
                   allocate(dV_i(l, n_i)%mm(2*l+1, 3*this%n_max))
                enddo
             enddo
+         ! general
          else
             allocate(dY_r(2, 0:this%l_max), dY_i(2, 0:this%l_max))
             do ik = 1, SIZE(dY_r(:, 0))
@@ -7698,7 +7668,7 @@ module descriptors_module
             enddo
          endif
 
-
+         !jpd47 temporary storage for the gradient cofficients before multiplication
          allocate(dX_r(0:2, 0:this%l_max), dX_i(0:2, 0:this%l_max))
          do l = 0, this%l_max
             allocate(dX_r(0, l)%mm(2*l+1, this%n_max), dX_i(0, l)%mm(2*l+1, this%n_max))
@@ -7715,7 +7685,6 @@ module descriptors_module
       i_desc = 0
       i_desc_i = 0
       do i = 1, at%N
-
          if( .not. any( at%Z(i) == this%Z ) .and. .not. any(this%Z == 0) ) cycle
 
          if(associated(atom_mask_pointer)) then
@@ -7828,11 +7797,9 @@ module descriptors_module
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs, ic, ir, ig, ik) &
 !$omp private(c_tmp, r_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
-!$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i, norm_descriptor_i2) &
+!$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
 !$omp private(radial_decay, dradial_decay) &
 !$omp reduction(+:global_fourier_so3_r_array,global_fourier_so3_i_array)
-
-
 
 
       do i = 1, at%N
@@ -7854,6 +7821,7 @@ module descriptors_module
                descriptor_out%x(i_desc_i)%has_grad_data(0) = .true.
 
                ! jpd47 zero the gradient contributions
+               ! jpd47 original only
                if (original) then
                   do n_i= 1, max_n_neigh
                      do l = 0, this%l_max
@@ -7861,7 +7829,7 @@ module descriptors_module
                         dV_i(l, n_i)%mm = 0.0_dp
                      enddo
                   enddo
-
+               ! jpd47 general
                else
                   do l = 0, this%l_max
                      do k = 1, size(dY_r(:, 0))
@@ -7873,12 +7841,6 @@ module descriptors_module
             endif
          endif
 
-
-
-         !do a = 1, this%n_max
-         !   radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
-         !enddo
-         !radial_coefficient(0,:) = matmul( radial_fun(0,:), this%transform_basis )
          radial_fun(0,:) = 0.0_dp
          radial_fun(0,1) = 1.0_dp
          radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
@@ -8415,8 +8377,6 @@ module descriptors_module
       if(allocated(grad_radial_fun)) deallocate(grad_radial_fun)
       if(allocated(grad_radial_coefficient)) deallocate(grad_radial_coefficient)
       if(allocated(descriptor_i)) deallocate(descriptor_i)
-      !jpd47
-      if(allocated(descriptor_i2)) deallocate(descriptor_i2)
 
       !print *, "about to deallocate grad_descriptor_i"
       if(allocated(grad_descriptor_i)) deallocate(grad_descriptor_i)
