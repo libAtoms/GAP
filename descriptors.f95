@@ -7428,8 +7428,9 @@ module descriptors_module
       integer :: max_n_neigh
 
       ! jpd47 new variables
-      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dY_r, dY_i, dZ_r, dZ_i
-      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dX_i, dX_r, Wz
+      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dZ_r, dZ_i
+      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dX_i, dX_r, Wz, dY_r, dY_i
+      type(real_2d), dimension(:, :), allocatable, save :: dV_r, dV_i
       real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
       integer :: ic, K1, K2, ir, ig, ik
       !integer, dimension(:, :), allocatable, save :: neighbour_list
@@ -7437,13 +7438,14 @@ module descriptors_module
       real(dp) :: r_tmp(3)
       real, dimension(0:50) :: sc_times
       complex(dp), dimension(:), allocatable, save :: l_tmp
+      logical :: original
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i, descriptor_i2, grad_descriptor_i2)
-!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2, l_tmp)
+!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2, l_tmp, dV_r, dV_i)
 
       INIT_ERROR(error)
       sc_times = 0.0
@@ -7462,6 +7464,9 @@ module descriptors_module
          RAISE_ERROR("nu_S outside allowed range of 0-2", error)
       endif
 
+      ! jpd47 logical for special routines to keep original power spectrum fast
+      original = .false.
+      if (this%coupling .and. this%nu_R == 2 .and. this%nu_S == 2 .and. .not. (this%R_mix .or. this%Z_mix)) original = .true.
 
       !jpd47 TODO replace this with form_WQ
       call cpu_time(sc_times(1))
@@ -7560,10 +7565,10 @@ module descriptors_module
 
       do_two_l_plus_one = (xml_version >= 1423143769)
 
-      allocate(rs_index(2,(this%n_max+1)*(this%n_species+1)))
+      allocate(rs_index(2,this%n_max*this%n_species))
       i = 0
-      do i_species = 0, this%n_species
-         do a = 0, this%n_max
+      do i_species = 1, this%n_species
+         do a = 1, this%n_max
             i = i + 1
             rs_index(:,i) = (/a,i_species/)
          enddo
@@ -7664,23 +7669,42 @@ module descriptors_module
       enddo
 
       if (my_do_grad_descriptor) then
-         allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
+         if (original) then
+            ! jpd47 exploit sparsity of gradients
+            allocate(Pl_g1(K1, 3*this%n_max))
+         else
+            allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
+         endif
 
           ! jpd47 allocate new grad storage
-          allocate(dY_r(0:this%l_max), dY_i(0:this%l_max), dZ_r(0:this%l_max), dZ_i(0:this%l_max) )
-          do l = 0, this%l_max
-            allocate(dY_r(l)%mm(2*l+1, 3*max_n_neigh*K1))
-            allocate(dY_i(l)%mm(2*l+1, 3*max_n_neigh*K1))
-            allocate(dZ_r(l)%mm(2*l+1, 3*max_n_neigh*K2))
-            allocate(dZ_i(l)%mm(2*l+1, 3*max_n_neigh*K2))
-          enddo
+         if (original) then
+            !allocate(dY_r(1, 0:this%l_max), dY_i(1, 0:this%l_max))
+            allocate(dV_r(0:this%l_max, max_n_neigh), dV_i(0:this%l_max, max_n_neigh))
+            do l = 0, this%l_max
+               do n_i = 1, max_n_neigh
+                  allocate(dV_r(l, n_i)%mm(2*l+1, 3*this%n_max))
+                  allocate(dV_i(l, n_i)%mm(2*l+1, 3*this%n_max))
+               enddo
+            enddo
+         else
+            allocate(dY_r(2, 0:this%l_max), dY_i(2, 0:this%l_max))
+            do ik = 1, SIZE(dY_r(:, 0))
+               k = K1
+               if (ik == 2) k = K2
+               do l = 0, this%l_max
+                  allocate(dY_r(ik, l)%mm(2*l+1, 3*max_n_neigh*k))
+                  allocate(dY_i(ik, l)%mm(2*l+1, 3*max_n_neigh*k))
+               enddo
+            enddo
+         endif
 
-          allocate(dX_r(0:2, 0:this%l_max), dX_i(0:2, 0:this%l_max))
-          do l = 0, this%l_max
+
+         allocate(dX_r(0:2, 0:this%l_max), dX_i(0:2, 0:this%l_max))
+         do l = 0, this%l_max
             allocate(dX_r(0, l)%mm(2*l+1, this%n_max), dX_i(0, l)%mm(2*l+1, this%n_max))
             allocate(dX_r(1, l)%mm(2*l+1, K1), dX_i(1, l)%mm(2*l+1, K1))
             allocate(dX_r(2, l)%mm(2*l+1, K2), dX_i(2, l)%mm(2*l+1, K2))
-          enddo
+         enddo
 
       endif
 !$omp end parallel
@@ -7830,12 +7854,22 @@ module descriptors_module
                descriptor_out%x(i_desc_i)%has_grad_data(0) = .true.
 
                ! jpd47 zero the gradient contributions
-               do l = 0, this%l_max
-                  dY_r(l)%mm = 0.0_dp
-                  dY_i(l)%mm = 0.0_dp
-                  dZ_r(l)%mm = 0.0_dp
-                  dZ_i(l)%mm = 0.0_dp
-               enddo
+               if (original) then
+                  do n_i= 1, max_n_neigh
+                     do l = 0, this%l_max
+                        dV_r(l, n_i)%mm = 0.0_dp
+                        dV_i(l, n_i)%mm = 0.0_dp
+                     enddo
+                  enddo
+
+               else
+                  do l = 0, this%l_max
+                     do k = 1, size(dY_r(:, 0))
+                        dY_r(k, l)%mm = 0.0_dp
+                        dY_i(k, l)%mm = 0.0_dp
+                     enddo
+                  enddo
+               endif
             endif
          endif
 
@@ -7966,46 +8000,50 @@ module descriptors_module
                enddo ! a
             enddo ! l
 
-            if(my_do_grad_descriptor) then
+            if(my_do_grad_descriptor .and. original) then
                do k = 1, 3
                   do l = 0, this%l_max
-                     !jpd47 this could be updated with a BLAS dger
+                     !jpd47 special case for original power spectrum
+                     do a = 1, this%n_max
+                        ic = (a-1)*3 + k
+                        l_tmp(1:2*l+1) =  grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(:) * u_ij(k) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(k,:)
+                        dV_r(l, n_i)%mm(:, ic) = real(l_tmp(1:2*l+1))
+                        dV_i(l, n_i)%mm(:, ic) = aimag(l_tmp(1:2*l+1))
+                     enddo ! a
+                  enddo ! l
+               enddo ! k
+            endif ! my_do_grad_descriptor
+
+            if(my_do_grad_descriptor .and. (.not. original)) then
+               do k = 1, 3
+                  do l = 0, this%l_max
                      do a = 1, this%n_max
                         l_tmp(1:2*l+1) =  grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(:) * u_ij(k) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(k,:)
                         dX_r(0, l)%mm(:, a) =  real(l_tmp(1:2*l+1))
                         dX_i(0, l)%mm(:, a) = aimag(l_tmp(1:2*l+1))
                      enddo ! a
 
-                     ! jpd47 TODO must repeat next two sections IF not symmetric
-                     ! jpd47 could be replaced with BLAS dgemm
+                     !jpd47 operate on the coefficients
                      ic = (i_species-1) * this%n_max
                      do ia = 1, 2
                         if (sym_desc .and. ia == 1) cycle
                         dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
                         dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
-                        ! jpd47 VERY minimal gains from using BLAS here...
-                        !call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_r(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_r(ia, l)%mm, 2*l+1)
-                        !call dgemm('N', 'N', 2*l+1, SIZE(Wz(ia, i_species)%mm(1,:)), this%n_max, 1.0_dp, dX_i(0, l)%mm, 2*l+1, Wz(ia, i_species)%mm, this%n_max, 0.0_dp, dX_i(ia, l)%mm, 2*l+1)
                      enddo
 
-                     ! jpd47 package coefficients
+                     ! jpd47 package coefficients TODO combine these into a single loop
                      do ik = 1, K2
                         ir = (n_i-1) * 3 * K2 + (ik-1)*3 + k
-                        dZ_r(l)%mm(:, ir) = dX_r(2, l)%mm(:, ik)
-                        dZ_i(l)%mm(:, ir) = dX_i(2, l)%mm(:, ik)
+                        dY_r(2, l)%mm(:, ir) = dX_r(2, l)%mm(:, ik)
+                        dY_i(2, l)%mm(:, ir) = dX_i(2, l)%mm(:, ik)
                      enddo
                      if (.not. sym_desc) then
                         do ik = 1, K1
-                           ir = (n_i-1) * 3 * K1 + (ik-1)*3 + k      !jpd47 IDEA, change order here? would avoid the loops...
-                           dY_r(l)%mm(:, ir) = dX_r(1, l)%mm(:, ik)
-                           dY_i(l)%mm(:, ir) = dX_i(1, l)%mm(:, ik)
+                           ir = (n_i-1) * 3 * K1 + (ik-1)*3 + k
+                           dY_r(1, l)%mm(:, ir) = dX_r(1, l)%mm(:, ik)
+                           dY_i(1, l)%mm(:, ir) = dX_i(1, l)%mm(:, ik)
                         enddo
                      endif
-
-                     !test of different order - didn't help at all.
-                     ! ir = (n_i-1) * 3 * K2
-                     ! dZ_r(l)%mm(:,ir+1:ir+K2) = dX_r(2, l)%mm
-                     ! dZ_i(l)%mm(:,ir+1:ir+K2) = dX_i(2, l)%mm
 
                   enddo ! l
                enddo ! k
@@ -8017,25 +8055,6 @@ module descriptors_module
             sc_times(15) = sc_times(15) + sc_times(13) - sc_times(12)
          enddo ! n
 
-
-         !jpd47 testing loop, should only match up for nu_R=nu_S=2, matches up exactly
-         ! if (i == 1) then
-         !    n_i = 1
-         !    do l = 0, this%l_max
-         !       do ic = 1, this%n_species
-         !          do a = 1, this%n_max
-         !             ik = (ic-1)*this%n_max + a
-         !             do m = -l, l
-         !                do k = 1,3
-         !                   ir = (n_i-1)*3*(this%n_species*this%n_max) + (ik-1)*3
-         !                   !print*, "dX_r", grad_fourier_so3_r(l,a,n_i)%mm(k,m), X_r(l)%mm(m+l+1, ir+k)
-         !                   print*, "dY_r", l, ic, a, m, k, ir+k, grad_fourier_so3_r(l,a,n_i)%mm(k,m), dY_r(l)%mm(m+l+1, ir+k), dZ_r(l)%mm(m+l+1, ir+k)
-         !                enddo
-         !             enddo
-         !          enddo
-         !       enddo
-         !    enddo
-         ! endif
 
          if(this%global .and. my_do_grad_descriptor) then
             global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
@@ -8076,12 +8095,14 @@ module descriptors_module
             do l = 0, this%l_max
                tlpo = 1.0_dp
                if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
-               if (this%nu_R == 2 .and. this%nu_S == 2 .and. .not. (this%R_mix .or. this%Z_mix)) then
+               ! special case for regular power spectrum
+               if (original) then
+                  ! Pl = matmul(tranpose(X_r(l)%mm), X_r(l)%mm)
                   call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, X_r(l)%mm, 2*l+1, 0.0_dp, Pl, K1)
                   call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, X_i(l)%mm, 2*l+1, 1.0_dp, Pl, K1)
+               ! everything else
                else
                   !Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
-                  !Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
                   call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
                   call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
 
@@ -8106,9 +8127,9 @@ module descriptors_module
                   if (sym_desc) then
                      ub = ia
                   endif
-                  a = modulo(ia, this%n_max)
+                  a = rs_index(1,ia)
                   do jb = 1, ub
-                     b = modulo(jb, this%n_max)
+                     b = rs_index(1,jb)
                      if (this%diagonal_radial .and. a /= b) cycle
                      descriptor_i(i_pow) = Pl(ia, jb)
                      if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
@@ -8152,20 +8173,19 @@ module descriptors_module
 
          call cpu_time(sc_times(7))
          !jpd47 new gradients calcuation
-         if (my_do_grad_descriptor) then
+         if (my_do_grad_descriptor .and. (.not. original)) then
             if (this%coupling) then
                !jpd47 gradients for full tensor product coupling
-               !allocate(Pl_g1(K1, 3 * max_n_neigh * K2), Pl_g2( 3 * max_n_neigh * K1, K2))
                do l = 0, this%l_max
                   !Pl_g1 = matmul(transpose(Y_r(1, l)%mm), dZ_r(l)%mm) + matmul(transpose(Y_i(1,l)%mm), dZ_i(l)%mm)
                   ! call dgemm(transA, transB, M, N, K, alpha, A, LDA, B, LDB, beta, C, LDC)
                   tlpo = 1.0_dp
                   if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
-                  call dgemm('T','N', K1, 3 * max_n_neigh * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dZ_r(l)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
-                  call dgemm('T','N', K1, 3 * max_n_neigh * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dZ_i(l)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
+                  call dgemm('T','N', K1, 3 * max_n_neigh * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dY_r(2, l)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
+                  call dgemm('T','N', K1, 3 * max_n_neigh * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dY_i(2, l)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
 
                   if (.not. sym_desc) then
-                     Pl_g2 = matmul(transpose(dY_r(l)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(l)%mm), Y_i(2,l)%mm)
+                     Pl_g2 = matmul(transpose(dY_r(1, l)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(1, l)%mm), Y_i(2,l)%mm)
                      if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
                   endif
 
@@ -8184,6 +8204,7 @@ module descriptors_module
                         ub = K2
                         if (sym_desc) ub = ia
                         a = modulo(ia, this%n_max)
+                        print*, "ia is", ia, "a is", a
                         do jb = 1, ub
                            b = modulo(jb, this%n_max)
                            if (this%diagonal_radial .and. a /= b) cycle
@@ -8207,6 +8228,8 @@ module descriptors_module
                enddo !l
 
 
+
+
             else
                ! jpd47 gradients for elementwise product
 
@@ -8222,8 +8245,8 @@ module descriptors_module
                      do ik = 1, K1
                         ir = (n_i - 1) * K1 * 3 + (ik-1) * 3
                         !jpd47 doing 3 gradient directions in one shot via matmul
-                        r_tmp = matmul(transpose(dY_r(l)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik)) + matmul(transpose(dY_i(l)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
-                        r_tmp = r_tmp + matmul(transpose(dZ_r(l)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik) ) + matmul(transpose(dZ_i(l)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
+                        r_tmp = matmul(transpose(dY_r(1, l)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik)) + matmul(transpose(dY_i(1, l)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
+                        r_tmp = r_tmp + matmul(transpose(dY_r(2, l)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik) ) + matmul(transpose(dY_i(2, l)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
                         descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp
                         i_pow = i_pow + this%l_max + 1
                      enddo
@@ -8255,6 +8278,68 @@ module descriptors_module
             call cpu_time(sc_times(25))
             sc_times(26) = sc_times(26) + sc_times(25) - sc_times(24)
          endif
+
+         if (this%coupling .and. original .and. my_do_grad_descriptor) then
+            !jpd47 TODO swap order of neighbours and loops back again so that normalising happens in one hit
+            ! AND might help with jumping around in memory of a much smaller array...
+            n_i = 0
+            do n = 1, n_neighbours(at,i)
+               j = neighbour(at, i, n, distance = r_ij)
+               if( r_ij >= this%cutoff ) cycle
+               n_i = n_i + 1
+               if( species_map(at%Z(j)) == 0 ) cycle
+               grad_descriptor_i = 0.0_dp
+               do l = 0, this%l_max
+                  tlpo = 1.0_dp
+                  if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                  !jpd47 TODO try swapping order here... might matter which one is transposed given big size difference
+                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, dV_r(l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
+                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, dV_i(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
+
+                  call cpu_time(sc_times(18))
+                  ! jpd47 loop over neighbour atoms "unravelling" matrix form of gradients
+                  grad_descriptor_i = 0.0_dp
+                  i_pow = l + 1
+                  do ia = 1, K1
+                     a = rs_index(1,ia)
+                     i_species = rs_index(2,ia)
+                     do jb = 1, ia
+                        b = rs_index(1,jb)
+                        j_species = rs_index(2,jb)
+                        if (this%diagonal_radial .and. a /= b) cycle
+                        if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) then
+                           ic = (a-1) * 3
+                           grad_descriptor_i(i_pow, :) =  grad_descriptor_i(i_pow, :) + Pl_g1(jb, ic+1:ic+3)
+                        endif
+                        if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) then
+                           ic = (b-1) * 3
+                           grad_descriptor_i(i_pow, :) =  grad_descriptor_i(i_pow, :) + Pl_g1(ia, ic+1:ic+3)
+                        endif
+
+                        if(ia /= jb) grad_descriptor_i(i_pow, :) = grad_descriptor_i(i_pow, :) * SQRT_TWO
+                        i_pow = i_pow + this%l_max+1
+                     enddo !jb
+                  enddo !ia
+               enddo !l
+
+               !jpd47 now normalise the gradients
+               grad_descriptor_i(d, 1:3) = 0.0_dp
+               if(.not. this%global) then
+                  if( this%normalise ) then
+                     grad_descriptor_i = grad_descriptor_i / norm_descriptor_i
+                     c_tmp = matmul(descriptor_i,grad_descriptor_i) / norm_descriptor_i**2
+                      do k = 1, 3
+                       descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = grad_descriptor_i(:,k) - descriptor_i * c_tmp(k)
+                     enddo
+                  else
+                     descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i
+                  endif
+                  descriptor_out%x(i_desc_i)%grad_data(:,:,0) = descriptor_out%x(i_desc_i)%grad_data(:,:,0) - descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
+               endif
+            enddo !n_i
+         endif
+
+
          call cpu_time(sc_times(8))
          sc_times(9) = sc_times(9) + sc_times(7)-sc_times(6)
          sc_times(10) = sc_times(10) + sc_times(8) - sc_times(7)
@@ -8372,18 +8457,26 @@ module descriptors_module
          if (allocated(Y_i)) deallocate(Y_i)
       endif
 
-
-      if (allocated(dY_i)) then
+      if (allocated(dV_r)) then
          do l = 0, this%l_max
-            if (allocated(dY_i(l)%mm)) deallocate(dY_i(l)%mm)
-            if (allocated(dY_r(l)%mm)) deallocate(dY_r(l)%mm)
-            if (allocated(dZ_i(l)%mm)) deallocate(dZ_i(l)%mm)
-            if (allocated(dZ_r(l)%mm)) deallocate(dZ_r(l)%mm)
+            do n_i = 1, max_n_neigh
+               if (allocated(dV_r(l, n_i)%mm)) deallocate(dV_r(l, n_i)%mm)
+               if (allocated(dV_i(l, n_i)%mm)) deallocate(dV_i(l, n_i)%mm)
+            enddo
+         enddo
+         if (allocated(dV_r)) deallocate(dV_r)
+         if (allocated(dV_i)) deallocate(dV_i)
+      endif
+
+      if (allocated(dY_R)) then
+         do ik = 1, size(dY_R(:, 0))
+            do l = 0, this%l_max
+               if (allocated(dY_i(ik, l)%mm)) deallocate(dY_i(ik, l)%mm)
+               if (allocated(dY_r(ik, l)%mm)) deallocate(dY_r(ik, l)%mm)
+            enddo
          enddo
          if (allocated(dY_i)) deallocate(dY_i)
          if (allocated(dY_r)) deallocate(dY_r)
-         if (allocated(dZ_i)) deallocate(dZ_i)
-         if (allocated(dZ_r)) deallocate(dZ_r)
       endif
 
       if (allocated(dX_r)) then
@@ -8396,7 +8489,9 @@ module descriptors_module
       endif
 
 
-      if (allocated(Pl_g1)) deallocate(Pl_g1, Pl_g2)
+      if (allocated(Pl_g1)) deallocate(Pl_g1)
+      if (allocated(Pl_g2)) deallocate(Pl_g2)
+
       if (allocated(l_tmp)) deallocate(l_tmp)
 
 !$omp end parallel
