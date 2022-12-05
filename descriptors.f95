@@ -7634,7 +7634,6 @@ module descriptors_module
          endif
 
           ! jpd47 allocate new grad storage
-         ! original only
          if (original) then
             allocate(dX_r(0:this%l_max, max_n_neigh), dX_i(0:this%l_max, max_n_neigh))
             do l = 0, this%l_max
@@ -7647,7 +7646,8 @@ module descriptors_module
          else
             allocate(dY_r(2, 0:this%l_max, max_n_neigh), dY_i(2, 0:this%l_max, max_n_neigh))
             do n_i = 1, max_n_neigh
-               do ik = 1, SIZE(dY_r(:, 0, 1))
+               do ik = 1, 2
+                  if (sym_desc .and. ik == 1) cycle
                   k = K1
                   if (ik == 2) k = K2
                   do l = 0, this%l_max
@@ -7823,7 +7823,8 @@ module descriptors_module
                else
                   do n_i = 1, max_n_neigh
                      do l = 0, this%l_max
-                        do k = 1, size(dY_r(:, 0, 1))
+                        do k = 1, 2
+                           if (sym_desc .and. k == 1) cycle
                            dY_r(k, l, n_i)%mm = 0.0_dp
                            dY_i(k, l, n_i)%mm = 0.0_dp
                         enddo
@@ -7977,7 +7978,7 @@ module descriptors_module
                         dT_i(0, l)%mm(:, a) = aimag(l_tmp(1:2*l+1))
                      enddo ! a
 
-                     !jpd47 operate on the coefficients
+                     !jpd47 operate on the coefficients then pack them
                      ic = (i_species-1) * this%n_max
                      do ia = 1, 2
                         if (sym_desc .and. ia == 1) cycle
@@ -8035,7 +8036,6 @@ module descriptors_module
 
          !jpd47 new power spectrum calculation
          call cpu_time(sc_times(6))
-
          if (this%coupling) then
             !jpd47 standard full tensor product coupling between density channels.
             i_pow = 0
@@ -8049,7 +8049,7 @@ module descriptors_module
                   call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, X_i(l)%mm, 2*l+1, 1.0_dp, Pl, K1)
                ! everything else
                else
-                  !Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+
                   call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
                   call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
 
@@ -8140,11 +8140,9 @@ module descriptors_module
                      if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                      call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dY_r(2, l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
                      call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dY_i(2, l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
-                     ! K1 x 3 K2
 
                      if (.not. sym_desc) then
                         Pl_g2 = matmul(transpose(dY_r(1, l, n_i)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(1, l, n_i)%mm), Y_i(2,l)%mm)
-                        ! 3 K1 x K2
                         if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
                      endif
 
@@ -8155,10 +8153,10 @@ module descriptors_module
                      do ia = 1, K1
                         ub = K2
                         if (sym_desc) ub = ia
-                        a = modulo(ia, this%n_max)    !jpd47 never checked, probably wrong
+                        !a = modulo(ia, this%n_max)    !jpd47 never checked, probably wrong
                         do jb = 1, ub
-                           b = modulo(jb, this%n_max)
-                           if (this%diagonal_radial .and. a /= b) cycle
+                           !b = modulo(jb, this%n_max)
+                           !if (this%diagonal_radial .and. a /= b) cycle
                            ic = (jb-1) * 3
                            ir = (ia-1) * 3
                            if (sym_desc) then
@@ -8375,8 +8373,8 @@ module descriptors_module
       endif
 
       if (allocated(dY_R)) then
-         do n_i = 1, size(dY_R(1, 0, :))
-            do ik = 1, size(dY_R(:, 0, 1))
+         do n_i = 1, max_n_neigh
+            do ik = 1, 2
                do l = 0, this%l_max
                   if (allocated(dY_i(ik, l, n_i)%mm)) deallocate(dY_i(ik, l, n_i)%mm)
                   if (allocated(dY_r(ik, l, n_i)%mm)) deallocate(dY_r(ik, l, n_i)%mm)
@@ -8399,7 +8397,6 @@ module descriptors_module
 
       if (allocated(Pl_g1)) deallocate(Pl_g1)
       if (allocated(Pl_g2)) deallocate(Pl_g2)
-
       if (allocated(l_tmp)) deallocate(l_tmp)
 
 !$omp end parallel
