@@ -7379,7 +7379,7 @@ module descriptors_module
 
 
 
-
+   ! main branch currently ~1000 lines long, would be nice not to blow this up
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 
       type real_2d_array
@@ -8006,7 +8006,8 @@ module descriptors_module
                         dY_r(2, l, n_i)%mm(:, ir) = dX_r(2, l)%mm(:, ik)
                         dY_i(2, l, n_i)%mm(:, ir) = dX_i(2, l)%mm(:, ik)
                      enddo
-                     if (.not. sym_desc) then
+                     !jpd47 TODO not doing this was cause of spurious factor of 2 because dY(1, .., ..) getting used when coupling=F and sym_desc = T
+                     if (.not. sym_desc .or. .true.) then
                         do ik = 1, K1
                            ir = (ik-1)*3 + k
                            dY_r(1, l, n_i)%mm(:, ir) = dX_r(1, l)%mm(:, ik)
@@ -8200,6 +8201,7 @@ module descriptors_module
                   call cpu_time(sc_times(19))
                   sc_times(20) = sc_times(20) + sc_times(19) - sc_times(18)
 
+            !coupling=F and sym_mix=T leads to spurious factor of 2 where gradients are 2x actual
             elseif(.not. this%coupling ) then
                do l = 0, this%l_max
                   tlpo = 1.0_dp
@@ -8210,8 +8212,7 @@ module descriptors_module
                      !jpd47 doing 3 gradient directions in one shot via matmul
                      r_tmp = matmul(transpose(dY_r(1, l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik)) + matmul(transpose(dY_i(1, l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
                      r_tmp = r_tmp + matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik) ) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
-                     ! jpd47 TODO check why this factor of 2 is there!! added it on train without paper to check algebra
-                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo * 2
+                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo
                      i_pow = i_pow + this%l_max + 1
                   enddo
                enddo
