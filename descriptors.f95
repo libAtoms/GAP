@@ -7480,16 +7480,6 @@ module descriptors_module
       K2 = size(W(2)%mm(0,:))
       allocate(Pl(K1, K2))
 
-      ! allocate(Wz(2, this%n_species))
-      ! do ik = 1, 2
-      !    do i_species = 1, this%n_species
-      !       ic = (i_species-1)*this%n_max
-      !       allocate(Wz(ik, i_species)%mm(this%n_max, size(W(ik)%mm(0,:))))
-      !       Wz(ik, i_species)%mm = W(ik)%mm(ic+1:ic+this%n_max, :)
-      !    enddo
-      ! enddo
-
-
       ! print*, "K1 and K2 are", K1, K2
       ! print*, "K1 and K2 are", K1, K2
       ! print*, "shape of W(1) is", SHAPE(W(1)%mm), W(1)%mm(1,1)
@@ -7505,14 +7495,9 @@ module descriptors_module
       !    enddo
       ! enddo
 
-
+      ! jpd47 TODO remove this at the end
       call form_gs_index(this, gs_index, error)
-      !jpd47 this would have been wrecking having with anything to do with form_mix_W!!
-      !if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
-      !   sym_desc = .false.
-      !else
-      !   sym_desc = .true.
-      !endif
+
 
       do i_species = 1, this%n_species
          if(this%species_Z(i_species) == 0) then
@@ -7995,26 +7980,18 @@ module descriptors_module
                      !jpd47 operate on the coefficients
                      ic = (i_species-1) * this%n_max
                      do ia = 1, 2
+                        if (sym_desc .and. ia == 1) cycle
                         dT_r(ia, l)%mm = matmul(dT_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
                         dT_i(ia, l)%mm = matmul(dT_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
-                     enddo
 
-                     ! jpd47 package coefficients TODO combine these into a single loop
-                     ! jpd47 put this into loop above to simplify
-                     do ik = 1, K2
-                        ir = (ik-1)*3 + k
-                        dY_r(2, l, n_i)%mm(:, ir) = dT_r(2, l)%mm(:, ik)
-                        dY_i(2, l, n_i)%mm(:, ir) = dT_i(2, l)%mm(:, ik)
-                     enddo
-                     !jpd47 TODO not doing this was cause of spurious factor of 2 because dY(1, .., ..) getting used when coupling=F and sym_desc = T
-                     if (.not. sym_desc .or. .true.) then
-                        do ik = 1, K1
+                        ub = K1
+                        if (ia == 2) ub = K2
+                        do ik = 1, ub
                            ir = (ik-1)*3 + k
-                           dY_r(1, l, n_i)%mm(:, ir) = dT_r(1, l)%mm(:, ik)
-                           dY_i(1, l, n_i)%mm(:, ir) = dT_i(1, l)%mm(:, ik)
+                           dY_r(ia, l, n_i)%mm(:, ir) = dT_r(ia, l)%mm(:, ik)
+                           dY_i(ia, l, n_i)%mm(:, ir) = dT_i(ia, l)%mm(:, ik)
                         enddo
-                     endif
-
+                     enddo
                   enddo ! l
                enddo ! k
             endif ! my_do_grad_descriptor
@@ -8097,9 +8074,9 @@ module descriptors_module
                   if (sym_desc) then
                      ub = ia
                   endif
-                  a = rs_index(1,ia)
+                  if (this%diagonal_radial) a = rs_index(1,ia)
                   do jb = 1, ub
-                     b = rs_index(1,jb)
+                     if (this%diagonal_radial) b = rs_index(1,jb)
                      if (this%diagonal_radial .and. a /= b) cycle
                      descriptor_i(i_pow) = Pl(ia, jb)
                      if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
@@ -8191,7 +8168,6 @@ module descriptors_module
                            endif
 
                            if(ia /= jb .and. sym_desc ) r_tmp = r_tmp * SQRT_TWO
-                           !descriptor_out%x(i_desc_i)%grad_data(i_pow,:,n_i) = r_tmp
                            grad_descriptor_i(i_pow, :) = r_tmp
                            i_pow = i_pow + this%l_max+1
                         enddo
@@ -8209,8 +8185,12 @@ module descriptors_module
                   do ik = 1, K1
                      ir = (ik-1) * 3
                      !jpd47 doing 3 gradient directions in one shot via matmul
-                     r_tmp = matmul(transpose(dY_r(1, l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik)) + matmul(transpose(dY_i(1, l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
-                     r_tmp = r_tmp + matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik) ) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
+                     r_tmp = matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik)) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
+                     if (sym_desc) then
+                        r_tmp = r_tmp * 2
+                     else
+                        r_tmp = r_tmp + matmul(transpose(dY_r(1, l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik) ) + matmul(transpose(dY_i(1, l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
+                     endif
                      grad_descriptor_i(i_pow, :) = r_tmp * tlpo
                      i_pow = i_pow + this%l_max + 1
                   enddo
@@ -8424,14 +8404,6 @@ module descriptors_module
 
 !$omp end parallel
       if (allocated(W)) deallocate(W)
-      ! if (allocated(Wz)) then
-      !    do k = 1,2
-      !       do i_species = 1, this%n_species
-      !          if (allocated(Wz(k, i_species)%mm)) deallocate(Wz(k, i_species)%mm)
-      !       enddo
-      !    enddo
-      !    deallocate(Wz)
-      ! endif
       if (allocated(Pl)) deallocate(Pl)
 
 
