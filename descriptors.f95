@@ -8153,10 +8153,7 @@ module descriptors_module
                      do ia = 1, K1
                         ub = K2
                         if (sym_desc) ub = ia
-                        !a = modulo(ia, this%n_max)    !jpd47 never checked, probably wrong
                         do jb = 1, ub
-                           !b = modulo(jb, this%n_max)
-                           !if (this%diagonal_radial .and. a /= b) cycle
                            ic = (jb-1) * 3
                            ir = (ia-1) * 3
                            if (sym_desc) then
