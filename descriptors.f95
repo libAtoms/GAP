@@ -7429,10 +7429,10 @@ module descriptors_module
       integer :: max_n_neigh
 
       ! jpd47 new variables
-      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W, dZ_r, dZ_i
-      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dX_i, dX_r, Wz
+      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W
+      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dT_i, dT_r
       type(real_2d), dimension(:, :, :), allocatable, save ::  dY_r, dY_i
-      type(real_2d), dimension(:, :), allocatable, save :: dV_r, dV_i
+      type(real_2d), dimension(:, :), allocatable, save :: dX_r, dX_i
       real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
       integer :: ic, K1, K2, ir, ig, ik
       !integer, dimension(:, :), allocatable, save :: neighbour_list
@@ -7447,7 +7447,7 @@ module descriptors_module
 !$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
-!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, dZ_r, dZ_i, Pl_g1, Pl_g2, l_tmp, dV_r, dV_i)
+!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, Pl_g1, Pl_g2, l_tmp, dX_r, dX_i)
 
       INIT_ERROR(error)
       sc_times = 0.0
@@ -7480,14 +7480,14 @@ module descriptors_module
       K2 = size(W(2)%mm(0,:))
       allocate(Pl(K1, K2))
 
-      allocate(Wz(2, this%n_species))
-      do ik = 1, 2
-         do i_species = 1, this%n_species
-            ic = (i_species-1)*this%n_max
-            allocate(Wz(ik, i_species)%mm(this%n_max, size(W(ik)%mm(0,:))))
-            Wz(ik, i_species)%mm = W(ik)%mm(ic+1:ic+this%n_max, :)
-         enddo
-      enddo
+      ! allocate(Wz(2, this%n_species))
+      ! do ik = 1, 2
+      !    do i_species = 1, this%n_species
+      !       ic = (i_species-1)*this%n_max
+      !       allocate(Wz(ik, i_species)%mm(this%n_max, size(W(ik)%mm(0,:))))
+      !       Wz(ik, i_species)%mm = W(ik)%mm(ic+1:ic+this%n_max, :)
+      !    enddo
+      ! enddo
 
 
       ! print*, "K1 and K2 are", K1, K2
@@ -7651,11 +7651,11 @@ module descriptors_module
           ! jpd47 allocate new grad storage
          ! original only
          if (original) then
-            allocate(dV_r(0:this%l_max, max_n_neigh), dV_i(0:this%l_max, max_n_neigh))
+            allocate(dX_r(0:this%l_max, max_n_neigh), dX_i(0:this%l_max, max_n_neigh))
             do l = 0, this%l_max
                do n_i = 1, max_n_neigh
-                  allocate(dV_r(l, n_i)%mm(2*l+1, 3*this%n_max))
-                  allocate(dV_i(l, n_i)%mm(2*l+1, 3*this%n_max))
+                  allocate(dX_r(l, n_i)%mm(2*l+1, 3*this%n_max))
+                  allocate(dX_i(l, n_i)%mm(2*l+1, 3*this%n_max))
                enddo
             enddo
          ! general
@@ -7674,11 +7674,11 @@ module descriptors_module
          endif
 
          !jpd47 temporary storage for the gradient cofficients before multiplication
-         allocate(dX_r(0:2, 0:this%l_max), dX_i(0:2, 0:this%l_max))
+         allocate(dT_r(0:2, 0:this%l_max), dT_i(0:2, 0:this%l_max))
          do l = 0, this%l_max
-            allocate(dX_r(0, l)%mm(2*l+1, this%n_max), dX_i(0, l)%mm(2*l+1, this%n_max))
-            allocate(dX_r(1, l)%mm(2*l+1, K1), dX_i(1, l)%mm(2*l+1, K1))
-            allocate(dX_r(2, l)%mm(2*l+1, K2), dX_i(2, l)%mm(2*l+1, K2))
+            allocate(dT_r(0, l)%mm(2*l+1, this%n_max), dT_i(0, l)%mm(2*l+1, this%n_max))
+            allocate(dT_r(1, l)%mm(2*l+1, K1), dT_i(1, l)%mm(2*l+1, K1))
+            allocate(dT_r(2, l)%mm(2*l+1, K2), dT_i(2, l)%mm(2*l+1, K2))
          enddo
 
       endif
@@ -7830,8 +7830,8 @@ module descriptors_module
                if (original) then
                   do n_i= 1, max_n_neigh
                      do l = 0, this%l_max
-                        dV_r(l, n_i)%mm = 0.0_dp
-                        dV_i(l, n_i)%mm = 0.0_dp
+                        dX_r(l, n_i)%mm = 0.0_dp
+                        dX_i(l, n_i)%mm = 0.0_dp
                      enddo
                   enddo
                ! jpd47 general
@@ -7976,8 +7976,8 @@ module descriptors_module
                      do a = 1, this%n_max
                         ic = (a-1)*3 + k
                         l_tmp(1:2*l+1) =  grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(:) * u_ij(k) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(k,:)
-                        dV_r(l, n_i)%mm(:, ic) = real(l_tmp(1:2*l+1))
-                        dV_i(l, n_i)%mm(:, ic) = aimag(l_tmp(1:2*l+1))
+                        dX_r(l, n_i)%mm(:, ic) = real(l_tmp(1:2*l+1))
+                        dX_i(l, n_i)%mm(:, ic) = aimag(l_tmp(1:2*l+1))
                      enddo ! a
                   enddo ! l
                enddo ! k
@@ -7988,30 +7988,30 @@ module descriptors_module
                   do l = 0, this%l_max
                      do a = 1, this%n_max
                         l_tmp(1:2*l+1) =  grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(:) * u_ij(k) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(k,:)
-                        dX_r(0, l)%mm(:, a) =  real(l_tmp(1:2*l+1))
-                        dX_i(0, l)%mm(:, a) = aimag(l_tmp(1:2*l+1))
+                        dT_r(0, l)%mm(:, a) =  real(l_tmp(1:2*l+1))
+                        dT_i(0, l)%mm(:, a) = aimag(l_tmp(1:2*l+1))
                      enddo ! a
 
                      !jpd47 operate on the coefficients
                      ic = (i_species-1) * this%n_max
                      do ia = 1, 2
-                        dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
-                        dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        dT_r(ia, l)%mm = matmul(dT_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        dT_i(ia, l)%mm = matmul(dT_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
                      enddo
 
                      ! jpd47 package coefficients TODO combine these into a single loop
                      ! jpd47 put this into loop above to simplify
                      do ik = 1, K2
                         ir = (ik-1)*3 + k
-                        dY_r(2, l, n_i)%mm(:, ir) = dX_r(2, l)%mm(:, ik)
-                        dY_i(2, l, n_i)%mm(:, ir) = dX_i(2, l)%mm(:, ik)
+                        dY_r(2, l, n_i)%mm(:, ir) = dT_r(2, l)%mm(:, ik)
+                        dY_i(2, l, n_i)%mm(:, ir) = dT_i(2, l)%mm(:, ik)
                      enddo
                      !jpd47 TODO not doing this was cause of spurious factor of 2 because dY(1, .., ..) getting used when coupling=F and sym_desc = T
                      if (.not. sym_desc .or. .true.) then
                         do ik = 1, K1
                            ir = (ik-1)*3 + k
-                           dY_r(1, l, n_i)%mm(:, ir) = dX_r(1, l)%mm(:, ik)
-                           dY_i(1, l, n_i)%mm(:, ir) = dX_i(1, l)%mm(:, ik)
+                           dY_r(1, l, n_i)%mm(:, ir) = dT_r(1, l)%mm(:, ik)
+                           dY_i(1, l, n_i)%mm(:, ir) = dT_i(1, l)%mm(:, ik)
                         enddo
                      endif
 
@@ -8158,7 +8158,6 @@ module descriptors_module
 
                if (this%coupling .and. (.not. original)) then
                   do l = 0, this%l_max
-                     !Pl_g1 = matmul(transpose(Y_r(1, l)%mm), dZ_r(l)%mm) + matmul(transpose(Y_i(1,l)%mm), dZ_i(l)%mm)
                      ! call dgemm(transA, transB, M, N, K, alpha, A, LDA, B, LDB, beta, C, LDC)
                      tlpo = 1.0_dp
                      if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
@@ -8217,14 +8216,14 @@ module descriptors_module
                   enddo
                enddo
 
-            !jpd47 original power spectrum gradients as special case to exploit sparsity of dV_r w.r.t the neighbour species
+            !jpd47 original power spectrum gradients as special case to exploit sparsity of dX_r w.r.t the neighbour species
             else
                do l = 0, this%l_max
                   tlpo = 1.0_dp
                   if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                   !jpd47 TODO try swapping order here... might matter which one is transposed given big size difference
-                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, dV_r(l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
-                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, dV_i(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
+                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, dX_r(l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
+                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, dX_i(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
 
                   call cpu_time(sc_times(18))
                   ! jpd47 loop over neighbour atoms "unravelling" matrix form of gradients
@@ -8384,15 +8383,15 @@ module descriptors_module
          if (allocated(Y_i)) deallocate(Y_i)
       endif
 
-      if (allocated(dV_r)) then
+      if (allocated(dX_r)) then
          do l = 0, this%l_max
             do n_i = 1, max_n_neigh
-               if (allocated(dV_r(l, n_i)%mm)) deallocate(dV_r(l, n_i)%mm)
-               if (allocated(dV_i(l, n_i)%mm)) deallocate(dV_i(l, n_i)%mm)
+               if (allocated(dX_r(l, n_i)%mm)) deallocate(dX_r(l, n_i)%mm)
+               if (allocated(dX_i(l, n_i)%mm)) deallocate(dX_i(l, n_i)%mm)
             enddo
          enddo
-         if (allocated(dV_r)) deallocate(dV_r)
-         if (allocated(dV_i)) deallocate(dV_i)
+         if (allocated(dX_r)) deallocate(dX_r)
+         if (allocated(dX_i)) deallocate(dX_i)
       endif
 
       if (allocated(dY_R)) then
@@ -8408,13 +8407,13 @@ module descriptors_module
          if (allocated(dY_r)) deallocate(dY_r)
       endif
 
-      if (allocated(dX_r)) then
+      if (allocated(dT_r)) then
          do k = 0, 2
             do l = 0, this%l_max
-               deallocate(dX_r(k, l)%mm, dX_i(k, l)%mm)
+               deallocate(dT_r(k, l)%mm, dT_i(k, l)%mm)
             enddo
          enddo
-         deallocate(dX_r, dX_i)
+         deallocate(dT_r, dT_i)
       endif
 
 
@@ -8425,14 +8424,14 @@ module descriptors_module
 
 !$omp end parallel
       if (allocated(W)) deallocate(W)
-      if (allocated(Wz)) then
-         do k = 1,2
-            do i_species = 1, this%n_species
-               if (allocated(Wz(k, i_species)%mm)) deallocate(Wz(k, i_species)%mm)
-            enddo
-         enddo
-         deallocate(Wz)
-      endif
+      ! if (allocated(Wz)) then
+      !    do k = 1,2
+      !       do i_species = 1, this%n_species
+      !          if (allocated(Wz(k, i_species)%mm)) deallocate(Wz(k, i_species)%mm)
+      !       enddo
+      !    enddo
+      !    deallocate(Wz)
+      ! endif
       if (allocated(Pl)) deallocate(Pl)
 
 
