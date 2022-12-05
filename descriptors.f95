@@ -7264,6 +7264,7 @@ module descriptors_module
       real(dp), dimension(:,:), allocatable :: R
       integer, dimension(:), allocatable  :: seed
 
+      sym_desc = this%sym_mix
       call random_seed(size=n_seed)
       allocate(seed(n_seed))
       seed = 0
@@ -7506,11 +7507,12 @@ module descriptors_module
 
 
       call form_gs_index(this, gs_index, error)
-      if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
-         sym_desc = .false.
-      else
-         sym_desc = .true.
-      endif
+      !jpd47 this would have been wrecking having with anything to do with form_mix_W!!
+      !if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
+      !   sym_desc = .false.
+      !else
+      !   sym_desc = .true.
+      !endif
 
       do i_species = 1, this%n_species
          if(this%species_Z(i_species) == 0) then
@@ -7993,12 +7995,12 @@ module descriptors_module
                      !jpd47 operate on the coefficients
                      ic = (i_species-1) * this%n_max
                      do ia = 1, 2
-                        if (sym_desc .and. ia == 1) cycle
                         dX_r(ia, l)%mm = matmul(dX_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
                         dX_i(ia, l)%mm = matmul(dX_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
                      enddo
 
                      ! jpd47 package coefficients TODO combine these into a single loop
+                     ! jpd47 put this into loop above to simplify
                      do ik = 1, K2
                         ir = (ik-1)*3 + k
                         dY_r(2, l, n_i)%mm(:, ir) = dX_r(2, l)%mm(:, ik)
@@ -8161,9 +8163,11 @@ module descriptors_module
                      if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                      call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dY_r(2, l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
                      call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dY_i(2, l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
+                     ! K1 x 3 K2
 
                      if (.not. sym_desc) then
                         Pl_g2 = matmul(transpose(dY_r(1, l, n_i)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(1, l, n_i)%mm), Y_i(2,l)%mm)
+                        ! 3 K1 x K2
                         if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
                      endif
 
@@ -8174,8 +8178,7 @@ module descriptors_module
                      do ia = 1, K1
                         ub = K2
                         if (sym_desc) ub = ia
-                        a = modulo(ia, this%n_max)
-                        print*, "ia is", ia, "a is", a
+                        a = modulo(ia, this%n_max)    !jpd47 never checked, probably wrong
                         do jb = 1, ub
                            b = modulo(jb, this%n_max)
                            if (this%diagonal_radial .and. a /= b) cycle
