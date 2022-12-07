@@ -400,6 +400,8 @@ module descriptors_module
       logical :: sym_mix = .false.
       logical :: coupling = .false.
       integer :: K
+
+      character(len=STRING_LENGTH) :: Z_map_str
    endtype soap
 
 
@@ -2512,6 +2514,7 @@ module descriptors_module
       call param_register(params, 'sym_mix', 'F', this%sym_mix, help_string="symmetric mixing")
       call param_register(params, 'coupling', 'T', this%coupling, help_string="Full tensor product(=T) or Elementwise product(=F) between density channels")
       call param_register(params, 'K', '0', this%K, help_string="Number of mixing channels to create")
+      call param_register(params, 'Z_map', '', this%Z_map_str, help_string="string defining the Zmap")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -7291,16 +7294,105 @@ module descriptors_module
    endsubroutine form_mix_W
 
 
+   subroutine form_Zmap_W(this, W, sym_desc, error)
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      logical :: sym_desc
+      character ::  let
+      integer :: i, a, i_species, i_row, i_col
+      integer :: i_s, i_group, i_density, Z
+      integer :: n_groups(2), Ks(2)
+      type(real_2d), dimension(:), allocatable :: W
 
+      !set how many groups there are
+      n_groups = 1
+      i_density = 1
+      do i = 1, len(this%Z_map_str)
+         let = this%Z_map_str(i:i)
+         if (let == ",") n_groups(i_density) = n_groups(i_density) + 1
+         if (let == ":") i_density = i_density + 1
+      enddo
+      !print*, "n_groups= ", n_groups
+
+      !allocate W with the correct size
+      allocate(W(2))
+      Ks(1) = this%n_max*n_groups(1)
+      if (i_density==2) then
+         sym_desc=.false.
+         Ks(2) = this%n_max*n_groups(2)
+      else
+         sym_desc=.true.
+         Ks(2) = this%n_max*n_groups(1)
+      endif
+
+      do i_density = 1, 2
+         allocate( W(i_density)%mm(this%n_max*this%n_species, Ks(i_density)) )
+         W(i_density)%mm = 0.0_dp
+      enddo
+      !print*, "Ks are=", Ks
+
+      !loop over the string populating W
+      i_s = 0
+      i_group = 1
+      i_density = 1
+      do i = 1, len(this%Z_map_str)
+         let = this%Z_map_str(i:i)
+
+         !any number
+         if (SCAN(let, "1234567890") > 0 .and. i_s == 0) then
+            i_s = i
+         endif
+
+         !anything but a number
+         if (SCAN(let, "{} ,:") > 0 .and. i_s > 0 ) then
+            !Z -> i_species
+            read(this%Z_map_str(i_s:i-1), *) Z
+            i_species = 0
+            do i_s = 1, this%n_species
+               if (this%species_Z(i_s) == Z) i_species = i_s
+            enddo
+            i_s = 0
+            !print*, "Z is", Z, "i_group is", i_group, "i_density is", i_density, "i_species is", i_species
+
+            !now populate the correct bit in W
+            do a = 1, this%n_max
+               i_row = (i_species-1)*this%n_max + a
+               i_col = (i_group-1)*this%n_max + a
+               W(i_density)%mm(i_row, i_col) = 1.0_dp
+            enddo
+         endif
+
+         !increment group and density
+         if (SCAN(let, ",") > 0)   i_group = i_group + 1
+         if (SCAN(let, ":") > 0) then
+            i_density = i_density + 1
+            i_group = 1
+         endif
+
+      enddo
+
+      if (sym_desc) W(2)%mm = W(1)%mm
+   endsubroutine form_Zmap_W
 
    subroutine form_W(this, W, sym_desc, error)
       !replacement for the old rs_index
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
       type(real_2d), dimension(:), allocatable :: W
-      logical  :: sym_desc
+      logical  :: sym_desc, using_Zmap, mixing
+      integer :: n
 
       INIT_ERROR(error)
+
+      print*, "Zmap_str is", trim(this%Z_map_str)
+      n = len(trim(this%Z_map_str))
+      print*, "n is", n
+      if (len(trim(this%Z_map_str)) > 0 ) then
+         using_Zmap = .true.
+      else
+         using_Zmap = .false.
+      endif
+
 
       if(.not. this%initialised) then
          RAISE_ERROR("form_W: descriptor object not initialised", error)
@@ -7310,12 +7402,31 @@ module descriptors_module
          RAISE_ERROR("(nu_R, nu_S) = (2,2) required to use channel mixing", error)
       endif
 
+      if ((this%nu_R /= 2 .OR. this%nu_R /= 2) .and. (this%diagonal_radial)) then
+         RAISE_ERROR("(nu_R, nu_S) = (2,2) required to use diagonal radial", error)
+      endif
+
+      if ((this%nu_R /= 2 .OR. this%nu_R /= 2) .and. (using_Zmap)) then
+         RAISE_ERROR("(nu_R, nu_S) = (2,2) required to use Zmap", error)
+      endif
+
+      if ((this%R_mix .or. this%Z_mix .or. this%sym_mix) .and. using_Zmap) then
+         RAISE_ERROR("cant' using mixing and Zmap at the same time", error)
+      endif
+
+      !call the correct
       if (this%R_mix .or. this%Z_mix .or. this%sym_mix) then
          call form_mix_W(this, W, sym_desc, error)
+      elseif (using_Zmap) then
+         call form_Zmap_W(this, W, sym_desc, error)
       else
          call form_nu_W(this, W, sym_desc, error)
       endif
 
+      print*, "W is"
+      print*, W(1)%mm
+      print*, W(2)%mm
+      print*, "sym_desc is", sym_desc
    endsubroutine form_W
 
 
@@ -7417,7 +7528,7 @@ module descriptors_module
       original = .false.
       if (this%coupling .and. this%nu_R == 2 .and. this%nu_S == 2 .and. .not. (this%R_mix .or. this%Z_mix)) original = .true.
 
-      !jpd47 TODO replace this with form_WQ
+      !jpd47 form W mixing matrices
       call cpu_time(sc_times(1))
       call form_W(this, W, sym_desc, error)
       call cpu_time(sc_times(2))
@@ -7508,6 +7619,7 @@ module descriptors_module
       call finalise(descriptor_out)
 
       d = soap_dimensions(this, error)
+      print*, "jpd47 d is", d
 
       if(associated(atom_mask_pointer)) then
          call descriptor_sizes(this,at,n_descriptors,n_cross, &
