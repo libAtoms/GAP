@@ -7126,64 +7126,6 @@ module descriptors_module
 
    endsubroutine power_SO4_calc
 
-   subroutine form_gs_index(this, gs_index, error)
-      !replacement for the old rs_index
-      type(soap), intent(in) :: this
-      integer, optional, intent(out) :: error
-      integer :: a, i, j, smin, smax, sdif, nmin, nmax, ndif, j_species, nu_R, nu_S
-      type(int_2d), dimension(:), allocatable :: gs_index
-
-      INIT_ERROR(error)
-
-      if(.not. this%initialised) then
-         RAISE_ERROR("form_gs_index: descriptor object not initialised", error)
-      endif
-
-      if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
-         RAISE_ERROR("nu_R outside allowed range of 0-2", error)
-      endif
-
-      if (( this%nu_S > 2) .OR. (this%nu_S < 0)) then
-         RAISE_ERROR("nu_S outside allowed range of 0-2", error)
-      endif
-
-
-      allocate(gs_index(2))
-      nu_R = this%nu_R
-      nu_S = this%nu_S
-
-      !new loop
-      do i = 1,2
-         if (nu_R > 0) then
-            nmin = 1
-            nu_R  = nu_R - 1
-         else
-            nmin = 0
-         endif
-         nmax =this%n_max * nmin
-         ndif = nmax-nmin
-
-         if (nu_S > 0) then
-            smin = 1
-            nu_S  = nu_S - 1
-         else
-            smin = 0
-         endif
-         smax = this%n_species* smin
-         sdif = smax-smin
-         allocate(gs_index(i)%mm((ndif+1)*(sdif+1), 2))
-
-         j = 0
-         do j_species = smin, smax
-            do a = nmin, nmax
-               j = j +1
-               gs_index(i)%mm(j,:) = (/ j_species, a /)
-            enddo
-         enddo
-      enddo
-   endsubroutine form_gs_index
-
-
    subroutine form_nu_W(this, W, sym_desc, error)
       !replacement for the old rs_index
       type(soap), intent(in) :: this
@@ -7427,7 +7369,6 @@ module descriptors_module
       real(dp), dimension(:), allocatable :: global_fourier_so3_r_array, global_fourier_so3_i_array
       type(real_2d_array), dimension(:), allocatable :: global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array
       integer, dimension(total_elements) :: species_map
-      type(int_2d), dimension(:), allocatable :: gs_index
       complex(dp), allocatable, save :: sphericalycartesian_all_t(:,:), gradsphericalycartesian_all_t(:,:,:)
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
@@ -7500,10 +7441,6 @@ module descriptors_module
       !       print*,"W is", ia, jb, W(2)%mm(ia, jb)
       !    enddo
       ! enddo
-
-      ! jpd47 TODO remove this at the end
-      call form_gs_index(this, gs_index, error)
-
 
       do i_species = 1, this%n_species
          if(this%species_Z(i_species) == 0) then
@@ -7820,7 +7757,7 @@ module descriptors_module
       !print*, "jpd47_timings: second round of allocations took", sc_times(2)-sc_times(1)
       sc_times(1) = sc_times(2)
 
-!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc, W, K1, K2, max_n_neigh) &
+!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, sym_desc, W, K1, K2, max_n_neigh) &
 !$omp shared(dXG_r, dXG_i, dYG_r, dYG_i, norm_radial_decay) &
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs, ic, ir, ig, ik) &
 !$omp private(c_tmp, r_tmp) &
@@ -8778,23 +8715,16 @@ module descriptors_module
       if (allocated(Pl_g1)) deallocate(Pl_g1)
       if (allocated(Pl_g2)) deallocate(Pl_g2)
       if (allocated(l_tmp)) deallocate(l_tmp)
-
       if (allocated(W)) deallocate(W)
       if (allocated(Pl)) deallocate(Pl)
       if (allocated(rs_index)) deallocate(rs_index)
       if (allocated(i_desc)) deallocate(i_desc)
-      if (allocated(gs_index)) deallocate(gs_index)
-
-
 
       call system_timer('soap_calc')
 
       call cpu_time(sc_times(2))
       print*, "jpd47_timings: in total soap_calc took", sc_times(2)-sc_times(0)
    endsubroutine soap_calc
-
-
-
 
 
    subroutine rdf_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
