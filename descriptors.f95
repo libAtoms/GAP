@@ -8454,7 +8454,6 @@ module descriptors_module
          call cpu_time(sc_times(6))
          if (this%coupling) then
             !jpd47 standard full tensor product coupling between density channels.
-            i_pow = 0
             do l = 0, this%l_max
                tlpo = 1.0_dp
                if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
@@ -8465,7 +8464,6 @@ module descriptors_module
                   call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, X_i(l)%mm, 2*l+1, 1.0_dp, Pl, K1)
                ! everything else
                else
-
                   call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
                   call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
 
@@ -8578,7 +8576,7 @@ module descriptors_module
                         tlpo = 1.0_dp
                         if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                         call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dYG_r(i_desc_i, 2)%x(l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
-                        call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dYG_r(i_desc_i, 2)%x(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
+                        call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dYG_i(i_desc_i, 2)%x(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
 
                         if (.not. sym_desc) then
                            Pl_g2 = matmul(transpose(dYG_r(i_desc_i, 1)%x(l, n_i)%mm), Y_r(2,l)%mm) + matmul(transpose(dYG_i(i_desc_i, 1)%x(l, n_i)%mm), Y_i(2,l)%mm)
