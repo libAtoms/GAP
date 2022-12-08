@@ -7218,6 +7218,8 @@ module descriptors_module
 
       INIT_ERROR(error)
 
+      print*, "jpd47 this%mix_shift is", this%mix_shift
+
       !full Z and R mixing
       allocate(W(2))
       if (this%R_mix .and. this%Z_mix) then
@@ -7228,7 +7230,7 @@ module descriptors_module
             else
                do is = 1, this%n_species
                   !seed = this%species_Z(is)
-                  call system_reseed_rng(this%species_Z(is)+this%mix_shift)
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j)
                   ir = (is-1)*this%n_max
                   !call random_number(W(j)%mm(ir+1:ir+this%n_max, :))
                   do r_r = ir+1, ir+this%n_max
@@ -7251,7 +7253,7 @@ module descriptors_module
                allocate(R(this%n_species, this%K))
                do is = 1, this%n_species
                   !call random_number(R(is,:))
-                  call system_reseed_rng(this%species_Z(is)+this%mix_shift)
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j)
                   do r_c = 1, this%K*this%n_max
                      R(is, r_c) = ran_normal()
                   enddo
@@ -7280,7 +7282,7 @@ module descriptors_module
             else
                allocate(R(this%n_max, this%K))
                !call random_number(R)
-               call system_reseed_rng(this%n_max+this%mix_shift)
+               call system_reseed_rng(this%n_max+this%mix_shift+j)
                do r_r = 1, this%n_max
                   do r_c = 1, this%K
                      R(r_r, r_c) = ran_normal()
@@ -7544,7 +7546,7 @@ module descriptors_module
       ! jpd47 logical for special routines to keep original power spectrum fast
       original = .false.
       if (this%coupling .and. this%nu_R == 2 .and. this%nu_S == 2) original = .true.
-      if (.not. (this%R_mix .or. this%Z_mix)) original = .false.
+      if (this%R_mix .or. this%Z_mix .or. this%sym_mix) original = .false.
       if (len(trim(this%Z_map_str)) > 0 ) original = .false.
       print*, "original is", original
 
