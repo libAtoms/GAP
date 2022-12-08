@@ -7526,7 +7526,10 @@ module descriptors_module
 
       ! jpd47 logical for special routines to keep original power spectrum fast
       original = .false.
-      if (this%coupling .and. this%nu_R == 2 .and. this%nu_S == 2 .and. .not. (this%R_mix .or. this%Z_mix)) original = .true.
+      if (this%coupling .and. this%nu_R == 2 .and. this%nu_S == 2) original = .true.
+      if (.not. (this%R_mix .or. this%Z_mix)) original = .false.
+      if (len(trim(this%Z_map_str)) > 0 ) original = .false.
+      print*, "original is", original
 
       !jpd47 form W mixing matrices
       call cpu_time(sc_times(1))
