@@ -400,6 +400,7 @@ module descriptors_module
       logical :: sym_mix = .false.
       logical :: coupling = .false.
       integer :: K
+      integer :: mix_shift = 0
 
       character(len=STRING_LENGTH) :: Z_map_str
    endtype soap
@@ -2514,6 +2515,7 @@ module descriptors_module
       call param_register(params, 'sym_mix', 'F', this%sym_mix, help_string="symmetric mixing")
       call param_register(params, 'coupling', 'T', this%coupling, help_string="Full tensor product(=T) or Elementwise product(=F) between density channels")
       call param_register(params, 'K', '0', this%K, help_string="Number of mixing channels to create")
+      call param_register(params, 'mix_shift', '0', this%mix_shift, help_string="shift for random number seed used to generate mixing weights")
       call param_register(params, 'Z_map', '', this%Z_map_str, help_string="string defining the Zmap")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
@@ -2666,6 +2668,7 @@ module descriptors_module
       this%sym_mix = .false.
       this%coupling = .true.
       this%K = 0
+      this%mix_shift = 0
 
       if(allocated(this%r_basis)) deallocate(this%r_basis)
       if(allocated(this%transform_basis)) deallocate(this%transform_basis)
@@ -7225,7 +7228,7 @@ module descriptors_module
             else
                do is = 1, this%n_species
                   !seed = this%species_Z(is)
-                  call system_reseed_rng(this%species_Z(is))
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift)
                   ir = (is-1)*this%n_max
                   !call random_number(W(j)%mm(ir+1:ir+this%n_max, :))
                   do r_r = ir+1, ir+this%n_max
@@ -7248,7 +7251,7 @@ module descriptors_module
                allocate(R(this%n_species, this%K))
                do is = 1, this%n_species
                   !call random_number(R(is,:))
-                  call system_reseed_rng(this%species_Z(is))
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift)
                   do r_c = 1, this%K*this%n_max
                      R(is, r_c) = ran_normal()
                   enddo
@@ -7277,7 +7280,7 @@ module descriptors_module
             else
                allocate(R(this%n_max, this%K))
                !call random_number(R)
-               call system_reseed_rng(this%n_max)
+               call system_reseed_rng(this%n_max+this%mix_shift)
                do r_r = 1, this%n_max
                   do r_c = 1, this%K
                      R(r_r, r_c) = ran_normal()
