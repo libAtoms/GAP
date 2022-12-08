@@ -38,7 +38,7 @@
 module descriptors_module
 
    use error_module
-   use system_module, only : dp, print, optional_default, system_timer, operator(//), split_string, string_to_int, split_string_simple, inoutput, OUTPUT, PRINT_VERBOSE, PRINT_NERD
+   use system_module, only : dp, print, optional_default, system_timer, operator(//), split_string, string_to_int, split_string_simple, inoutput, OUTPUT, PRINT_VERBOSE, PRINT_NERD, ran_normal, system_reseed_rng, system_get_random_seed
    use linkedlist_module
    use units_module
    use periodictable_module
@@ -7205,17 +7205,17 @@ module descriptors_module
       integer, optional, intent(out) :: error
       type(real_2d), dimension(:), allocatable :: W
       logical  :: sym_desc
-      integer  :: ik, in, is, ic, ir, j, n_seed
+      integer  :: ik, in, is, ic, ir, j, r_r, r_c
       real(dp), dimension(:,:), allocatable :: R
-      integer, dimension(:), allocatable  :: seed
+      integer :: orig_seed
 
+      !store the original random seed and reset it to this at the end
+      orig_seed = system_get_random_seed()
       sym_desc = this%sym_mix
-      call random_seed(size=n_seed)
-      allocate(seed(n_seed))
-      seed = 0
 
       INIT_ERROR(error)
-      print*, "In form_mix_W", this%Z_mix, this%R_mix, this%sym_mix
+
+      !full Z and R mixing
       allocate(W(2))
       if (this%R_mix .and. this%Z_mix) then
          do j = 1, 2
@@ -7224,14 +7224,21 @@ module descriptors_module
                W(2)%mm = W(1)%mm
             else
                do is = 1, this%n_species
-                  seed = this%species_Z(is)
+                  !seed = this%species_Z(is)
+                  call system_reseed_rng(this%species_Z(is))
                   ir = (is-1)*this%n_max
-                  call random_seed(put=seed)
-                  call random_number(W(j)%mm(ir+1:ir+this%n_max, :))
+                  !call random_number(W(j)%mm(ir+1:ir+this%n_max, :))
+                  do r_r = ir+1, ir+this%n_max
+                     do r_c = 1, this%K
+                        W(j)%mm(r_r, r_c) = ran_normal()
+                     enddo
+                  enddo
+
                enddo
             endif
          enddo
 
+      !mix elements only
       elseif (this%Z_mix) then
          do j = 1, 2
             allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_max))
@@ -7240,9 +7247,11 @@ module descriptors_module
             else
                allocate(R(this%n_species, this%K))
                do is = 1, this%n_species
-                  seed = this%species_Z(is)
-                  call random_seed(put=seed)
-                  call random_number(R(is,:))
+                  !call random_number(R(is,:))
+                  call system_reseed_rng(this%species_Z(is))
+                  do r_c = 1, this%K*this%n_max
+                     R(is, r_c) = ran_normal()
+                  enddo
                enddo
 
                ir = 0
@@ -7259,6 +7268,7 @@ module descriptors_module
             endif
          enddo
 
+      !mix radial channels only
       elseif (this%R_mix) then
          do j = 1, 2
             allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_species))
@@ -7266,9 +7276,14 @@ module descriptors_module
                W(2)%mm = W(1)%mm
             else
                allocate(R(this%n_max, this%K))
-               seed = this%n_max
-               call random_seed(put=seed)
-               call random_number(R)
+               !call random_number(R)
+               call system_reseed_rng(this%n_max)
+               do r_r = 1, this%n_max
+                  do r_c = 1, this%K
+                     R(r_r, r_c) = ran_normal()
+                  enddo
+               enddo
+
                ir = 0
                do is = 1, this%n_species
                   do in = 1, this%n_max
@@ -7287,10 +7302,9 @@ module descriptors_module
          RAISE_ERROR("form_mix_W: not mixing anything", error)
       endif
 
-      !jpd47 center the uniform random numbers on zero
-      do j = 1, 2
-         W(j)%mm = W(j)%mm - 0.5
-      enddo
+      !reset the system random seed
+      call system_reseed_rng(orig_seed)
+
    endsubroutine form_mix_W
 
 
