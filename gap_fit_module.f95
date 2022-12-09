@@ -2212,7 +2212,7 @@ contains
    integer(idp), parameter :: bit_limit = 2_idp**31
 
    integer :: nrows, nrows0, trows, ncols, mb_A, nb_A, i
-   integer(idp) :: lwork1, lwork2, trows64
+   integer(idp) :: lwork1, lwork2, trows64, size_A_local
 
    if (.not. this%task_manager%active) return
 
@@ -2238,6 +2238,14 @@ contains
    i = nrows - nrows0
    call print("distA extension: "//i//" "//ncols//" memory "//i2si(8_idp * i * ncols)//"B", PRINT_VERBOSE)
 
+   ! transfer nrows and blocksizes to gp_predict
+   this%task_manager%idata(1) = nrows
+   this%task_manager%idata(2) = mb_A
+   this%task_manager%idata(3) = nb_A
+
+   if (iwp == idp) return ! ignore 32bit checks for 64bit compilation
+
+
    trows64 = int(nrows, idp) * this%task_manager%n_workers
    trows = int(trows64, isp)
    if (trows > bit_limit) then
@@ -2253,11 +2261,15 @@ contains
          //"Set mpi_blocksize_cols to something smaller, see --help.")
    end if
 
-   ! transfer nrows and blocksizes to gp_predict
-   this%task_manager%idata(1) = nrows
-   this%task_manager%idata(2) = mb_A
-   this%task_manager%idata(3) = nb_A
- end subroutine gap_fit_set_mpi_blocksizes
+   size_A_local = int(nrows, idp) * ncols
+   if (size_A_local > bit_limit) then
+      i = (trows64 * ncols + bit_limit - 1) / bit_limit
+      call system_abort("The local part of matrix A will have "//size_A_local//" entries."//char(10) &
+         // "This is too large for a 32bit integer calculation."//char(10) &
+         // "Use at least "//i//" MPI processes instead.")
+   end if
+
+  end subroutine gap_fit_set_mpi_blocksizes
 
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
