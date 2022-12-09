@@ -8683,12 +8683,23 @@ module descriptors_module
                   Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
                endif
 
+               !OLD VERSION without coupling inds
+               ! i_pow = l + 1
+               ! do ik = 1, K1
+               !    descriptor_i(i_pow) =  dot_product(Y_r(1, l)%mm(:, ik), Y_r(2, l)%mm(:, ik)) + dot_product(Y_i(1, l)%mm(:, ik), Y_i(2, l)%mm(:, ik))
+               !    if (do_two_l_plus_one) descriptor_i(i_pow)  = descriptor_i(i_pow) * tlpo
+               !    i_pow = i_pow + this%l_max + 1
+               ! enddo
+
                i_pow = l + 1
-               do ik = 1, K1
-                  descriptor_i(i_pow) =  dot_product(Y_r(1, l)%mm(:, ik), Y_r(2, l)%mm(:, ik)) + dot_product(Y_i(1, l)%mm(:, ik), Y_i(2, l)%mm(:, ik))
+               do ik = 1, SIZE(sym_facs)
+                  ia = coupling_inds(ik, 1)
+                  jb = coupling_inds(ik, 2)
+                  descriptor_i(i_pow) = (dot_product(Y_r(1, l)%mm(:, ia), Y_r(2, l)%mm(:, jb)) + dot_product(Y_i(1, l)%mm(:, ia), Y_i(2, l)%mm(:, jb))) * sym_facs(ik)
                   if (do_two_l_plus_one) descriptor_i(i_pow)  = descriptor_i(i_pow) * tlpo
                   i_pow = i_pow + this%l_max + 1
                enddo
+
             enddo
          endif
          !jpd47 ********** end of code duplication. Avoid with function / subroutine ??
@@ -8778,20 +8789,41 @@ module descriptors_module
 
                   ! jpd47 element-wise coupling
                   elseif(.not. this%coupling ) then
+                     ! do l = 0, this%l_max
+                     !    tlpo = 1.0_dp
+                     !    if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                     !    i_pow = l + 1
+                     !    do ik = 1, K1
+                     !       ir = (ik-1) * 3
+                     !       !jpd47 doing 3 gradient directions in one shot via matmul
+                     !       r_tmp = matmul(transpose(dYG_r(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik)) + matmul(transpose(dYG_i(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
+                     !       if (sym_desc) then
+                     !          r_tmp = r_tmp * 2
+                     !       else
+                     !          r_tmp = r_tmp + matmul(transpose(dYG_r(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik) ) + matmul(transpose(dYG_i(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
+                     !       endif
+                     !       grad_descriptor_i(i_pow, :) = r_tmp * tlpo
+                     !       i_pow = i_pow + this%l_max + 1
+                     !    enddo
+                     ! enddo
+
                      do l = 0, this%l_max
                         tlpo = 1.0_dp
                         if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                         i_pow = l + 1
-                        do ik = 1, K1
-                           ir = (ik-1) * 3
-                           !jpd47 doing 3 gradient directions in one shot via matmul
-                           r_tmp = matmul(transpose(dYG_r(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik)) + matmul(transpose(dYG_i(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
+                        !do ik = 1, K1
+                        do ik = 1, SIZE(sym_facs)
+                           ia = coupling_inds(ik, 1)
+                           jb = coupling_inds(ik, 2)
+                           ir = (jb-1) * 3
+                           r_tmp = matmul(transpose(dYG_r(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ia)) + matmul(transpose(dYG_i(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ia) )
+                           ir = (ia-1)*3
                            if (sym_desc) then
-                              r_tmp = r_tmp * 2
+                              r_tmp = r_tmp + matmul(transpose(dYG_r(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, jb) ) + matmul(transpose(dYG_i(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, jb) )
                            else
-                              r_tmp = r_tmp + matmul(transpose(dYG_r(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik) ) + matmul(transpose(dYG_i(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
+                              r_tmp = r_tmp + matmul(transpose(dYG_r(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, jb) ) + matmul(transpose(dYG_i(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, jb) )
                            endif
-                           grad_descriptor_i(i_pow, :) = r_tmp * tlpo
+                           grad_descriptor_i(i_pow, :) = r_tmp * tlpo * sym_facs(ik)
                            i_pow = i_pow + this%l_max + 1
                         enddo
                      enddo
