@@ -7132,6 +7132,91 @@ module descriptors_module
 
    endsubroutine power_SO4_calc
 
+   subroutine form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
+      !forms coupling inds
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      integer, intent(in) :: K1
+
+      integer :: i, d, a, b, k, ik, ub, i_species, j_species
+      integer, dimension(:, :), allocatable :: coupling_inds
+      real, dimension(:), allocatable :: sym_facs
+
+      !Z_mixing only
+      if (this%Z_mix .and. (.not. this%R_mix)) then
+         print*, "jpd47 mixing is Z_mix only"
+         if (this%sym_mix) then
+            d = this%K * (this%n_max*(this%n_max+1))/2
+         else
+            d = this%K* this%n_max**2
+         endif
+         allocate(coupling_inds(d, 2))
+         allocate(sym_facs(d))
+         i = 1
+         do k = 1, this%K
+            ik = (k-1) * this%n_max
+            do a = 1, this%n_max
+                  ub = this%n_max
+                  if (this%sym_mix) ub = a
+                  do b = 1, ub
+                     coupling_inds(i,:) = (/ik+a, ik+b /)
+                     if (a /= b .and. this%sym_mix) then
+                        sym_facs(i) = SQRT_TWO
+                     else
+                        sym_facs(i) = 1.0
+                     endif
+                     i = i + 1
+                  enddo
+            enddo
+         enddo
+
+      !radial mixing only
+      elseif (this%R_mix .and. (.not. this%Z_mix)) then
+         print*, "jpd47 mixing is R_mix only"
+
+         if (this%sym_mix) then
+            d = this%K * (this%n_species*(this%n_species+1))/2
+         else
+            d = this%K * this%n_species**2
+         endif
+         allocate(coupling_inds(d, 2))
+         allocate(sym_facs(d))
+         i = 1
+
+         do i_species = 1, this%n_species
+            ub = this%n_species
+            if (this%sym_mix) ub = i_species
+            do j_species = 1, ub
+                  do k = 1, this%K
+                     coupling_inds(i,:) = (/(i_species-1)*this%K + k,  (j_species-1)*this%K + k/)
+                     if (i_species /= j_species .and. this%sym_mix) then
+                        sym_facs(i) = SQRT_TWO
+                     else
+                        sym_facs(i) = 1.0
+                     endif
+                     i = i + 1
+                  enddo
+            enddo
+         enddo
+
+      !everything else aka default is elementwise coupling only
+      else
+         print*, "jpd47 mixing is default"
+
+         allocate(coupling_inds(K1, 2))
+         allocate(sym_facs(K1))
+         do i = 1, K1
+            coupling_inds(i,:) = (/i, i/)
+            sym_facs(i) = 1.0
+         enddo
+      endif
+
+   do i = 1, size(sym_facs)
+      print*, "jpd47 i=1", i, coupling_inds(i, :), sym_facs(i)
+   enddo
+   endsubroutine form_coupling_inds
+
+
    subroutine form_nu_W(this, W, sym_desc, error)
       !replacement for the old rs_index
       type(soap), intent(in) :: this
@@ -7247,6 +7332,7 @@ module descriptors_module
       elseif (this%Z_mix) then
          do j = 1, 2
             allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_max))
+            W(j)%mm = 0.0_dp
             if (this%sym_mix .and. j == 2) then
                W(2)%mm = W(1)%mm
             else
@@ -7254,7 +7340,7 @@ module descriptors_module
                do is = 1, this%n_species
                   !call random_number(R(is,:))
                   call system_reseed_rng(this%species_Z(is)+this%mix_shift+j)
-                  do r_c = 1, this%K*this%n_max
+                  do r_c = 1, this%K
                      R(is, r_c) = ran_normal()
                   enddo
                enddo
@@ -7277,6 +7363,7 @@ module descriptors_module
       elseif (this%R_mix) then
          do j = 1, 2
             allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_species))
+            W(j)%mm = 0.0_dp
             if (this%sym_mix .and. j == 2) then
                W(2)%mm = W(1)%mm
             else
@@ -7293,7 +7380,7 @@ module descriptors_module
                do is = 1, this%n_species
                   do in = 1, this%n_max
                      ir = ir + 1
-                     do ik = 1, this%k
+                     do ik = 1, this%K
                         ic = (is-1)*this%K + ik
                         W(j)%mm(ir, ic) = R(in, ik)
                      enddo
@@ -7518,6 +7605,8 @@ module descriptors_module
       real, dimension(0:50) :: sc_times
       complex(dp), dimension(:), allocatable, save :: l_tmp
       logical :: original
+      integer, dimension(:, :), allocatable :: coupling_inds
+      real, dimension(:), allocatable :: sym_facs
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
@@ -7548,16 +7637,19 @@ module descriptors_module
       if (this%coupling .and. this%nu_R == 2 .and. this%nu_S == 2) original = .true.
       if (this%R_mix .or. this%Z_mix .or. this%sym_mix) original = .false.
       if (len(trim(this%Z_map_str)) > 0 ) original = .false.
-      print*, "original is", original
+
 
       !jpd47 form W mixing matrices
       call cpu_time(sc_times(1))
       call form_W(this, W, sym_desc, error)
+      K1 = size(W(1)%mm(0,:))
+      K2 = size(W(2)%mm(0,:))
+      if (.not. this%coupling)   call form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
       call cpu_time(sc_times(2))
       !print*, "jpd47_timings: form_W took", sc_times(2)-sc_times(1)
 
-      K1 = size(W(1)%mm(0,:))
-      K2 = size(W(2)%mm(0,:))
+      print*, "jpd47 original is", original, "and sym_desc is", sym_desc
+
       allocate(Pl(K1, K2))
 
       ! print*, "K1 and K2 are", K1, K2
@@ -8227,8 +8319,10 @@ module descriptors_module
                endif
 
                i_pow = l + 1
-               do ik = 1, K1
-                  descriptor_i(i_pow) =  dot_product(Y_r(1, l)%mm(:, ik), Y_r(2, l)%mm(:, ik)) + dot_product(Y_i(1, l)%mm(:, ik), Y_i(2, l)%mm(:, ik))
+               do ik = 1, SIZE(sym_facs)
+                  ia = coupling_inds(ik, 1)
+                  jb = coupling_inds(ik, 2)
+                  descriptor_i(i_pow) = (dot_product(Y_r(1, l)%mm(:, ia), Y_r(2, l)%mm(:, jb)) + dot_product(Y_i(1, l)%mm(:, ia), Y_i(2, l)%mm(:, jb))) * sym_facs(ik)
                   if (do_two_l_plus_one) descriptor_i(i_pow)  = descriptor_i(i_pow) * tlpo
                   i_pow = i_pow + this%l_max + 1
                enddo
@@ -8302,16 +8396,19 @@ module descriptors_module
                   tlpo = 1.0_dp
                   if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                   i_pow = l + 1
-                  do ik = 1, K1
-                     ir = (ik-1) * 3
-                     !jpd47 doing 3 gradient directions in one shot via matmul
-                     r_tmp = matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ik)) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ik) )
+                  !do ik = 1, K1
+                  do ik = 1, SIZE(sym_facs)
+                     ia = coupling_inds(ik, 1)
+                     jb = coupling_inds(ik, 2)
+                     ir = (jb-1) * 3
+                     r_tmp = matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ia)) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ia) )
+                     ir = (ia-1)*3
                      if (sym_desc) then
-                        r_tmp = r_tmp * 2
+                        r_tmp = r_tmp + matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, jb) ) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, jb) )
                      else
-                        r_tmp = r_tmp + matmul(transpose(dY_r(1, l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, ik) ) + matmul(transpose(dY_i(1, l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, ik) )
+                        r_tmp = r_tmp + matmul(transpose(dY_r(1, l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, jb) ) + matmul(transpose(dY_i(1, l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, jb) )
                      endif
-                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo
+                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo * sym_facs(ik)
                      i_pow = i_pow + this%l_max + 1
                   enddo
                enddo
@@ -8853,6 +8950,8 @@ module descriptors_module
       if (allocated(Pl)) deallocate(Pl)
       if (allocated(rs_index)) deallocate(rs_index)
       if (allocated(i_desc)) deallocate(i_desc)
+      if (allocated(coupling_inds)) deallocate(coupling_inds)
+      if (allocated(sym_facs)) deallocate(sym_facs)
 
       call system_timer('soap_calc')
 
@@ -10678,6 +10777,8 @@ module descriptors_module
       integer :: i, K1, K2
       logical :: sym_desc
       type(real_2d), dimension(:), allocatable :: W
+      integer, dimension(:, :), allocatable :: coupling_inds
+      real, dimension(:), allocatable :: sym_facs
 
       INIT_ERROR(error)
 
@@ -10704,10 +10805,14 @@ module descriptors_module
          if (K1 /= K2) then
             RAISE_ERROR("require K1=K2 to use elementwise coupling", error)
          endif
-         i = K1 * (this%l_max + 1) + 1
+
+         call form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
+         i = SIZE(sym_facs) * (this%l_max + 1) + 1
       endif
 
       if (allocated(W)) deallocate(W)
+      if (allocated(coupling_inds)) deallocate(coupling_inds)
+      if (allocated(sym_facs)) deallocate(sym_facs)
    endfunction soap_dimensions
 
 
