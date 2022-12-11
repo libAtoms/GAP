@@ -188,22 +188,7 @@ module gp_fit_module
          call print('NONE type sparsification specified. The number of sparse points was changed to '//this%n_sparseX//' from '//n_sparseX//'.')
 
       elseif(my_sparseMethod == GP_SPARSE_FILE .or. my_sparseMethod == GP_SPARSE_INDEX_FILE) then
-         inquire(file=trim(my_sparse_file),exist=exist_sparse_file)
-         if(.not. exist_sparse_file) then
-            RAISE_ERROR('gpCoordinates_sparsify: '//trim(my_sparse_file)//' does not exist',error)
-         endif
-         
-         call fwc_l(trim(my_sparse_file)//C_NULL_CHAR,n_sparse_file)
-         if( my_sparseMethod == GP_SPARSE_FILE ) then
-            if(mod(n_sparse_file,d+1) /= 0) then
-               RAISE_ERROR('gpCoordinates_sparsify: file '//trim(my_sparse_file)//' contains '//n_sparse_file//" lines, not conforming with descriptor size "//d,error)
-            endif
-
-            this%n_sparseX = n_sparse_file / ( d + 1 )
-         else
-            this%n_sparseX = n_sparse_file
-         endif
-
+         this%n_sparseX = count_entries_in_sparse_file(my_sparse_file, my_sparseMethod, d, error)
       else
          do i_config_type = 1, size(n_sparseX)
             if(default_all) then
@@ -402,6 +387,38 @@ module gp_fit_module
       this%sparsified = .true.
 
    endsubroutine gpCoordinates_sparsify_config_type
+
+   function count_entries_in_sparse_file(sparse_file, sparse_method, d, error) result(res)
+      character(len=*), intent(in) :: sparse_file
+      integer, intent(in) :: sparse_method
+      integer, intent(in) :: d ! coordinate_length
+      integer, intent(out), optional :: error
+      integer :: res
+
+      logical :: exist_sparse_file
+      integer :: n_sparse_file
+
+      INIT_ERROR(error)
+
+      inquire(file=trim(sparse_file), exist=exist_sparse_file)
+      if (.not. exist_sparse_file) then
+         RAISE_ERROR('count_entries_in_sparse_file: '//trim(sparse_file)//' does not exist', error)
+      end if
+
+      call fwc_l(trim(sparse_file)//C_NULL_CHAR, n_sparse_file)
+
+      select case (sparse_method)
+         case (GP_SPARSE_INDEX_FILE)
+            res = n_sparse_file
+         case (GP_SPARSE_FILE)
+            if (mod(n_sparse_file, d+1) /= 0) then
+               RAISE_ERROR('count_entries_in_sparse_file: file '//trim(sparse_file)//' contains '//n_sparse_file//" lines, not conforming with descriptor size "//d, error)
+            end if
+            res = n_sparse_file / (d + 1)
+         case default
+            RAISE_ERROR('count_entries_in_sparse_file: given sparse_method is not implemented: '//sparse_method, error)
+      end select
+   end function count_entries_in_sparse_file
 
    subroutine gpFull_sparsify_array_config_type(this, n_sparseX, default_all, sparseMethod, sparse_file, use_actual_gpcov, print_sparse_index, &
          unique_hash_tolerance, unique_descriptor_tolerance, error)
