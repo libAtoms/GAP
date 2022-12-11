@@ -67,6 +67,8 @@ module gp_fit_module
    endinterface gp_sparsify
    public :: gp_sparsify
 
+   public :: count_entries_in_sparse_file
+
    contains
 
    subroutine gpCoordinates_sparsify_config_type(this, n_sparseX, default_all, sparseMethod, sparse_file, use_actual_gpcov, print_sparse_index, &

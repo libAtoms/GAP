@@ -131,6 +131,7 @@ module gap_fit_module
   public :: file_print_xml
 !  public :: print_sparse
   public :: set_baselines
+  public :: get_n_sparseX_for_files
   public :: parse_config_type_sigma
   public :: parse_config_type_n_sparseX
   public :: read_fit_xyz
@@ -1741,6 +1742,26 @@ contains
 !    endif
 !
 !  endsubroutine print_sparse
+
+  subroutine get_n_sparseX_for_files(this)
+     type(gap_fit), intent(inout) :: this
+
+     integer :: i, n_sparseX, d
+
+     do i = 1, this%n_coordinate
+       if (all(this%sparse_method(i) /= [GP_SPARSE_FILE, GP_SPARSE_INDEX_FILE])) cycle
+
+       d = descriptor_dimensions(this%my_descriptor(i))
+       n_sparseX = count_entries_in_sparse_file(this%sparse_file(i), this%sparse_method(i), d)
+
+       if (this%n_sparseX(i) /= 0 .and. this%n_sparseX(i) /= n_sparseX) then
+         call system_abort("get_n_sparseX_for_files: Given n_sparse ("//this%n_sparseX(i)//") " &
+            // "does not match with file ("//n_sparseX//"). ")
+       end if
+
+       this%n_sparseX(i) = n_sparseX
+     end do
+  end subroutine get_n_sparseX_for_files
 
   subroutine parse_config_type_sigma(this)
     type(gap_fit), intent(inout) :: this
