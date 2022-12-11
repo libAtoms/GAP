@@ -2278,15 +2278,15 @@ contains
    lwork2 = get_lwork_pdormqr(this%ScaLAPACK_obj, 'L', trows, 1, mb_A, nb_A, mb_A, 1)
    call print("lwork_pdormqr = "//lwork2//" = "//int(lwork2, isp), PRINT_VERBOSE)
    if (max(lwork1, lwork2) > bit_limit) then
-      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!"//char(10) &
+      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!" &
          //"Set mpi_blocksize_cols to something smaller, see --help.")
    end if
 
    size_A_local = int(nrows, idp) * ncols
    if (size_A_local > bit_limit) then
       i = (trows64 * ncols + bit_limit - 1) / bit_limit
-      call system_abort("The local part of matrix A will have "//size_A_local//" entries."//char(10) &
-         // "This is too large for a 32bit integer calculation."//char(10) &
+      call system_abort("The local part of matrix A will have "//size_A_local//" entries. " &
+         // "This is too large for a 32bit integer calculation. " &
          // "Use at least "//i//" MPI processes instead.")
    end if
 
