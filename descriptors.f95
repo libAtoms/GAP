@@ -7268,16 +7268,20 @@ module descriptors_module
          endif
          allocate(W(i)%mm(this%n_max * this%n_species, K))
          W(i)%mm(:,:) = 0.0_dp
+
          !loop over S and N, populating W. 4 Loops but just looping over rows and columns of matrix
          ir = 0
          do s = 1, this%n_species
             do n = 1, this%n_max
                ir = ir + 1       ! row index in W
+
+               ic = 0
                do s2 = 1, s2_max
                   do n2 = 1, n2_max
+                     ic = ic + 1
                      if (ds*s == ds*s2 .and. dn*n == dn*n2) then
-                        ic = 1 + (s2-1)*ds*n2_max + (n2-1)*dn
-                        W(i)%mm(ir, ic) = 1.0
+                        !ic = 1 + (s2-1)*ds*n2_max + (n2-1)*dn
+                        W(i)%mm(ir, ic) = 1.0_dp
                      endif
                   enddo
                enddo
@@ -7529,10 +7533,10 @@ module descriptors_module
          call form_nu_W(this, W, sym_desc, error)
       endif
 
-      print*, "W is"
-      print*, W(1)%mm
-      print*, W(2)%mm
-      print*, "sym_desc is", sym_desc
+      ! print*, "W is"
+      ! print*, W(1)%mm
+      ! print*, W(2)%mm
+      ! print*, "sym_desc is", sym_desc
    endsubroutine form_W
 
 
