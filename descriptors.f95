@@ -7144,7 +7144,7 @@ module descriptors_module
 
       !Z_mixing only
       if (this%Z_mix .and. (.not. this%R_mix)) then
-         print*, "jpd47 mixing is Z_mix only"
+         !print*, "jpd47 mixing is Z_mix only"
          if (this%sym_mix) then
             d = this%K * (this%n_max*(this%n_max+1))/2
          else
@@ -7172,7 +7172,7 @@ module descriptors_module
 
       !radial mixing only
       elseif (this%R_mix .and. (.not. this%Z_mix)) then
-         print*, "jpd47 mixing is R_mix only"
+         !print*, "jpd47 mixing is R_mix only"
 
          if (this%sym_mix) then
             d = this%K * (this%n_species*(this%n_species+1))/2
@@ -7201,7 +7201,7 @@ module descriptors_module
 
       !everything else aka default is elementwise coupling only
       else
-         print*, "jpd47 mixing is default"
+         !print*, "jpd47 mixing is default"
 
          allocate(coupling_inds(K1, 2))
          allocate(sym_facs(K1))
@@ -7211,9 +7211,9 @@ module descriptors_module
          enddo
       endif
 
-   do i = 1, size(sym_facs)
-      print*, "jpd47 i=1", i, coupling_inds(i, :), sym_facs(i)
-   enddo
+   !do i = 1, size(sym_facs)
+   !   print*, "jpd47 i=1", i, coupling_inds(i, :), sym_facs(i)
+   !enddo
    endsubroutine form_coupling_inds
 
 
@@ -7307,7 +7307,7 @@ module descriptors_module
 
       INIT_ERROR(error)
 
-      print*, "jpd47 this%mix_shift is", this%mix_shift
+      !print*, "jpd47 this%mix_shift is", this%mix_shift
 
       !full Z and R mixing
       allocate(W(2))
@@ -7495,7 +7495,7 @@ module descriptors_module
 
       INIT_ERROR(error)
 
-      print*, "Zmap_str is", trim(this%Z_map_str)
+      !print*, "Zmap_str is", trim(this%Z_map_str)
       n = len(trim(this%Z_map_str))
       print*, "n is", n
       if (len(trim(this%Z_map_str)) > 0 ) then
@@ -7653,7 +7653,7 @@ module descriptors_module
       call cpu_time(sc_times(2))
       !print*, "jpd47_timings: form_W took", sc_times(2)-sc_times(1)
 
-      print*, "jpd47 original is", original, "and sym_desc is", sym_desc
+      !print*, "jpd47 original is", original, "and sym_desc is", sym_desc
 
       allocate(Pl(K1, K2))
 
