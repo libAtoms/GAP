@@ -7319,7 +7319,7 @@ module descriptors_module
             else
                do is = 1, this%n_species
                   !seed = this%species_Z(is)
-                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j)
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j*200)
                   ir = (is-1)*this%n_max
                   !call random_number(W(j)%mm(ir+1:ir+this%n_max, :))
                   do r_r = ir+1, ir+this%n_max
@@ -7343,7 +7343,7 @@ module descriptors_module
                allocate(R(this%n_species, this%K))
                do is = 1, this%n_species
                   !call random_number(R(is,:))
-                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j)
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j*200)
                   do r_c = 1, this%K
                      R(is, r_c) = ran_normal()
                   enddo
@@ -7373,7 +7373,7 @@ module descriptors_module
             else
                allocate(R(this%n_max, this%K))
                !call random_number(R)
-               call system_reseed_rng(this%n_max+this%mix_shift+j)
+               call system_reseed_rng(this%n_max+this%mix_shift+j*200)
                do r_r = 1, this%n_max
                   do r_c = 1, this%K
                      R(r_r, r_c) = ran_normal()
@@ -7468,6 +7468,7 @@ module descriptors_module
             do a = 1, this%n_max
                i_row = (i_species-1)*this%n_max + a
                i_col = (i_group-1)*this%n_max + a
+               print*, "i_species=", i_species, 'this%n_max=', this%n_max, "a=", a, "i_row=", i_row
                W(i_density)%mm(i_row, i_col) = 1.0_dp
             enddo
          endif
@@ -7533,10 +7534,10 @@ module descriptors_module
          call form_nu_W(this, W, sym_desc, error)
       endif
 
-      ! print*, "W is"
-      ! print*, W(1)%mm
-      ! print*, W(2)%mm
-      ! print*, "sym_desc is", sym_desc
+      ! Printing these is useful for debugging and was used to check the mixing is working correctly
+      print*, "W(1) is", W(1)%mm
+      print*, "W(2) is", W(2)%mm
+      print*, "sym_desc is", sym_desc
    endsubroutine form_W
 
 
