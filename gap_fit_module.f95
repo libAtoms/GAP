@@ -131,6 +131,7 @@ module gap_fit_module
   public :: file_print_xml
 !  public :: print_sparse
   public :: set_baselines
+  public :: get_n_sparseX_for_files
   public :: parse_config_type_sigma
   public :: parse_config_type_n_sparseX
   public :: read_fit_xyz
@@ -1742,6 +1743,26 @@ contains
 !
 !  endsubroutine print_sparse
 
+  subroutine get_n_sparseX_for_files(this)
+     type(gap_fit), intent(inout) :: this
+
+     integer :: i, n_sparseX, d
+
+     do i = 1, this%n_coordinate
+       if (all(this%sparse_method(i) /= [GP_SPARSE_FILE, GP_SPARSE_INDEX_FILE])) cycle
+
+       d = descriptor_dimensions(this%my_descriptor(i))
+       n_sparseX = count_entries_in_sparse_file(this%sparse_file(i), this%sparse_method(i), d)
+
+       if (this%n_sparseX(i) /= 0 .and. this%n_sparseX(i) /= n_sparseX) then
+         call system_abort("get_n_sparseX_for_files: Given n_sparse ("//this%n_sparseX(i)//") " &
+            // "does not match with file ("//n_sparseX//"). ")
+       end if
+
+       this%n_sparseX(i) = n_sparseX
+     end do
+  end subroutine get_n_sparseX_for_files
+
   subroutine parse_config_type_sigma(this)
     type(gap_fit), intent(inout) :: this
     character(len=STRING_LENGTH), dimension(200) :: config_type_sigma_fields
@@ -2212,7 +2233,7 @@ contains
    integer(idp), parameter :: bit_limit = 2_idp**31
 
    integer :: nrows, nrows0, trows, ncols, mb_A, nb_A, i
-   integer(idp) :: lwork1, lwork2, trows64
+   integer(idp) :: lwork1, lwork2, trows64, size_A_local
 
    if (.not. this%task_manager%active) return
 
@@ -2238,6 +2259,14 @@ contains
    i = nrows - nrows0
    call print("distA extension: "//i//" "//ncols//" memory "//i2si(8_idp * i * ncols)//"B", PRINT_VERBOSE)
 
+   ! transfer nrows and blocksizes to gp_predict
+   this%task_manager%idata(1) = nrows
+   this%task_manager%idata(2) = mb_A
+   this%task_manager%idata(3) = nb_A
+
+   if (iwp == idp) return ! ignore 32bit checks for 64bit compilation
+
+
    trows64 = int(nrows, idp) * this%task_manager%n_workers
    trows = int(trows64, isp)
    if (trows > bit_limit) then
@@ -2249,15 +2278,19 @@ contains
    lwork2 = get_lwork_pdormqr(this%ScaLAPACK_obj, 'L', trows, 1, mb_A, nb_A, mb_A, 1)
    call print("lwork_pdormqr = "//lwork2//" = "//int(lwork2, isp), PRINT_VERBOSE)
    if (max(lwork1, lwork2) > bit_limit) then
-      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!"//char(10) &
+      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!" &
          //"Set mpi_blocksize_cols to something smaller, see --help.")
    end if
 
-   ! transfer nrows and blocksizes to gp_predict
-   this%task_manager%idata(1) = nrows
-   this%task_manager%idata(2) = mb_A
-   this%task_manager%idata(3) = nb_A
- end subroutine gap_fit_set_mpi_blocksizes
+   size_A_local = int(nrows, idp) * ncols
+   if (size_A_local > bit_limit) then
+      i = (trows64 * ncols + bit_limit - 1) / bit_limit
+      call system_abort("The local part of matrix A will have "//size_A_local//" entries. " &
+         // "This is too large for a 32bit integer calculation. " &
+         // "Use at least "//i//" MPI processes instead.")
+   end if
+
+  end subroutine gap_fit_set_mpi_blocksizes
 
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
