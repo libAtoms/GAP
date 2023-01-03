@@ -94,7 +94,7 @@ module gap_fit_module
      integer :: min_save
      integer :: mpi_blocksize_rows = 0
      integer :: mpi_blocksize_cols = 0
-     type(extendable_str) :: quip_string
+     type(extendable_str) :: quip_string, config_string
      type(Potential) :: core_pot
 
      type(gpFull) :: my_gp
@@ -116,7 +116,7 @@ module gap_fit_module
 
      logical :: sparseX_separate_file
      logical :: sparse_use_actual_gpcov
-     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset, has_linear_system_dump_file
+     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset, has_linear_system_dump_file, has_config_file
 
   endtype gap_fit
      
@@ -131,6 +131,7 @@ module gap_fit_module
   public :: file_print_xml
 !  public :: print_sparse
   public :: set_baselines
+  public :: get_n_sparseX_for_files
   public :: parse_config_type_sigma
   public :: parse_config_type_n_sparseX
   public :: read_fit_xyz
@@ -159,7 +160,6 @@ contains
      type(gap_fit), intent(inout), target :: this
 
      type(Dictionary) :: params
-     type(extendable_str) :: config_str
 
      character(len=STRING_LENGTH), pointer :: at_file, e0_str, local_property0_str, &
           core_param_file, core_ip_args, &
@@ -229,10 +229,11 @@ contains
         if (has_config_file) then
            inquire(file=config_file, exist=file_exists)
            if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
-           call read(config_str, config_file, keep_lf=.false., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
+           call read(this%config_string, config_file, keep_lf=.true., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
         end if
      end if
-     if (.not. has_config_file) config_str = this%command_line
+     if (.not. has_config_file) this%config_string = this%command_line
+     this%has_config_file = has_config_file
 
      call param_register(params, 'atoms_filename', '//MANDATORY//', at_file, has_value_target = has_at_file, help_string="XYZ file with fitting configurations", altkey="at_file")
      call param_register(params, 'gap', '//MANDATORY//', gap_str, has_value_target = has_gap, help_string="Initialisation string for GAPs")
@@ -328,8 +329,8 @@ contains
      call param_register(params, "rnd_seed", "-1", rnd_seed, &
           help_string="Random seed.")
    
-     call param_register(params, "openmp_chunk_size", ""//openmp_chunk_size, openmp_chunk_size, &
-          help_string="Chunk size in OpenMP scheduling")
+     call param_register(params, "openmp_chunk_size", "0", openmp_chunk_size, &
+          help_string="Chunk size in OpenMP scheduling; 0: each thread gets a single block of similar size (default)")
    
      call param_register(params, 'do_ip_timing', 'F', do_ip_timing, &
           help_string="To enable or not timing of the interatomic potential.")
@@ -358,10 +359,10 @@ contains
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
 
-     if (.not. param_read_line(params, string(config_str))) then
+     if (.not. param_read_line(params, replace(string(this%config_string), quip_new_line, ' '))) then
         call system_abort('Exit: Mandatory argument(s) missing...')
      endif
-     call finalise(config_str)
+
      call print_title("Input parameters")
      call param_print(params)
      call print_title("")
@@ -1610,10 +1611,11 @@ contains
         call gp_printXML(this%gp_sp,xf,label=gp_label)
      endif
 
-     ! Print the command line used for the fitting
-     if(len(trim(this%command_line))> 0 ) then
+     ! Print the config string (from command line or config file) used for the fitting
+     ! Keep <command_line> for backwards compatibility
+     if(this%config_string%len > 0) then
         call xml_NewElement(xf,"command_line")
-        call xml_AddCharacters(xf,trim(this%command_line),parsed=.false.)
+        call xml_AddCharacters(xf,trim(string(this%config_string)),parsed=.false.)
         call xml_EndElement(xf,"command_line")
      endif
 
@@ -1740,6 +1742,26 @@ contains
 !    endif
 !
 !  endsubroutine print_sparse
+
+  subroutine get_n_sparseX_for_files(this)
+     type(gap_fit), intent(inout) :: this
+
+     integer :: i, n_sparseX, d
+
+     do i = 1, this%n_coordinate
+       if (all(this%sparse_method(i) /= [GP_SPARSE_FILE, GP_SPARSE_INDEX_FILE])) cycle
+
+       d = descriptor_dimensions(this%my_descriptor(i))
+       n_sparseX = count_entries_in_sparse_file(this%sparse_file(i), this%sparse_method(i), d)
+
+       if (this%n_sparseX(i) /= 0 .and. this%n_sparseX(i) /= n_sparseX) then
+         call system_abort("get_n_sparseX_for_files: Given n_sparse ("//this%n_sparseX(i)//") " &
+            // "does not match with file ("//n_sparseX//"). ")
+       end if
+
+       this%n_sparseX(i) = n_sparseX
+     end do
+  end subroutine get_n_sparseX_for_files
 
   subroutine parse_config_type_sigma(this)
     type(gap_fit), intent(inout) :: this
@@ -2211,7 +2233,7 @@ contains
    integer(idp), parameter :: bit_limit = 2_idp**31
 
    integer :: nrows, nrows0, trows, ncols, mb_A, nb_A, i
-   integer(idp) :: lwork1, lwork2, trows64
+   integer(idp) :: lwork1, lwork2, trows64, size_A_local
 
    if (.not. this%task_manager%active) return
 
@@ -2237,6 +2259,14 @@ contains
    i = nrows - nrows0
    call print("distA extension: "//i//" "//ncols//" memory "//i2si(8_idp * i * ncols)//"B", PRINT_VERBOSE)
 
+   ! transfer nrows and blocksizes to gp_predict
+   this%task_manager%idata(1) = nrows
+   this%task_manager%idata(2) = mb_A
+   this%task_manager%idata(3) = nb_A
+
+   if (iwp == idp) return ! ignore 32bit checks for 64bit compilation
+
+
    trows64 = int(nrows, idp) * this%task_manager%n_workers
    trows = int(trows64, isp)
    if (trows > bit_limit) then
@@ -2248,15 +2278,19 @@ contains
    lwork2 = get_lwork_pdormqr(this%ScaLAPACK_obj, 'L', trows, 1, mb_A, nb_A, mb_A, 1)
    call print("lwork_pdormqr = "//lwork2//" = "//int(lwork2, isp), PRINT_VERBOSE)
    if (max(lwork1, lwork2) > bit_limit) then
-      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!"//char(10) &
+      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!" &
          //"Set mpi_blocksize_cols to something smaller, see --help.")
    end if
 
-   ! transfer nrows and blocksizes to gp_predict
-   this%task_manager%idata(1) = nrows
-   this%task_manager%idata(2) = mb_A
-   this%task_manager%idata(3) = nb_A
- end subroutine gap_fit_set_mpi_blocksizes
+   size_A_local = int(nrows, idp) * ncols
+   if (size_A_local > bit_limit) then
+      i = (trows64 * ncols + bit_limit - 1) / bit_limit
+      call system_abort("The local part of matrix A will have "//size_A_local//" entries. " &
+         // "This is too large for a 32bit integer calculation. " &
+         // "Use at least "//i//" MPI processes instead.")
+   end if
+
+  end subroutine gap_fit_set_mpi_blocksizes
 
   subroutine gap_fit_estimate_memory(this)
     type(gap_fit), intent(in) :: this
