@@ -145,7 +145,8 @@ module gp_predict_module
 
    integer, parameter, public :: PP_Q = 1
 
-   integer, public, save :: openmp_chunk_size = 1000  ! loop iterations per OpenMP thread
+   ! loop iterations per OpenMP thread, 0: each thread gets a single block of similar size
+   integer, public, save :: openmp_chunk_size = 0
 
    type gpCovariance_bond_real_space
 
@@ -402,6 +403,22 @@ module gp_predict_module
    public :: covariancePP
 
    contains
+
+#ifdef _OPENMP
+   function get_chunk_size(n) result(res)
+     integer, intent(in) :: n
+     integer :: res
+     integer :: t
+
+     if (openmp_chunk_size == 0) then
+       ! We can't emulate OpenMP default exactly, so we use ceil(n / t)
+       t = omp_get_num_threads()
+       res = (n + t - 1) / t
+     else
+       res = openmp_chunk_size
+     end if
+   end function get_chunk_size
+#endif
 
    subroutine gpFull_setParameters(this, n_coordinate, n_y, n_yPrime, sparse_jitter, error)
 
@@ -1694,7 +1711,10 @@ module gp_predict_module
 
             covariance_subY_currentX_y = 0.0_dp
             covariance_subY_currentX_suby = 0.0_dp
-!$omp parallel do schedule(static,openmp_chunk_size) default(none) shared(openmp_chunk_size,this,i_coordinate,covariance_x_sparseX,grad_Covariance_i,i_sparseX) private(i_x,i_y,i_globalY) reduction(+:covariance_subY_currentX_y)
+
+!$omp parallel do schedule(static,get_chunk_size(this%coordinate(i_coordinate)%n_x)) default(none) &
+!$omp shared(this,i_coordinate,covariance_x_sparseX,grad_Covariance_i,i_sparseX) &
+!$omp private(i_x,i_y,i_globalY) reduction(+:covariance_subY_currentX_y)
             do i_x = 1, this%coordinate(i_coordinate)%n_x
                ! loop over all data
 
@@ -1713,38 +1733,43 @@ module gp_predict_module
 		     covariance_x_sparseX(i_x)*this%coordinate(i_coordinate)%cutoff(i_x)*this%coordinate(i_coordinate)%sparseCutoff(i_sparseX)
                endif
             enddo
-!$omp parallel do schedule(static,openmp_chunk_size) default(none) shared(openmp_chunk_size,this,i_coordinate,i_sparseX,grad_Covariance_i,covariance_x_sparseX) private(i_xPrime,i_yPrime,i_x,i_global_yPrime,covariance_xPrime_sparseX) reduction(+:covariance_subY_currentX_y)
 
-	    do i_xPrime = 1, this%coordinate(i_coordinate)%n_xPrime
-	       ! loop over all derivative data
+!$omp parallel do schedule(static,get_chunk_size(this%coordinate(i_coordinate)%n_xPrime)) default(none) &
+!$omp shared(this,i_coordinate,i_sparseX,grad_Covariance_i,covariance_x_sparseX) &
+!$omp private(i_xPrime,i_yPrime,i_x,i_global_yPrime,covariance_xPrime_sparseX) reduction(+:covariance_subY_currentX_y)
 
-	       i_yPrime = this%coordinate(i_coordinate)%map_xPrime_yPrime(i_xPrime)
-	       ! find which derivative depends on the given descriptor
+            do i_xPrime = 1, this%coordinate(i_coordinate)%n_xPrime
+               ! loop over all derivative data
 
-	       i_x = this%coordinate(i_coordinate)%map_xPrime_x(i_xPrime)
-	       if( i_yPrime /= 0 ) then
-		  i_global_yPrime = this%map_yPrime_globalY(i_yPrime)
-		  ! find unique function value/derivative identifier
+               i_yPrime = this%coordinate(i_coordinate)%map_xPrime_yPrime(i_xPrime)
+               ! find which derivative depends on the given descriptor
 
-		  ! on Xeon w/ ifort 12, sum is fastest .  ddot is close.  dot_product is terrible
-		  ! on Opteron w/ ifort 12 acml 5.2, ddot is 14.95 s, dot_product is 22.5 s, and sum is 13.9 s
-		  ! dgemv doesn't seem noticeably faster at Opterons (may be faster on Xeon for 'N' transpose setting)
-		  ! covariance_xPrime_sparseX = ddot(size(this%coordinate(i_coordinate)%xPrime,1),grad_Covariance_i(first_nonzero,i_x),1,this%coordinate(i_coordinate)%xPrime(1,i_xPrime),1)*&
-		  ! covariance_xPrime_sparseX = dot_product(grad_Covariance_i(first_nonzero:last_nonzero,i_x),this%coordinate(i_coordinate)%xPrime(:,i_xPrime))* &
-		  covariance_xPrime_sparseX = sum(grad_Covariance_i(:,i_x)*this%coordinate(i_coordinate)%xPrime(:,i_xPrime))* &
-		     this%coordinate(i_coordinate)%cutoff(i_x)*this%coordinate(i_coordinate)%sparseCutoff(i_sparseX) + &
-		     covariance_x_sparseX(i_x)*this%coordinate(i_coordinate)%cutoffPrime(i_xPrime)*this%coordinate(i_coordinate)%sparseCutoff(i_sparseX)
+               i_x = this%coordinate(i_coordinate)%map_xPrime_x(i_xPrime)
+               if( i_yPrime /= 0 ) then
+                  i_global_yPrime = this%map_yPrime_globalY(i_yPrime)
+                  ! find unique function value/derivative identifier
 
-		  !this%covariance_subY_y(i_global_sparseX, i_global_yPrime) = this%covariance_subY_y(i_global_sparseX, i_global_yPrime) + covariance_xPrime_sparseX
-		  covariance_subY_currentX_y(i_global_yPrime) = covariance_subY_currentX_y(i_global_yPrime) + covariance_xPrime_sparseX
-	       endif
-	    enddo
+                  ! on Xeon w/ ifort 12, sum is fastest .  ddot is close.  dot_product is terrible
+                  ! on Opteron w/ ifort 12 acml 5.2, ddot is 14.95 s, dot_product is 22.5 s, and sum is 13.9 s
+                  ! dgemv doesn't seem noticeably faster at Opterons (may be faster on Xeon for 'N' transpose setting)
+                  ! covariance_xPrime_sparseX = ddot(size(this%coordinate(i_coordinate)%xPrime,1),grad_Covariance_i(first_nonzero,i_x),1,this%coordinate(i_coordinate)%xPrime(1,i_xPrime),1)*&
+                  ! covariance_xPrime_sparseX = dot_product(grad_Covariance_i(first_nonzero:last_nonzero,i_x),this%coordinate(i_coordinate)%xPrime(:,i_xPrime))* &
+                  covariance_xPrime_sparseX = sum(grad_Covariance_i(:,i_x)*this%coordinate(i_coordinate)%xPrime(:,i_xPrime))* &
+                     this%coordinate(i_coordinate)%cutoff(i_x)*this%coordinate(i_coordinate)%sparseCutoff(i_sparseX) + &
+                     covariance_x_sparseX(i_x)*this%coordinate(i_coordinate)%cutoffPrime(i_xPrime)*this%coordinate(i_coordinate)%sparseCutoff(i_sparseX)
+
+                  !this%covariance_subY_y(i_global_sparseX, i_global_yPrime) = this%covariance_subY_y(i_global_sparseX, i_global_yPrime) + covariance_xPrime_sparseX
+                  covariance_subY_currentX_y(i_global_yPrime) = covariance_subY_currentX_y(i_global_yPrime) + covariance_xPrime_sparseX
+               endif
+            enddo
 
 
             if(allocated(grad_Covariance_i)) deallocate(grad_Covariance_i)
             if(allocated(covariance_x_sparseX)) deallocate(covariance_x_sparseX)
 
-!$omp parallel do schedule(static,openmp_chunk_size) default(none) shared(openmp_chunk_size,this,i_coordinate,covariance_x_sparseX,grad_Covariance_i,i_sparseX,i_global_sparseX) private(j_sparseX,j_global_sparseX) reduction(+:covariance_subY_currentX_suby)
+!$omp parallel do schedule(static,get_chunk_size(this%coordinate(i_coordinate)%n_sparseX)) default(none) &
+!$omp shared(this,i_coordinate,covariance_x_sparseX,grad_Covariance_i,i_sparseX,i_global_sparseX) &
+!$omp private(j_sparseX,j_global_sparseX) reduction(+:covariance_subY_currentX_suby)
             do j_sparseX = 1, this%coordinate(i_coordinate)%n_sparseX
                ! loop over sparse points of each descriptor
 
