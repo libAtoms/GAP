@@ -63,6 +63,7 @@ program gap_fit_program
   call get_species_xyz(main_gap_fit) ! counts the number of species present in the xyz file.
   call add_multispecies_gaps(main_gap_fit)
 
+  call get_n_sparseX_for_files(main_gap_fit)
   call parse_config_type_sigma(main_gap_fit)
   call parse_config_type_n_sparseX(main_gap_fit)
 
