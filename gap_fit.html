@@ -254,54 +254,54 @@ characterised in theform of a force variance.</p>
 <section id="command-line-example">
 <h2>Command line example<a class="headerlink" href="#command-line-example" title="Permalink to this heading"></a></h2>
 <p>Here is an annotated fitting example.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gap_fit <span class="nv">atoms_filename</span><span class="o">=</span>database.xyz <span class="c1"># input data in extended XYZ format</span>
-  <span class="nv">gap</span><span class="o">={</span>                              <span class="c1"># start of descriptor and kernel spec</span>
-  distance_Nb                       <span class="c1"># first descriptor is interatomic distance based</span>
-  <span class="nv">order</span><span class="o">=</span><span class="m">2</span>                           <span class="c1"># descriptor is 2-body (i.e. a pair potential)</span>
-  <span class="nv">cutoff</span><span class="o">=</span><span class="m">5</span>.0                        <span class="c1"># distance cutoff in the kernel, in Angstrom</span>
-  <span class="nv">n_sparse</span><span class="o">=</span><span class="m">15</span>                       <span class="c1"># number of representative points, M in Sec. II</span>
-  <span class="nv">covariance_type</span><span class="o">=</span>ard_se            <span class="c1"># form of kernel: squared exponential (Gaussian)</span>
-  <span class="nv">delta</span><span class="o">=</span><span class="m">2</span>.0                         <span class="c1"># scaling of kernel, per descriptor, here it is per atom pair, in eV</span>
-  <span class="nv">theta_uniform</span><span class="o">=</span><span class="m">2</span>.5                 <span class="c1"># length scale in Gaussian kernel in Angstrom</span>
-  <span class="nv">sparse_method</span><span class="o">=</span>uniform             <span class="c1"># choice of representative points, here a uniform grid up to the cutoff</span>
-  <span class="nv">compact_clusters</span><span class="o">=</span>T                <span class="c1"># how cutoff is applied, here a spherical manner around each atom</span>
-  :                                 <span class="c1"># separator between descriptors</span>
-  soap                              <span class="c1"># second descriptor is a SOAP</span>
-  <span class="nv">l_max</span><span class="o">=</span><span class="m">6</span> <span class="nv">n_max</span><span class="o">=</span><span class="m">12</span>                  <span class="c1"># number of angular and radial basis functions for SOAP</span>
-  <span class="nv">atom_sigma</span><span class="o">=</span><span class="m">0</span>.5                    <span class="c1"># Gaussian smearing width of atom density for SOAP, in Angstrom</span>
-  <span class="nv">cutoff</span><span class="o">=</span><span class="m">5</span>.0                        <span class="c1"># distance cutoff in the kernel, in Angstrom</span>
-  <span class="nv">radial_scaling</span><span class="o">=</span>-0.5               <span class="c1"># exponent of atom density scaling, power of distance</span>
-  <span class="nv">cutoff_transition_width</span><span class="o">=</span><span class="m">1</span>.0       <span class="c1"># distance across which kernel is smoothly taken to zero, in Angstrom</span>
-  <span class="nv">central_weight</span><span class="o">=</span><span class="m">1</span>.0                <span class="c1"># relative weight of central atom in atom density for SOAP</span>
-  <span class="nv">n_sparse</span><span class="o">=</span><span class="m">8000</span>                     <span class="c1"># number of representative points, M in Sec. II</span>
-  <span class="nv">delta</span><span class="o">=</span><span class="m">0</span>.2                         <span class="c1"># scaling of kernel, per descriptor, here for SOAP it is per atom, in eV</span>
-  <span class="nv">covariance_type</span><span class="o">=</span>dot_product       <span class="c1"># form of kernel</span>
-  <span class="nv">zeta</span><span class="o">=</span><span class="m">4</span>                            <span class="c1"># power kernel is raised to - together with dot_product gives a polynomial kernel</span>
-  <span class="nv">sparse_method</span><span class="o">=</span>cur_points          <span class="c1"># choice of representative points, here CUR decomposition of descriptor matrix</span>
-  <span class="o">}</span>                                 <span class="c1"># end of descriptor and kernel spec</span>
- <span class="nv">default_sigma</span><span class="o">={</span><span class="m">0</span>.002 <span class="m">0</span>.2 <span class="m">0</span>.2 <span class="m">0</span>.0<span class="o">}</span>  <span class="c1"># default regularisation corresponding to energy, force, virial, hessian</span>
- <span class="nv">config_type_sigma</span><span class="o">={</span>                <span class="c1"># start of per configuration-group regularisation spec, using groups defined in the input data file</span>
-  isolated_atom:0.0001:0.01:1.0:0.0:
-  rss_rnd:0.03:0.4:0.5:0.0:
-  rss_005:0.02:0.3:0.4:0.0:
-  rss_200:0.01:0.2:0.2:0.0:
-  rss_3c:0.005:0.1:0.1:0.00:
-  cryst_dist:0.0003:0.03:0.05:0.00:
-  cryst_dist_hp:0.005:0.1:0.1:0.0:
-  liq_P4:0.003:0.3:0.5:0.0:
-  liq_network:0.003:0.3:0.5:0.0:
-  2D:0.001:0.03:0.05:0.0:
-  ribbons:0.01:0.5:0.2:0.0
-  <span class="o">}</span>                                 <span class="c1"># end of per configuration-group regularisation spec</span>
- <span class="nv">energy_parameter_name</span><span class="o">=</span>energy       <span class="c1"># name of the key in the input data file corresponding to the total energy</span>
- <span class="nv">force_parameter_name</span><span class="o">=</span>forces        <span class="c1"># name of the key in the input data file corresponding to the forces</span>
- <span class="nv">virial_parameter_name</span><span class="o">=</span>virial       <span class="c1"># name of the key in the input data file corresponding to the virial stress</span>
- <span class="nv">sparse_jitter</span><span class="o">=</span><span class="m">1</span>.0e-8               <span class="c1"># extra diagonal regulariser</span>
- <span class="nv">do_copy_at_file</span><span class="o">=</span>F                  <span class="c1"># copy input data into potential XML file?</span>
- <span class="nv">sparse_separate_file</span><span class="o">=</span>T             <span class="c1"># write representative point data into a separate file not in the main potential XML</span>
- <span class="nv">gp_file</span><span class="o">=</span>gap.xml                    <span class="c1"># name of output potential XML file</span>
- <span class="nv">core_param_file</span><span class="o">=</span>P_r6_innercut.xml  <span class="c1"># name of XML file containing the baseline potential (QUIP format)</span>
- <span class="nv">core_ip_args</span><span class="o">={</span>IP Glue<span class="o">}</span>             <span class="c1"># initialisation string to call baseline potential</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gap_fit<span class="w"> </span><span class="nv">atoms_filename</span><span class="o">=</span>database.xyz<span class="w"> </span><span class="c1"># input data in extended XYZ format</span>
+<span class="w">  </span><span class="nv">gap</span><span class="o">={</span><span class="w">                              </span><span class="c1"># start of descriptor and kernel spec</span>
+<span class="w">  </span>distance_Nb<span class="w">                       </span><span class="c1"># first descriptor is interatomic distance based</span>
+<span class="w">  </span><span class="nv">order</span><span class="o">=</span><span class="m">2</span><span class="w">                           </span><span class="c1"># descriptor is 2-body (i.e. a pair potential)</span>
+<span class="w">  </span><span class="nv">cutoff</span><span class="o">=</span><span class="m">5</span>.0<span class="w">                        </span><span class="c1"># distance cutoff in the kernel, in Angstrom</span>
+<span class="w">  </span><span class="nv">n_sparse</span><span class="o">=</span><span class="m">15</span><span class="w">                       </span><span class="c1"># number of representative points, M in Sec. II</span>
+<span class="w">  </span><span class="nv">covariance_type</span><span class="o">=</span>ard_se<span class="w">            </span><span class="c1"># form of kernel: squared exponential (Gaussian)</span>
+<span class="w">  </span><span class="nv">delta</span><span class="o">=</span><span class="m">2</span>.0<span class="w">                         </span><span class="c1"># scaling of kernel, per descriptor, here it is per atom pair, in eV</span>
+<span class="w">  </span><span class="nv">theta_uniform</span><span class="o">=</span><span class="m">2</span>.5<span class="w">                 </span><span class="c1"># length scale in Gaussian kernel in Angstrom</span>
+<span class="w">  </span><span class="nv">sparse_method</span><span class="o">=</span>uniform<span class="w">             </span><span class="c1"># choice of representative points, here a uniform grid up to the cutoff</span>
+<span class="w">  </span><span class="nv">compact_clusters</span><span class="o">=</span>T<span class="w">                </span><span class="c1"># how cutoff is applied, here a spherical manner around each atom</span>
+<span class="w">  </span>:<span class="w">                                 </span><span class="c1"># separator between descriptors</span>
+<span class="w">  </span>soap<span class="w">                              </span><span class="c1"># second descriptor is a SOAP</span>
+<span class="w">  </span><span class="nv">l_max</span><span class="o">=</span><span class="m">6</span><span class="w"> </span><span class="nv">n_max</span><span class="o">=</span><span class="m">12</span><span class="w">                  </span><span class="c1"># number of angular and radial basis functions for SOAP</span>
+<span class="w">  </span><span class="nv">atom_sigma</span><span class="o">=</span><span class="m">0</span>.5<span class="w">                    </span><span class="c1"># Gaussian smearing width of atom density for SOAP, in Angstrom</span>
+<span class="w">  </span><span class="nv">cutoff</span><span class="o">=</span><span class="m">5</span>.0<span class="w">                        </span><span class="c1"># distance cutoff in the kernel, in Angstrom</span>
+<span class="w">  </span><span class="nv">radial_scaling</span><span class="o">=</span>-0.5<span class="w">               </span><span class="c1"># exponent of atom density scaling, power of distance</span>
+<span class="w">  </span><span class="nv">cutoff_transition_width</span><span class="o">=</span><span class="m">1</span>.0<span class="w">       </span><span class="c1"># distance across which kernel is smoothly taken to zero, in Angstrom</span>
+<span class="w">  </span><span class="nv">central_weight</span><span class="o">=</span><span class="m">1</span>.0<span class="w">                </span><span class="c1"># relative weight of central atom in atom density for SOAP</span>
+<span class="w">  </span><span class="nv">n_sparse</span><span class="o">=</span><span class="m">8000</span><span class="w">                     </span><span class="c1"># number of representative points, M in Sec. II</span>
+<span class="w">  </span><span class="nv">delta</span><span class="o">=</span><span class="m">0</span>.2<span class="w">                         </span><span class="c1"># scaling of kernel, per descriptor, here for SOAP it is per atom, in eV</span>
+<span class="w">  </span><span class="nv">covariance_type</span><span class="o">=</span>dot_product<span class="w">       </span><span class="c1"># form of kernel</span>
+<span class="w">  </span><span class="nv">zeta</span><span class="o">=</span><span class="m">4</span><span class="w">                            </span><span class="c1"># power kernel is raised to - together with dot_product gives a polynomial kernel</span>
+<span class="w">  </span><span class="nv">sparse_method</span><span class="o">=</span>cur_points<span class="w">          </span><span class="c1"># choice of representative points, here CUR decomposition of descriptor matrix</span>
+<span class="w">  </span><span class="o">}</span><span class="w">                                 </span><span class="c1"># end of descriptor and kernel spec</span>
+<span class="w"> </span><span class="nv">default_sigma</span><span class="o">={</span><span class="m">0</span>.002<span class="w"> </span><span class="m">0</span>.2<span class="w"> </span><span class="m">0</span>.2<span class="w"> </span><span class="m">0</span>.0<span class="o">}</span><span class="w">  </span><span class="c1"># default regularisation corresponding to energy, force, virial, hessian</span>
+<span class="w"> </span><span class="nv">config_type_sigma</span><span class="o">={</span><span class="w">                </span><span class="c1"># start of per configuration-group regularisation spec, using groups defined in the input data file</span>
+<span class="w">  </span>isolated_atom:0.0001:0.01:1.0:0.0:
+<span class="w">  </span>rss_rnd:0.03:0.4:0.5:0.0:
+<span class="w">  </span>rss_005:0.02:0.3:0.4:0.0:
+<span class="w">  </span>rss_200:0.01:0.2:0.2:0.0:
+<span class="w">  </span>rss_3c:0.005:0.1:0.1:0.00:
+<span class="w">  </span>cryst_dist:0.0003:0.03:0.05:0.00:
+<span class="w">  </span>cryst_dist_hp:0.005:0.1:0.1:0.0:
+<span class="w">  </span>liq_P4:0.003:0.3:0.5:0.0:
+<span class="w">  </span>liq_network:0.003:0.3:0.5:0.0:
+<span class="w">  </span>2D:0.001:0.03:0.05:0.0:
+<span class="w">  </span>ribbons:0.01:0.5:0.2:0.0
+<span class="w">  </span><span class="o">}</span><span class="w">                                 </span><span class="c1"># end of per configuration-group regularisation spec</span>
+<span class="w"> </span><span class="nv">energy_parameter_name</span><span class="o">=</span>energy<span class="w">       </span><span class="c1"># name of the key in the input data file corresponding to the total energy</span>
+<span class="w"> </span><span class="nv">force_parameter_name</span><span class="o">=</span>forces<span class="w">        </span><span class="c1"># name of the key in the input data file corresponding to the forces</span>
+<span class="w"> </span><span class="nv">virial_parameter_name</span><span class="o">=</span>virial<span class="w">       </span><span class="c1"># name of the key in the input data file corresponding to the virial stress</span>
+<span class="w"> </span><span class="nv">sparse_jitter</span><span class="o">=</span><span class="m">1</span>.0e-8<span class="w">               </span><span class="c1"># extra diagonal regulariser</span>
+<span class="w"> </span><span class="nv">do_copy_at_file</span><span class="o">=</span>F<span class="w">                  </span><span class="c1"># copy input data into potential XML file?</span>
+<span class="w"> </span><span class="nv">sparse_separate_file</span><span class="o">=</span>T<span class="w">             </span><span class="c1"># write representative point data into a separate file not in the main potential XML</span>
+<span class="w"> </span><span class="nv">gp_file</span><span class="o">=</span>gap.xml<span class="w">                    </span><span class="c1"># name of output potential XML file</span>
+<span class="w"> </span><span class="nv">core_param_file</span><span class="o">=</span>P_r6_innercut.xml<span class="w">  </span><span class="c1"># name of XML file containing the baseline potential (QUIP format)</span>
+<span class="w"> </span><span class="nv">core_ip_args</span><span class="o">={</span>IP<span class="w"> </span>Glue<span class="o">}</span><span class="w">             </span><span class="c1"># initialisation string to call baseline potential</span>
 </pre></div>
 </div>
 </section>
