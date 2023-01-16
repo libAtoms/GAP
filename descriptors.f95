@@ -2459,7 +2459,7 @@ module descriptors_module
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
-      real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
+      real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent, sigma_basis
       real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, cholesky_overlap_basis
       integer :: i, j, xml_version
 
@@ -2557,7 +2557,15 @@ module descriptors_module
 
 
       this%alpha = 0.5_dp / this%atom_sigma**2
-      alpha_basis = this%alpha
+
+      if ( xml_version < 1426512068 ) then
+         alpha_basis = this%alpha
+      else
+         sigma_basis = this%cutoff / this%n_max
+         this%alpha = 0.5_dp / sigma_basis**2
+      endif
+      print*, "xml_version is", xml_version, "sigma_basis is", alpha_basis
+
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
