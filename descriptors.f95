@@ -394,6 +394,7 @@ module descriptors_module
       logical :: diagonal_radial = .false.
       logical :: normalise = .true.
       logical :: initialised = .false.
+      logical :: old_radial_basis = .true.
    endtype soap
 
 
@@ -2459,7 +2460,7 @@ module descriptors_module
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
-      real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent, sigma_basis
+      real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent, sigma_basis, basis_sigma_scale
       real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, cholesky_overlap_basis
       integer :: i, j, xml_version
 
@@ -2501,6 +2502,9 @@ module descriptors_module
 
       call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
       call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
+      !jpd47 new params for radial basis tweaking
+      call param_register(params, 'old_radial_basis', 'F', this%old_radial_basis, help_string="Whether to use old radial basis or not")
+      call param_register(params, 'basis_sigma_scale', '1.0', basis_sigma_scale, help_string="basis_sigma = cutoff/n_max * basis_sigma_scale")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -2558,13 +2562,15 @@ module descriptors_module
 
       this%alpha = 0.5_dp / this%atom_sigma**2
 
-      if ( xml_version < 1426512068 ) then
+      !if ( xml_version < 1426512068 ) then
+      if (this%old_radial_basis) then
          alpha_basis = this%alpha
+         sigma_basis = (0.5_dp/alpha_basis)**0.5
       else
-         sigma_basis = this%cutoff / this%n_max
-         this%alpha = 0.5_dp / sigma_basis**2
+         sigma_basis = this%cutoff / this%n_max * basis_sigma_scale
+         alpha_basis = 0.5_dp / sigma_basis**2
       endif
-      print*, "xml_version is", xml_version, "sigma_basis is", alpha_basis
+      print*, "this%old_radial_basis is", this%old_radial_basis, "sigma_basis is", sigma_basis, "basis_sigma_scale is", basis_sigma_scale
 
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
@@ -7530,13 +7536,18 @@ module descriptors_module
 
 
 
-         !do a = 1, this%n_max
-         !   radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
-         !enddo
-         !radial_coefficient(0,:) = matmul( radial_fun(0,:), this%transform_basis )
-         radial_fun(0,:) = 0.0_dp
-         radial_fun(0,1) = 1.0_dp
-         radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
+         if (this%old_radial_basis) then
+            ! original version
+            radial_fun(0,:) = 0.0_dp
+            radial_fun(0,1) = 1.0_dp
+            radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
+         else
+            ! uncommented old version that I think should work...
+            do a = 1, this%n_max
+               radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
+            enddo
+            radial_coefficient(0,:) = matmul( radial_fun(0,:), this%transform_basis )
+         endif
 
 
          do i_species = 0, this%n_species
