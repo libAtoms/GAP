@@ -395,6 +395,7 @@ module descriptors_module
       logical :: normalise = .true.
       logical :: initialised = .false.
       logical :: old_radial_basis = .true.
+      logical :: poly_basis = .false.
    endtype soap
 
 
@@ -2460,7 +2461,8 @@ module descriptors_module
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
-      real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent, sigma_basis, basis_sigma_scale
+      real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
+      real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta
       real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, cholesky_overlap_basis
       integer :: i, j, xml_version
 
@@ -2504,6 +2506,7 @@ module descriptors_module
       call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
       !jpd47 new params for radial basis tweaking
       call param_register(params, 'old_radial_basis', 'F', this%old_radial_basis, help_string="Whether to use old radial basis or not")
+      call param_register(params, 'poly_basis', 'F', this%poly_basis, help_string="Whether to use old radial basis or not")
       call param_register(params, 'basis_sigma_scale', '1.0', basis_sigma_scale, help_string="basis_sigma = cutoff/n_max * basis_sigma_scale")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
@@ -2578,30 +2581,14 @@ module descriptors_module
       allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
          covariance_basis(this%n_max,this%n_max), overlap_basis(this%n_max,this%n_max), this%cholesky_overlap_basis(this%n_max,this%n_max))
 
-      !this%r_basis(this%n_max) = cutoff_basis
-      !do i = this%n_max-1, 1, -1
-      !   this%r_basis(i)  = this%r_basis(i+1) - spacing_basis
-      !enddo
-
       this%r_basis(1) = 0.0_dp
       do i = 2, this%n_max
          this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
       enddo
 
-
       do i = 1, this%n_max
          do j = 1, this%n_max
             covariance_basis(j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
-            !overlap_basis(j,i) = exp(-0.5_dp * alpha_basis* (this%r_basis(i) - this%r_basis(j))**2) * ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) )
-            !print*, 'A', exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) )
-            !print*, 'B', sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j))
-            !print*, 'C', alpha_basis*exp(0.5_dp * alpha_basis * (this%r_basis(i) + this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 )
-            !print*, 'D', ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) )
-            !overlap_basis(j,i) = exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
-            !   ( sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
-            !   alpha_basis*exp(0.5_dp * alpha_basis * (this%r_basis(i) + this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
-            !   ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
-
             overlap_basis(j,i) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
                sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
                alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
@@ -2611,6 +2598,25 @@ module descriptors_module
 
       !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
       overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
+
+
+      !jpd47 temporary hack - just overwrite covariance_basis and overlap_basis with polynomial terms here
+      print*, "jpd47 this%poly_basis is", this%poly_basis
+      if (this%poly_basis) then
+         do i = 1, this%n_max
+            N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
+            print*, "jpd47 N_alpha is", N_alpha
+            do j = 1, this%n_max
+               N_beta = ((cutoff_basis**(2*j+7))/((j+3)*(2*j+5)*(2*j+7)))**0.5_dp
+               S_alpha_beta = (2*cutoff_basis**(i+j+7))/((5+i+j)*(6+i+j)*(7+i+j))
+               covariance_basis(j, i) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
+               overlap_basis(j,i) = S_alpha_beta/(N_alpha*N_beta)
+               print*, "jpd47 covar", i, j, covariance_basis(j, i)
+               print*, "jpd47 overlap", i, j, overlap_basis(j, i)
+            enddo
+         enddo
+      endif
+
 
       call initialise(LA_covariance_basis,covariance_basis)
       call initialise(LA_overlap_basis,overlap_basis)
