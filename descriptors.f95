@@ -2462,9 +2462,10 @@ module descriptors_module
 
       type(Dictionary) :: params
       real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
-      real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta
+      real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta, dummy
       real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, cholesky_overlap_basis
-      integer :: i, j, xml_version
+      integer :: i, j, xml_version, info
+      integer, dimension(:), allocatable :: i_pivot
 
       type(LA_Matrix) :: LA_covariance_basis, LA_overlap_basis
       character(len=STRING_LENGTH) :: species_Z_str
@@ -2601,33 +2602,68 @@ module descriptors_module
 
 
       !jpd47 temporary hack - just overwrite covariance_basis and overlap_basis with polynomial terms here
+      print*, "cutoff_basis is", cutoff_basis, "spacing_basis is", spacing_basis
       print*, "jpd47 this%poly_basis is", this%poly_basis
       if (this%poly_basis) then
          do i = 1, this%n_max
             N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
-            print*, "jpd47 N_alpha is", N_alpha
+            !print*, "jpd47 N_alpha is", N_alpha
             do j = 1, this%n_max
                N_beta = ((cutoff_basis**(2*j+7))/((j+3)*(2*j+5)*(2*j+7)))**0.5_dp
                S_alpha_beta = (2*cutoff_basis**(i+j+7))/((5+i+j)*(6+i+j)*(7+i+j))
                covariance_basis(j, i) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
                overlap_basis(j,i) = S_alpha_beta/(N_alpha*N_beta)
-               print*, "jpd47 covar", i, j, covariance_basis(j, i)
-               print*, "jpd47 overlap", i, j, overlap_basis(j, i)
+               !print*, "jpd47 covar", i, j, covariance_basis(j, i)
+               !print*, "jpd47 overlap", i, j, overlap_basis(j, i)
             enddo
          enddo
       endif
 
 
-      call initialise(LA_covariance_basis,covariance_basis)
+      call initialise(LA_covariance_basis, covariance_basis)
       call initialise(LA_overlap_basis,overlap_basis)
       call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
       do i = 1, this%n_max
          do j = 1, i-1 !i + 1, this%n_max
-            this%cholesky_overlap_basis(j,i) = 0.0_dp
+            this%cholesky_overlap_basis(j,i) = 0.0_dp    ! jpd47 lower triangular, upper right is zeros
          enddo
       enddo
 
-      call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis,this%transform_basis)
+      print*, "jpd47 covariance_basis is"
+      do i = 1, this%n_max
+         dummy = covariance_basis(i, 1)
+         print*, "jpd47 CB is", covariance_basis(i, :)
+      enddo
+
+      print*, "jpd47 overlap_basis is"
+      do i = 1, this%n_max
+         dummy = overlap_basis(i, 1)
+         print*, "jpd47 OB is", overlap_basis(i, :)
+      enddo
+
+      print*, "jpd47 cholesky_overlap_basis is"
+      do i = 1, this%n_max
+         dummy = this%cholesky_overlap_basis(i, 1)
+         print*, "jpd47 COB is", this%cholesky_overlap_basis(i, :)
+      enddo
+
+      ! jpd47 TODO this matrix solve is failing!
+      if (this%poly_basis) then
+         this%transform_basis = transpose(this%cholesky_overlap_basis)
+         allocate(i_pivot(this%n_max))
+         call dgesv(this%n_max, this%n_max, covariance_basis, this%n_max, i_pivot, this%transform_basis, this%n_max, info)
+         print*, "jpd47 info is", info
+         if (allocated(i_pivot))   deallocate(i_pivot)
+         this%transform_basis = transpose(this%transform_basis)
+      else
+         call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis,this%transform_basis)
+      endif
+
+      print*, "jpd47 tranform_basis is"
+      do i = 1, this%n_max
+         dummy = this%transform_basis(i, 1)
+         print*, "jpd47 TB is", this%transform_basis(i, :)
+      enddo
 
       call finalise(LA_covariance_basis)
       call finalise(LA_overlap_basis)
