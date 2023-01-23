@@ -387,7 +387,7 @@ module descriptors_module
       integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
-      real(dp), dimension(:,:), allocatable :: transform_basis,cholesky_overlap_basis
+      real(dp), dimension(:,:), allocatable :: transform_basis, cholesky_overlap_basis, Q, R
 
       logical :: global = .false.
       logical :: central_reference_all_species = .false.
@@ -2463,8 +2463,8 @@ module descriptors_module
       type(Dictionary) :: params
       real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
       real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta, dummy
-      real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, cholesky_overlap_basis
-      integer :: i, j, xml_version, info
+      real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis
+      integer :: i, j, xml_version, info, n_radial_grid
       integer, dimension(:), allocatable :: i_pivot
 
       type(LA_Matrix) :: LA_covariance_basis, LA_overlap_basis
@@ -2565,112 +2565,110 @@ module descriptors_module
 
 
       this%alpha = 0.5_dp / this%atom_sigma**2
-
-      !if ( xml_version < 1426512068 ) then
-      if (this%old_radial_basis) then
-         alpha_basis = this%alpha
-         sigma_basis = (0.5_dp/alpha_basis)**0.5
-      else
-         sigma_basis = this%cutoff / this%n_max * basis_sigma_scale
-         alpha_basis = 0.5_dp / sigma_basis**2
-      endif
-      print*, "this%old_radial_basis is", this%old_radial_basis, "sigma_basis is", sigma_basis, "basis_sigma_scale is", basis_sigma_scale
-
+      alpha_basis = this%alpha
+      sigma_basis = (0.5_dp/alpha_basis)**0.5
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
-      allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
-         covariance_basis(this%n_max,this%n_max), overlap_basis(this%n_max,this%n_max), this%cholesky_overlap_basis(this%n_max,this%n_max))
+      if (this%old_radial_basis) then
+         allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
+            covariance_basis(this%n_max,this%n_max), overlap_basis(this%n_max,this%n_max), this%cholesky_overlap_basis(this%n_max,this%n_max))
 
-      this%r_basis(1) = 0.0_dp
-      do i = 2, this%n_max
-         this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
-      enddo
-
-      do i = 1, this%n_max
-         do j = 1, this%n_max
-            covariance_basis(j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
-            overlap_basis(j,i) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
-               sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
-               alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
-               ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
+         this%r_basis(1) = 0.0_dp
+         do i = 2, this%n_max
+            this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
          enddo
-      enddo
 
-      !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
-      overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
+         do i = 1, this%n_max
+            do j = 1, this%n_max
+               covariance_basis(j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
+               overlap_basis(j,i) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
+                  sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
+                  alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
+                  ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
+            enddo
+         enddo
 
+         !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
+         overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
 
-      !jpd47 temporary hack - just overwrite covariance_basis and overlap_basis with polynomial terms here
-      print*, "cutoff_basis is", cutoff_basis, "spacing_basis is", spacing_basis
-      print*, "jpd47 this%poly_basis is", this%poly_basis
-      if (this%poly_basis) then
+         call initialise(LA_covariance_basis, covariance_basis)
+         call initialise(LA_overlap_basis,overlap_basis)
+         call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
+         do i = 1, this%n_max
+            do j = 1, i-1 !i + 1, this%n_max
+               this%cholesky_overlap_basis(j,i) = 0.0_dp    ! jpd47 lower triangular, upper right is zeros
+            enddo
+         enddo
+
+         call finalise(LA_covariance_basis)
+         call finalise(LA_overlap_basis)
+
+         if(allocated(covariance_basis)) deallocate(covariance_basis)
+         if(allocated(overlap_basis)) deallocate(overlap_basis)
+
+      else
+         ! fine radial grid to fit radial coeficients
+         n_radial_grid = 3* this%n_max
+         allocate(this%r_basis(n_radial_grid))
+         spacing_basis = cutoff_basis / n_radial_grid
+         this%r_basis(1) = 0.0_dp
+         do i = 2, n_radial_grid
+            this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
+         enddo
+         print*, "jpd47 n_radial grid is", n_radial_grid
+         print*, "jpd47 cutoff_basis is", cutoff_basis, "spacing_basis is", spacing_basis
+
+         ! allocations
+         allocate(covariance_basis(n_radial_grid, this%n_max))
+         allocate(overlap_basis(this%n_max,this%n_max))
+         allocate(this%cholesky_overlap_basis(this%n_max,this%n_max))
+
+         ! form the overlap matrix and do cholesky decomposition
          do i = 1, this%n_max
             N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
-            !print*, "jpd47 N_alpha is", N_alpha
             do j = 1, this%n_max
                N_beta = ((cutoff_basis**(2*j+7))/((j+3)*(2*j+5)*(2*j+7)))**0.5_dp
                S_alpha_beta = (2*cutoff_basis**(i+j+7))/((5+i+j)*(6+i+j)*(7+i+j))
-               covariance_basis(j, i) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
                overlap_basis(j,i) = S_alpha_beta/(N_alpha*N_beta)
-               !print*, "jpd47 covar", i, j, covariance_basis(j, i)
-               !print*, "jpd47 overlap", i, j, overlap_basis(j, i)
             enddo
          enddo
-      endif
 
-
-      call initialise(LA_covariance_basis, covariance_basis)
-      call initialise(LA_overlap_basis,overlap_basis)
-      call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
-      do i = 1, this%n_max
-         do j = 1, i-1 !i + 1, this%n_max
-            this%cholesky_overlap_basis(j,i) = 0.0_dp    ! jpd47 lower triangular, upper right is zeros
+         call initialise(LA_covariance_basis, covariance_basis)
+         call initialise(LA_overlap_basis,overlap_basis)
+         call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
+         do i = 1, this%n_max
+            do j = 1, i-1 !i + 1, this%n_max
+               this%cholesky_overlap_basis(j,i) = 0.0_dp    ! jpd47 lower triangular, upper right is zeros
+            enddo
          enddo
-      enddo
 
-      print*, "jpd47 covariance_basis is"
-      do i = 1, this%n_max
-         dummy = covariance_basis(i, 1)
-         print*, "jpd47 CB is", covariance_basis(i, :)
-      enddo
+         ! form the "covariance matrix" and perform the QR factorisation
+         do i = 1, this%n_max
+            N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
+            do j = 1, n_radial_grid
+               covariance_basis(j, i) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
+            enddo
+         enddo
 
-      print*, "jpd47 overlap_basis is"
-      do i = 1, this%n_max
-         dummy = overlap_basis(i, 1)
-         print*, "jpd47 OB is", overlap_basis(i, :)
-      enddo
+         call initialise(LA_covariance_basis, covariance_basis)
+         allocate(this%Q(n_radial_grid, this%n_max))
+         allocate(this%R(this%n_max, this%n_max))
+         call LA_Matrix_QR_Factorise(LA_covariance_basis, this%Q, this%R, error)
 
-      print*, "jpd47 cholesky_overlap_basis is"
-      do i = 1, this%n_max
-         dummy = this%cholesky_overlap_basis(i, 1)
-         print*, "jpd47 COB is", this%cholesky_overlap_basis(i, :)
-      enddo
+         print*, "jpd47 done with QR factorisation"
+         print*, "jpd47 Q is"
+         do i = 1, n_radial_grid
+            print*, "jpd47", this%Q(i, :)
+         enddo
+         print*, "jpd47 R is"
+         do i = 1, this%n_max
+            print*, "jpd47", this%R(i, :)
+         enddo
 
-      ! jpd47 TODO this matrix solve is failing!
-      if (this%poly_basis) then
-         this%transform_basis = transpose(this%cholesky_overlap_basis)
-         allocate(i_pivot(this%n_max))
-         call dgesv(this%n_max, this%n_max, covariance_basis, this%n_max, i_pivot, this%transform_basis, this%n_max, info)
-         print*, "jpd47 info is", info
-         if (allocated(i_pivot))   deallocate(i_pivot)
-         this%transform_basis = transpose(this%transform_basis)
-      else
-         call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis,this%transform_basis)
+         if(allocated(covariance_basis)) deallocate(covariance_basis)
+         if(allocated(overlap_basis)) deallocate(overlap_basis)
       endif
-
-      print*, "jpd47 tranform_basis is"
-      do i = 1, this%n_max
-         dummy = this%transform_basis(i, 1)
-         print*, "jpd47 TB is", this%transform_basis(i, :)
-      enddo
-
-      call finalise(LA_covariance_basis)
-      call finalise(LA_overlap_basis)
-
-      if(allocated(covariance_basis)) deallocate(covariance_basis)
-      if(allocated(overlap_basis)) deallocate(overlap_basis)
-      if(allocated(cholesky_overlap_basis)) deallocate(cholesky_overlap_basis)
 
       this%initialised = .true.
 
@@ -2706,6 +2704,8 @@ module descriptors_module
       if(allocated(this%r_basis)) deallocate(this%r_basis)
       if(allocated(this%transform_basis)) deallocate(this%transform_basis)
       if(allocated(this%cholesky_overlap_basis)) deallocate(this%cholesky_overlap_basis)
+      if(allocated(this%Q)) deallocate(this%Q)
+      if(allocated(this%R)) deallocate(this%R)
       if(allocated(this%species_Z)) deallocate(this%species_Z)
       if(allocated(this%Z)) deallocate(this%Z)
 
@@ -7588,8 +7588,11 @@ module descriptors_module
             do a = 1, this%n_max
                radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
             enddo
-            radial_coefficient(0,:) = matmul( radial_fun(0,:), this%transform_basis )
+            radial_coefficient(0,:) = matmul(this%transform_basis,  radial_fun(0,:) )
+            print*, "jpd47 is is", i, "radial_fun is", radial_fun(0, :)
+            print*, "jpd47 i is", i, "radial_coefficient is", radial_coefficient(0, :)
          endif
+
 
 
          do i_species = 0, this%n_species
@@ -7640,6 +7643,7 @@ module descriptors_module
             f_cut = coordination_function(r_ij, this%cutoff, this%cutoff_transition_width)
             radial_decay = ( 1.0_dp + this%cutoff_rate ) / ( this%cutoff_rate + ( r_ij / this%cutoff_scale )**this%cutoff_dexp )
             radial_decay = norm_radial_decay * radial_decay
+            print*, "jpd47 radial_decay is", radial_decay
 
             if(my_do_grad_descriptor) then
                df_cut = dcoordination_function(r_ij,this%cutoff, this%cutoff_transition_width)
@@ -7693,9 +7697,27 @@ module descriptors_module
                enddo
             enddo
 
-            radial_coefficient = matmul( radial_fun, this%transform_basis )
-            if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
-            radial_coefficient = radial_coefficient * f_cut
+            print*, "jpd47 neighbour radial_fun is"
+            print*, "jpd47 r_ij is", r_ij
+            do l = 0, this%l_max
+               print*, "jpd47 l=", l, "RF=", radial_fun(l,:)
+            enddo
+            if (.not. this%poly_basis) then
+               radial_coefficient = matmul( radial_fun, this%transform_basis )
+               if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
+               radial_coefficient = radial_coefficient * f_cut
+            else
+               radial_coefficient = matmul( radial_fun, transpose(this%transform_basis)     )
+               if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
+               radial_coefficient = radial_coefficient * f_cut
+            endif
+
+            print*, "jpd47 f_cut is", f_cut
+            print*, "jpd47 radial_coefficient is"
+            do l = 0, this%l_max
+               print*, "jpd47 l=", l, radial_coefficient(l, :)
+            enddo
+
 
 
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
