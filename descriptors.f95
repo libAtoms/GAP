@@ -57,6 +57,7 @@ module descriptors_module
    use clusters_module
    use connection_module
    use angular_functions_module
+   use gamma_module
 
    implicit none
 
@@ -387,7 +388,7 @@ module descriptors_module
       integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
-      real(dp), dimension(:,:), allocatable :: transform_basis, cholesky_overlap_basis, Q, R
+      real(dp), dimension(:,:), allocatable :: transform_basis, cholesky_overlap_basis, LA_BL_ti
 
       logical :: global = .false.
       logical :: central_reference_all_species = .false.
@@ -396,6 +397,8 @@ module descriptors_module
       logical :: initialised = .false.
       logical :: old_radial_basis = .true.
       logical :: poly_basis = .false.
+
+      character(len=STRING_LENGTH) :: radial_basis
    endtype soap
 
 
@@ -2463,11 +2466,11 @@ module descriptors_module
       type(Dictionary) :: params
       real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
       real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta, dummy
-      real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis
+      real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, Q, R
       integer :: i, j, xml_version, info, n_radial_grid
       integer, dimension(:), allocatable :: i_pivot
 
-      type(LA_Matrix) :: LA_covariance_basis, LA_overlap_basis
+      type(LA_Matrix) :: LA_covariance_basis, LA_overlap_basis, LA_L_ti
       character(len=STRING_LENGTH) :: species_Z_str
       logical :: has_n_species, has_species_Z, has_central_reference_all_species
 
@@ -2509,6 +2512,7 @@ module descriptors_module
       call param_register(params, 'old_radial_basis', 'F', this%old_radial_basis, help_string="Whether to use old radial basis or not")
       call param_register(params, 'poly_basis', 'F', this%poly_basis, help_string="Whether to use old radial basis or not")
       call param_register(params, 'basis_sigma_scale', '1.0', basis_sigma_scale, help_string="basis_sigma = cutoff/n_max * basis_sigma_scale")
+      call param_register(params, 'radial_basis', 'ORIGINAL', this%radial_basis, help_string="Radial basis functions to use. Options are ORIGINAL, POLY and GTO")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -2570,7 +2574,8 @@ module descriptors_module
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
-      if (this%old_radial_basis) then
+      print*, "jpd47 this%radial_basis is ", TRIM(this%radial_basis)
+      if (this%radial_basis == "ORIGINAL") then
          allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
             covariance_basis(this%n_max,this%n_max), overlap_basis(this%n_max,this%n_max), this%cholesky_overlap_basis(this%n_max,this%n_max))
 
@@ -2601,6 +2606,8 @@ module descriptors_module
             enddo
          enddo
 
+         call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis,this%transform_basis)
+
          call finalise(LA_covariance_basis)
          call finalise(LA_overlap_basis)
 
@@ -2616,8 +2623,6 @@ module descriptors_module
          do i = 2, n_radial_grid
             this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
          enddo
-         print*, "jpd47 n_radial grid is", n_radial_grid
-         print*, "jpd47 cutoff_basis is", cutoff_basis, "spacing_basis is", spacing_basis
 
          ! allocations
          allocate(covariance_basis(n_radial_grid, this%n_max))
@@ -2634,6 +2639,15 @@ module descriptors_module
             enddo
          enddo
 
+         ! form the "covariance matrix"
+         do i = 1, this%n_max
+            N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
+            do j = 1, n_radial_grid
+               covariance_basis(j, i) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
+            enddo
+         enddo
+
+         ! cholesky factorisation
          call initialise(LA_covariance_basis, covariance_basis)
          call initialise(LA_overlap_basis,overlap_basis)
          call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
@@ -2643,29 +2657,36 @@ module descriptors_module
             enddo
          enddo
 
-         ! form the "covariance matrix" and perform the QR factorisation
-         do i = 1, this%n_max
-            N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
-            do j = 1, n_radial_grid
-               covariance_basis(j, i) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
-            enddo
-         enddo
+         !find inverse of L^T
+         call initialise(LA_L_ti, transpose(this%cholesky_overlap_basis))
+         !call LA_Matrix_Inverse(LA_L_ti, overlap_basis)
+         overlap_basis = transpose(this%cholesky_overlap_basis)
+         call dtrtri("U", "N", this%n_max, overlap_basis, this%n_max, i)
 
-         call initialise(LA_covariance_basis, covariance_basis)
-         allocate(this%Q(n_radial_grid, this%n_max))
-         allocate(this%R(this%n_max, this%n_max))
-         call LA_Matrix_QR_Factorise(LA_covariance_basis, this%Q, this%R, error)
+         ! print*, "jpd47 L is"
+         ! do i = 1, this%n_max
+         !    print*, "jpd47 i is", i, this%cholesky_overlap_basis(i, :)
+         ! enddo
 
-         print*, "jpd47 done with QR factorisation"
-         print*, "jpd47 Q is"
+         ! print*, "jpd47 L_ti is"
+         ! do i = 1, this%n_max
+         !    print*, "jpd47 i is", i, overlap_basis(i, :)
+         ! enddo
+
+
+         print*, "jpd47 B is"
          do i = 1, n_radial_grid
-            print*, "jpd47", this%Q(i, :)
-         enddo
-         print*, "jpd47 R is"
-         do i = 1, this%n_max
-            print*, "jpd47", this%R(i, :)
+            print*, "jpd47 i is", i, covariance_basis(i, :)
          enddo
 
+         ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
+         allocate(this%LA_BL_ti(n_radial_grid, this%n_max))
+         this%LA_BL_ti =  matmul(covariance_basis, overlap_basis)
+         !allocate(Q(n_radial_grid, this%n_max), R(this%n_max, this%n_max))
+         !call LA_Matrix_QR_Factorise(this%LA_cov_B, Q, R, error)
+
+         !if (allocated(Q)) deallocate(Q)
+         !if (allocated(R)) deallocate(R)
          if(allocated(covariance_basis)) deallocate(covariance_basis)
          if(allocated(overlap_basis)) deallocate(overlap_basis)
       endif
@@ -2704,8 +2725,6 @@ module descriptors_module
       if(allocated(this%r_basis)) deallocate(this%r_basis)
       if(allocated(this%transform_basis)) deallocate(this%transform_basis)
       if(allocated(this%cholesky_overlap_basis)) deallocate(this%cholesky_overlap_basis)
-      if(allocated(this%Q)) deallocate(this%Q)
-      if(allocated(this%R)) deallocate(this%R)
       if(allocated(this%species_Z)) deallocate(this%species_Z)
       if(allocated(this%Z)) deallocate(this%Z)
 
@@ -7270,6 +7289,9 @@ module descriptors_module
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
 
+      type(LA_Matrix), save :: LA_BL_ti
+      real(dp), dimension(:,:), allocatable :: Q, R
+
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i)
@@ -7307,6 +7329,16 @@ module descriptors_module
             species_map(this%species_Z(i_species)) = i_species
          endif
       enddo
+
+      ! jpd47 radial basis
+      if (.not. this%radial_basis == "ORIGINAL") then
+         print*, "jpd47 shape of this%LA_BL_ti is", shape(this%LA_BL_ti)
+         call initialise(LA_BL_ti, this%LA_BL_ti)
+         allocate(Q(size(this%r_basis), this%n_max), R(this%n_max, this%n_max))
+         call LA_Matrix_QR_Factorise(LA_BL_ti, Q, R, error)
+         if (allocated(Q)) deallocate(Q)
+         if (allocated(R)) deallocate(R)
+      endif
 
       my_do_descriptor = optional_default(.false., do_descriptor)
       my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
@@ -7386,7 +7418,7 @@ module descriptors_module
       allocate(descriptor_i(d))
       if(my_do_grad_descriptor) allocate(grad_descriptor_i(d,3))
 
-      allocate(radial_fun(0:this%l_max, this%n_max), radial_coefficient(0:this%l_max, this%n_max))
+      allocate(radial_fun(0:this%l_max, size(this%r_basis)), radial_coefficient(0:this%l_max, this%n_max))
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
       allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
 
@@ -7546,7 +7578,7 @@ module descriptors_module
 
 
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
-!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
+!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay, LA_BL_ti) &
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
@@ -7577,20 +7609,19 @@ module descriptors_module
          endif
 
 
-
-         if (this%old_radial_basis) then
+         !print*, "jpd47 this%old_rdaial_basis is", this%old_radial_basis
+         if (this%radial_basis == "ORIGINAL") then
             ! original version
             radial_fun(0,:) = 0.0_dp
             radial_fun(0,1) = 1.0_dp
             radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
          else
             ! uncommented old version that I think should work...
-            do a = 1, this%n_max
+            do a = 1, size(this%r_basis)
                radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
             enddo
-            radial_coefficient(0,:) = matmul(this%transform_basis,  radial_fun(0,:) )
-            print*, "jpd47 is is", i, "radial_fun is", radial_fun(0, :)
-            print*, "jpd47 i is", i, "radial_coefficient is", radial_coefficient(0, :)
+            !print*, "jpd47 shapes are", LA_BL_ti%n, LA_BL_ti%m, shape(radial_fun(0, :)), shape(radial_coefficient(0, :))
+            call LA_Matrix_QR_Solve_Vector(LA_BL_ti, radial_fun(0, :), radial_coefficient(0, :))
          endif
 
 
@@ -7643,7 +7674,7 @@ module descriptors_module
             f_cut = coordination_function(r_ij, this%cutoff, this%cutoff_transition_width)
             radial_decay = ( 1.0_dp + this%cutoff_rate ) / ( this%cutoff_rate + ( r_ij / this%cutoff_scale )**this%cutoff_dexp )
             radial_decay = norm_radial_decay * radial_decay
-            print*, "jpd47 radial_decay is", radial_decay
+            !print*, "jpd47 radial_decay is", radial_decay
 
             if(my_do_grad_descriptor) then
                df_cut = dcoordination_function(r_ij,this%cutoff, this%cutoff_transition_width)
@@ -7655,7 +7686,7 @@ module descriptors_module
             endif
             f_cut = f_cut * radial_decay
 
-            do a = 1, this%n_max
+            do a = 1, size(this%r_basis)
                arg_bess = 2.0_dp * this%alpha * r_ij * this%r_basis(a)
                exp_p = exp( -this%alpha*( r_ij + this%r_basis(a) )**2 )
                exp_m = exp( -this%alpha*( r_ij - this%r_basis(a) )**2 )
@@ -7697,26 +7728,29 @@ module descriptors_module
                enddo
             enddo
 
-            print*, "jpd47 neighbour radial_fun is"
-            print*, "jpd47 r_ij is", r_ij
-            do l = 0, this%l_max
-               print*, "jpd47 l=", l, "RF=", radial_fun(l,:)
-            enddo
-            if (.not. this%poly_basis) then
+            ! print*, "jpd47 neighbour radial_fun is"
+            ! print*, "jpd47 r_ij is", r_ij
+            ! do l = 0, this%l_max
+            !    print*, "jpd47 l=", l, "RF=", radial_fun(l,:)
+            ! enddo
+            if (this%radial_basis == "ORIGINAL") then
                radial_coefficient = matmul( radial_fun, this%transform_basis )
                if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
                radial_coefficient = radial_coefficient * f_cut
             else
-               radial_coefficient = matmul( radial_fun, transpose(this%transform_basis)     )
+               !call LA_Matrix_QR_Solve_Matrix(LA_BL_ti, radial_fun, radial_coefficient)
+               do l = 0, this%l_max
+                  call LA_Matrix_QR_Solve_Vector(LA_BL_ti, radial_fun(l, :), radial_coefficient(l, :))
+               enddo
                if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
                radial_coefficient = radial_coefficient * f_cut
             endif
 
-            print*, "jpd47 f_cut is", f_cut
-            print*, "jpd47 radial_coefficient is"
-            do l = 0, this%l_max
-               print*, "jpd47 l=", l, radial_coefficient(l, :)
-            enddo
+            !print*, "jpd47 f_cut is", f_cut
+            ! print*, "jpd47 radial_coefficient is"
+            ! do l = 0, this%l_max
+            !    print*, "jpd47 l=", l, radial_coefficient(l, :)
+            ! enddo
 
 
 
@@ -8265,6 +8299,7 @@ module descriptors_module
       if(allocated(rs_index)) deallocate(rs_index)
       if(allocated(i_desc)) deallocate(i_desc)
       if (allocated(gs_index)) deallocate(gs_index)
+      call finalise(LA_BL_ti)
 
       call system_timer('soap_calc')
 
