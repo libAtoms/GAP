@@ -389,7 +389,7 @@ module descriptors_module
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
       real(dp), dimension(:,:,:), allocatable :: cholesky_overlap_basis, LA_BL_ti
-      real(dp), dimension(:, :, :), allocatable :: transform_basis
+      real(dp), dimension(:, :), allocatable :: transform_basis
 
       logical :: global = .false.
       logical :: central_reference_all_species = .false.
@@ -2579,7 +2579,7 @@ module descriptors_module
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
-      print*, "jpd47 this%radial_basis is ", TRIM(this%radial_basis)
+      !print*, "jpd47 this%radial_basis is ", TRIM(this%radial_basis)
       if (this%radial_basis == "ORIGINAL") then
          allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
             covariance_basis(1, this%n_max,this%n_max), overlap_basis(1, this%n_max,this%n_max), this%cholesky_overlap_basis(1, this%n_max,this%n_max))
@@ -2658,11 +2658,16 @@ module descriptors_module
          elseif (this%radial_basis == "GTO") then
             l_ub = this%l_max
             ! form the
-            allocate(alpha_ln(this%l_max+1, this%n_max))
+            allocate(alpha_ln(0:this%l_max+1, this%n_max))
+
+            !print*, "alpha_ln is"
+            !print*, "jpd47 spacing_basis is", spacing_basis
+            spacing_basis = cutoff_basis/this%n_max
             do l = 0, this%l_max
                do n = 1, this%n_max
                   Rg = spacing_basis * n
                   alpha_ln(l, n) = -Rg**(-2) * (log(0.001_dp) - l*log(Rg))
+                  !print*, "l=", l, "n=", n, "Rg=", Rg, "alpha_ln=", alpha_ln(l, n)
                enddo
             enddo
 
@@ -2673,8 +2678,11 @@ module descriptors_module
                      alpha_gto = alpha_ln(l, i) + alpha_ln(l, j)
                      u = alpha_gto*cutoff_basis**2
                      t = l + 1.5_dp
-                     overlap_basis(l, i, j) = 0.5*cutoff_basis**(2*t)*u**(-t)* ( ln_gamma(t) - gamma_incomplete_upper(t, u) )
+                     !print*, "jpd47 lij=", l, i, j, "alpha=", alpha_gto, "u=", u, "t=", t
+                     !print*, "gamma(t)=", gamma(t), "gamm_inc(t, u)=", gamma_incomplete_upper(t, u)
+                     overlap_basis(l, i, j) = 0.5*cutoff_basis**(2*t)*u**(-t)* ( gamma(t) - gamma_incomplete_upper(t, u) )
                   enddo
+               !print*, "jpd47 overlap basis: l,i=", l, i, overlap_basis(l, i, :)
                enddo
             enddo
 
@@ -2688,7 +2696,7 @@ module descriptors_module
             enddo
 
          else
-            print*, "this%radial_basis=", this%radial_basis, "not recognised"
+            RAISE_ERROR("soap_initialise: radial_basis not recognised: ORIGINAL, POLY or GTO" ,error)
          endif
 
          allocate(this%LA_BL_ti(0:this%l_max, n_radial_grid, this%n_max))
@@ -2706,10 +2714,15 @@ module descriptors_module
             enddo
 
             !find inverse of L^T
-            call initialise(LA_L_ti, transpose(this%cholesky_overlap_basis(l, :, :)))
+            !call initialise(LA_L_ti, transpose(this%cholesky_overlap_basis(l, :, :)))
             !call LA_Matrix_Inverse(LA_L_ti, overlap_basis)
             overlap_basis(l, :, :) = transpose(this%cholesky_overlap_basis(l, :, :))
             call dtrtri("U", "N", this%n_max, overlap_basis(l, :, :), this%n_max, i)
+            ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
+            this%LA_BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
+
+            ! avoid inverse instead
+            !this%LA_BL_ti(l, :, :) = covariance_basis(l, :, :)
 
             ! print*, "jpd47 L is"
             ! do i = 1, this%n_max
@@ -2726,8 +2739,7 @@ module descriptors_module
             !    print*, "jpd47 i is", i, covariance_basis(i, :)
             ! enddo
 
-            ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
-            this%LA_BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
+
             call finalise(LA_covariance_basis)
             call finalise(LA_overlap_basis)
          enddo
@@ -7675,6 +7687,7 @@ module descriptors_module
             enddo
             !print*, "jpd47 shapes are", LA_BL_ti%n, LA_BL_ti%m, shape(radial_fun(0, :)), shape(radial_coefficient(0, :))
             call LA_Matrix_QR_Solve_Vector(LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
+            !radial_coefficient = matmul(radial_coefficient, this%cholesky_overlap_basis(0, :, :))
          endif
 
 
@@ -7794,6 +7807,7 @@ module descriptors_module
                !call LA_Matrix_QR_Solve_Matrix(LA_BL_ti, radial_fun, radial_coefficient)
                do l = 0, this%l_max
                   call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
+                  !radial_coefficient(l, :) = matmul(radial_coefficient(l, :), this%cholesky_overlap_basis(l, :, :))
                enddo
                if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
                radial_coefficient = radial_coefficient * f_cut
