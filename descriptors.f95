@@ -7554,7 +7554,6 @@ module descriptors_module
          enddo
       enddo
 
-
       do l = 0, this%l_max
          allocate(SphericalY_ij(l)%m(-l:l))
          if(my_do_grad_descriptor) allocate(grad_SphericalY_ij(l)%mm(3,-l:l))
