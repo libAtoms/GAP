@@ -2513,7 +2513,7 @@ module descriptors_module
 
       call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
       call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
-      !jpd47 new params for radial basis tweaking
+
       call param_register(params, 'old_radial_basis', 'F', this%old_radial_basis, help_string="Whether to use old radial basis or not")
       call param_register(params, 'poly_basis', 'F', this%poly_basis, help_string="Whether to use old radial basis or not")
       call param_register(params, 'basis_sigma_scale', '1.0', basis_sigma_scale, help_string="basis_sigma = cutoff/n_max * basis_sigma_scale")
@@ -2579,7 +2579,6 @@ module descriptors_module
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
-      !print*, "jpd47 this%radial_basis is ", TRIM(this%radial_basis)
       if (this%radial_basis == "ORIGINAL") then
          allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
             covariance_basis(1, this%n_max,this%n_max), overlap_basis(1, this%n_max,this%n_max), this%cholesky_overlap_basis(1, this%n_max,this%n_max))
@@ -2607,7 +2606,7 @@ module descriptors_module
          call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(1, :, :))
          do i = 1, this%n_max
             do j = 1, i-1 !i + 1, this%n_max
-               this%cholesky_overlap_basis(1,j,i) = 0.0_dp    ! jpd47 lower triangular, upper right is zeros
+               this%cholesky_overlap_basis(1,j,i) = 0.0_dp    ! lower triangular
             enddo
          enddo
 
@@ -2621,7 +2620,7 @@ module descriptors_module
 
       else
          ! fine radial grid to fit radial coeficients
-         n_radial_grid = 3* this%n_max
+         n_radial_grid = 3 * this%n_max
          allocate(this%r_basis(n_radial_grid))
          spacing_basis = cutoff_basis / n_radial_grid
          this%r_basis(1) = 0.0_dp
@@ -2657,11 +2656,8 @@ module descriptors_module
 
          elseif (this%radial_basis == "GTO") then
             l_ub = this%l_max
-            ! form the
             allocate(alpha_ln(0:this%l_max+1, this%n_max))
 
-            !print*, "alpha_ln is"
-            !print*, "jpd47 spacing_basis is", spacing_basis
             spacing_basis = cutoff_basis/this%n_max
             do l = 0, this%l_max
                do n = 1, this%n_max
@@ -2678,11 +2674,8 @@ module descriptors_module
                      alpha_gto = alpha_ln(l, i) + alpha_ln(l, j)
                      u = alpha_gto*cutoff_basis**2
                      t = l + 1.5_dp
-                     !print*, "jpd47 lij=", l, i, j, "alpha=", alpha_gto, "u=", u, "t=", t
-                     !print*, "gamma(t)=", gamma(t), "gamm_inc(t, u)=", gamma_incomplete_upper(t, u)
                      overlap_basis(l, i, j) = 0.5*cutoff_basis**(2*t)*u**(-t)* ( gamma(t) - gamma_incomplete_upper(t, u) )
                   enddo
-               !print*, "jpd47 overlap basis: l,i=", l, i, overlap_basis(l, i, :)
                enddo
             enddo
 
@@ -2709,36 +2702,15 @@ module descriptors_module
             call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(l, :, :))
             do i = 1, this%n_max
                do j = 1, i-1 !i + 1, this%n_max
-                  this%cholesky_overlap_basis(l, j,i) = 0.0_dp    ! jpd47 lower triangular, upper right is zeros
+                  this%cholesky_overlap_basis(l, j,i) = 0.0_dp    ! lower triangular
                enddo
             enddo
 
-            !find inverse of L^T
-            !call initialise(LA_L_ti, transpose(this%cholesky_overlap_basis(l, :, :)))
-            !call LA_Matrix_Inverse(LA_L_ti, overlap_basis)
+            !find inverse of L^T, NOTE: reusing overlap basis in a confusing way here
             overlap_basis(l, :, :) = transpose(this%cholesky_overlap_basis(l, :, :))
             call dtrtri("U", "N", this%n_max, overlap_basis(l, :, :), this%n_max, i)
             ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
             this%LA_BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
-
-            ! avoid inverse instead
-            !this%LA_BL_ti(l, :, :) = covariance_basis(l, :, :)
-
-            ! print*, "jpd47 L is"
-            ! do i = 1, this%n_max
-            !    print*, "jpd47 i is", i, this%cholesky_overlap_basis(i, :)
-            ! enddo
-
-            ! print*, "jpd47 L_ti is"
-            ! do i = 1, this%n_max
-            !    print*, "jpd47 i is", i, overlap_basis(i, :)
-            ! enddo
-
-            ! print*, "jpd47 B is"
-            ! do i = 1, n_radial_grid
-            !    print*, "jpd47 i is", i, covariance_basis(i, :)
-            ! enddo
-
 
             call finalise(LA_covariance_basis)
             call finalise(LA_overlap_basis)
@@ -7303,6 +7275,58 @@ module descriptors_module
       enddo
    endsubroutine form_gs_index
 
+   subroutine QR_SOLVE_VECTOR(factor, tau, vector, vec_result)
+      ! This routine is copied here from linear algebra as I can't make LA_Matrix work with OMP_NUM_THREADS > 1
+      ! nasty solution but it works... can be improved in future
+      real(dp), dimension(:), intent(in) :: vector
+      real(dp), dimension(:), intent(out) :: vec_result
+      real(dp), dimension(:, :), intent(in) :: factor
+      real(dp), dimension(:), intent(in)    :: tau
+
+      integer :: n, m, o,  l, lwork, info, i, j
+      real(dp), dimension(:), allocatable :: work
+      real(dp), dimension(:, :), allocatable :: matrix, my_result
+
+      !reshape vector into matrix
+      n = size(vector)
+      allocate(matrix(n, 1))
+      matrix = reshape(vector,(/n,1/))
+
+      ! sizes, n is already set
+      o = 1
+      m = size(factor, 2)
+
+      allocate(my_result(n, o))
+      my_result = matrix
+
+      ! copied this directly from LA_Matrix_QR_Solve_Matrix in linearalgebra
+      lwork = -1
+      allocate(work(1))
+      call dormqr('L', 'T', n, o, m, factor, n, tau, my_result, n, work, lwork, info)
+      lwork = nint(work(1))
+      deallocate(work)
+
+      allocate(work(lwork))
+      call dormqr('L', 'T', n, o, m, factor, n, tau, my_result, n, work, lwork, info)
+      deallocate(work)
+
+      if( info /= 0 ) then
+         print*, "paramater", info, "had an illegal value"
+      endif
+
+      do i = 1, o
+         do j = m, 2, -1
+            my_result(j,i) = my_result(j,i)/factor(j,j)
+            my_result(1:j-1,i) = my_result(1:j-1,i) - my_result(j,i)*factor(1:j-1,j)
+         enddo
+         my_result(1,i) = my_result(1,i) / factor(1,1)
+      enddo
+
+      !result = my_result(1:m,:)
+      vec_result = my_result(1:m, 1)
+      deallocate(my_result)
+      deallocate(matrix)
+   endsubroutine
 
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 
@@ -7354,6 +7378,8 @@ module descriptors_module
 
       type(LA_Matrix), dimension(:), allocatable, save :: LA_BL_ti
       real(dp), dimension(:,:), allocatable :: Q, R
+      real(dp), dimension(:,:,:), allocatable, save :: QR_factor
+      real(dp), dimension(:,:), allocatable, save :: QR_tau
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
@@ -7361,6 +7387,7 @@ module descriptors_module
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
 !$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
+
 
       INIT_ERROR(error)
 
@@ -7393,8 +7420,9 @@ module descriptors_module
          endif
       enddo
 
-      ! jpd47 radial basis
+      ! setup radial basis
       if (.not. this%radial_basis == "ORIGINAL") then
+         ! perform QR factorisation once and save for re-use
          allocate(LA_BL_ti(0:this%l_max))
          allocate(Q(size(this%r_basis), this%n_max), R(this%n_max, this%n_max))
          do l = 0, this%l_max
@@ -7403,6 +7431,21 @@ module descriptors_module
          enddo
          if (allocated(Q)) deallocate(Q)
          if (allocated(R)) deallocate(R)
+
+         ! 2nd method: extract the only bits needed to solve linear systems
+         allocate(QR_factor(0:this%l_max, size(this%r_basis), this%n_max))
+         allocate(QR_tau(0:this%l_max, this%n_max))
+         do l = 0, this%l_max
+            QR_factor(l, :, :) = LA_BL_ti(l)%factor
+            QR_tau(l, :) = LA_BL_ti(l)%tau
+         enddo
+
+         !deallocate as only using first method now
+         do l = 0, this%l_max
+            call finalise(LA_BL_ti(l))
+         enddo
+         deallocate(LA_BL_ti)
+
       endif
 
       my_do_descriptor = optional_default(.false., do_descriptor)
@@ -7643,7 +7686,7 @@ module descriptors_module
 
 
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
-!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay, LA_BL_ti) &
+!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay, QR_factor, QR_tau) &
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
@@ -7673,8 +7716,6 @@ module descriptors_module
             endif
          endif
 
-
-         !print*, "jpd47 this%old_rdaial_basis is", this%old_radial_basis
          if (this%radial_basis == "ORIGINAL") then
             ! original version
             radial_fun(0,:) = 0.0_dp
@@ -7685,8 +7726,9 @@ module descriptors_module
             do a = 1, size(this%r_basis)
                radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
             enddo
-            !print*, "jpd47 shapes are", LA_BL_ti%n, LA_BL_ti%m, shape(radial_fun(0, :)), shape(radial_coefficient(0, :))
-            call LA_Matrix_QR_Solve_Vector(LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
+            !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
+            call QR_SOLVE_VECTOR(QR_factor(0, :, :), QR_tau(0, :), radial_fun(0, :), radial_coefficient(0, :))
+            ! alternative approach: don't invert L^T and multiply at the end. Doesn't work as well for POLY basis
             !radial_coefficient = matmul(radial_coefficient, this%cholesky_overlap_basis(0, :, :))
          endif
 
@@ -7740,7 +7782,6 @@ module descriptors_module
             f_cut = coordination_function(r_ij, this%cutoff, this%cutoff_transition_width)
             radial_decay = ( 1.0_dp + this%cutoff_rate ) / ( this%cutoff_rate + ( r_ij / this%cutoff_scale )**this%cutoff_dexp )
             radial_decay = norm_radial_decay * radial_decay
-            !print*, "jpd47 radial_decay is", radial_decay
 
             if(my_do_grad_descriptor) then
                df_cut = dcoordination_function(r_ij,this%cutoff, this%cutoff_transition_width)
@@ -7794,11 +7835,6 @@ module descriptors_module
                enddo
             enddo
 
-            ! print*, "jpd47 neighbour radial_fun is"
-            ! print*, "jpd47 r_ij is", r_ij
-            ! do l = 0, this%l_max
-            !    print*, "jpd47 l=", l, "RF=", radial_fun(l,:)
-            ! enddo
             if (this%radial_basis == "ORIGINAL") then
                radial_coefficient = matmul( radial_fun, this%transform_basis )
                if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
@@ -7806,19 +7842,13 @@ module descriptors_module
             else
                !call LA_Matrix_QR_Solve_Matrix(LA_BL_ti, radial_fun, radial_coefficient)
                do l = 0, this%l_max
-                  call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
+                  !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
+                  call QR_SOLVE_VECTOR(QR_factor(l, :, :), QR_tau(l, :), radial_fun(l, :), radial_coefficient(l, :))
                   !radial_coefficient(l, :) = matmul(radial_coefficient(l, :), this%cholesky_overlap_basis(l, :, :))
                enddo
                if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
                radial_coefficient = radial_coefficient * f_cut
             endif
-
-            !print*, "jpd47 f_cut is", f_cut
-            ! print*, "jpd47 radial_coefficient is"
-            ! do l = 0, this%l_max
-            !    print*, "jpd47 l=", l, radial_coefficient(l, :)
-            ! enddo
-
 
 
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
@@ -8366,13 +8396,8 @@ module descriptors_module
       if(allocated(rs_index)) deallocate(rs_index)
       if(allocated(i_desc)) deallocate(i_desc)
       if (allocated(gs_index)) deallocate(gs_index)
-
-      if (allocated(LA_BL_ti)) then
-         do l = 0, this%l_max
-            call finalise(LA_BL_ti(l))
-         enddo
-         deallocate(LA_BL_ti)
-      endif
+      if (allocated(QR_factor)) deallocate(QR_factor)
+      if (allocated(QR_tau)) deallocate(QR_tau)
 
       call system_timer('soap_calc')
 
