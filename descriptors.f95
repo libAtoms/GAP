@@ -2762,6 +2762,7 @@ module descriptors_module
       if(allocated(this%cholesky_overlap_basis)) deallocate(this%cholesky_overlap_basis)
       if(allocated(this%species_Z)) deallocate(this%species_Z)
       if(allocated(this%Z)) deallocate(this%Z)
+      if(allocated(this%LA_BL_ti)) deallocate(this%LA_BL_ti)
 
       this%initialised = .false.
 
@@ -7531,7 +7532,7 @@ module descriptors_module
       allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
 
       if(my_do_grad_descriptor) then
-         allocate(grad_radial_fun(0:this%l_max, this%n_max), grad_radial_coefficient(0:this%l_max, this%n_max))
+         allocate(grad_radial_fun(0:this%l_max, size(this%r_basis)), grad_radial_coefficient(0:this%l_max, this%n_max))
          allocate(grad_SphericalY_ij(0:this%l_max))
       endif
 
@@ -7733,7 +7734,6 @@ module descriptors_module
          endif
 
 
-
          do i_species = 0, this%n_species
             do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
@@ -7840,13 +7840,18 @@ module descriptors_module
                if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
                radial_coefficient = radial_coefficient * f_cut
             else
-               !call LA_Matrix_QR_Solve_Matrix(LA_BL_ti, radial_fun, radial_coefficient)
                do l = 0, this%l_max
                   !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
                   call QR_SOLVE_VECTOR(QR_factor(l, :, :), QR_tau(l, :), radial_fun(l, :), radial_coefficient(l, :))
                   !radial_coefficient(l, :) = matmul(radial_coefficient(l, :), this%cholesky_overlap_basis(l, :, :))
                enddo
-               if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
+               if(my_do_grad_descriptor) then
+                  !grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
+                  do l = 0, this%l_max
+                     call QR_SOLVE_VECTOR(QR_factor(l, :, :), QR_tau(l, :), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
+                  enddo
+                  grad_radial_coefficient = grad_radial_coefficient * f_cut + radial_coefficient * df_cut
+               endif
                radial_coefficient = radial_coefficient * f_cut
             endif
 
