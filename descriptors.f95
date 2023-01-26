@@ -2466,13 +2466,12 @@ module descriptors_module
 
       type(Dictionary) :: params
       real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
-      real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta, dummy
+      real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta
       real(dp), dimension(:,:,:), allocatable :: covariance_basis, overlap_basis
       integer :: i, j, xml_version, info, n_radial_grid
-      integer, dimension(:), allocatable :: i_pivot
 
       real(dp), dimension(:, :), allocatable ::  alpha_ln
-      real(dp) :: R, u, alpha_gto, t, Rg
+      real(dp) :: u, alpha_gto, t, Rg
       integer :: l, n, l_ub
 
       type(LA_Matrix) :: LA_covariance_basis, LA_overlap_basis, LA_L_ti
@@ -2513,10 +2512,6 @@ module descriptors_module
 
       call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
       call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
-
-      call param_register(params, 'old_radial_basis', 'F', this%old_radial_basis, help_string="Whether to use old radial basis or not")
-      call param_register(params, 'poly_basis', 'F', this%poly_basis, help_string="Whether to use old radial basis or not")
-      call param_register(params, 'basis_sigma_scale', '1.0', basis_sigma_scale, help_string="basis_sigma = cutoff/n_max * basis_sigma_scale")
       call param_register(params, 'radial_basis', 'ORIGINAL', this%radial_basis, help_string="Radial basis functions to use. Options are ORIGINAL, POLY and GTO")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
@@ -2663,7 +2658,6 @@ module descriptors_module
                do n = 1, this%n_max
                   Rg = spacing_basis * n
                   alpha_ln(l, n) = -Rg**(-2) * (log(0.001_dp) - l*log(Rg))
-                  !print*, "l=", l, "n=", n, "Rg=", Rg, "alpha_ln=", alpha_ln(l, n)
                enddo
             enddo
 
