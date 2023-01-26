@@ -388,7 +388,7 @@ module descriptors_module
       integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
-      real(dp), dimension(:,:,:), allocatable :: cholesky_overlap_basis, LA_BL_ti
+      real(dp), dimension(:,:,:), allocatable :: cholesky_overlap_basis, BL_ti
       real(dp), dimension(:, :), allocatable :: transform_basis
 
       logical :: global = .false.
@@ -396,8 +396,6 @@ module descriptors_module
       logical :: diagonal_radial = .false.
       logical :: normalise = .true.
       logical :: initialised = .false.
-      logical :: old_radial_basis = .true.
-      logical :: poly_basis = .false.
 
       character(len=STRING_LENGTH) :: radial_basis
    endtype soap
@@ -2466,7 +2464,7 @@ module descriptors_module
 
       type(Dictionary) :: params
       real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
-      real(dp) :: sigma_basis, basis_sigma_scale, N_alpha, S_alpha_beta, N_beta
+      real(dp) ::  N_alpha, S_alpha_beta, N_beta
       real(dp), dimension(:,:,:), allocatable :: covariance_basis, overlap_basis
       integer :: i, j, xml_version, info, n_radial_grid
 
@@ -2570,7 +2568,6 @@ module descriptors_module
 
       this%alpha = 0.5_dp / this%atom_sigma**2
       alpha_basis = this%alpha
-      sigma_basis = (0.5_dp/alpha_basis)**0.5
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
@@ -2686,7 +2683,7 @@ module descriptors_module
             RAISE_ERROR("soap_initialise: radial_basis not recognised: ORIGINAL, POLY or GTO" ,error)
          endif
 
-         allocate(this%LA_BL_ti(0:this%l_max, n_radial_grid, this%n_max))
+         allocate(this%BL_ti(0:this%l_max, n_radial_grid, this%n_max))
 
          ! per l
          do l = 0, l_ub
@@ -2704,7 +2701,7 @@ module descriptors_module
             overlap_basis(l, :, :) = transpose(this%cholesky_overlap_basis(l, :, :))
             call dtrtri("U", "N", this%n_max, overlap_basis(l, :, :), this%n_max, i)
             ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
-            this%LA_BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
+            this%BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
 
             call finalise(LA_covariance_basis)
             call finalise(LA_overlap_basis)
@@ -2712,7 +2709,7 @@ module descriptors_module
 
          if (l_ub == 0) then
             do l = 0, this%l_max
-               this%LA_BL_ti(l, :, :) = this%LA_BL_ti(0, :, :)
+               this%BL_ti(l, :, :) = this%BL_ti(0, :, :)
             enddo
          endif
 
@@ -2756,7 +2753,7 @@ module descriptors_module
       if(allocated(this%cholesky_overlap_basis)) deallocate(this%cholesky_overlap_basis)
       if(allocated(this%species_Z)) deallocate(this%species_Z)
       if(allocated(this%Z)) deallocate(this%Z)
-      if(allocated(this%LA_BL_ti)) deallocate(this%LA_BL_ti)
+      if(allocated(this%BL_ti)) deallocate(this%BL_ti)
 
       this%initialised = .false.
 
@@ -7417,17 +7414,17 @@ module descriptors_module
 
       ! setup radial basis
       if (.not. this%radial_basis == "ORIGINAL") then
-         ! perform QR factorisation once and save for re-use
+         ! perform QR factorisation once
          allocate(LA_BL_ti(0:this%l_max))
          allocate(Q(size(this%r_basis), this%n_max), R(this%n_max, this%n_max))
          do l = 0, this%l_max
-            call initialise(LA_BL_ti(l), this%LA_BL_ti(l, :, :))
+            call initialise(LA_BL_ti(l), this%BL_ti(l, :, :))
             call LA_Matrix_QR_Factorise(LA_BL_ti(l), Q, R, error)
          enddo
          if (allocated(Q)) deallocate(Q)
          if (allocated(R)) deallocate(R)
 
-         ! 2nd method: extract the only bits needed to solve linear systems
+         ! extract factor and tau as these are only bits needed for QR_solve
          allocate(QR_factor(0:this%l_max, size(this%r_basis), this%n_max))
          allocate(QR_tau(0:this%l_max, this%n_max))
          do l = 0, this%l_max
@@ -7435,7 +7432,7 @@ module descriptors_module
             QR_tau(l, :) = LA_BL_ti(l)%tau
          enddo
 
-         !deallocate as only using first method now
+         !deallocate LA_BL_ti
          do l = 0, this%l_max
             call finalise(LA_BL_ti(l))
          enddo
