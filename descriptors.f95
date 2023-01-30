@@ -2690,8 +2690,8 @@ module descriptors_module
 
          !allocate(this%BL_ti(0:this%l_max, n_radial_grid, this%n_max))
          ! extract factor and tau as these are only bits needed for QR_solve
-         allocate(this%QR_factor(0:this%l_max, size(this%r_basis), this%n_max))
-         allocate(this%QR_tau(0:this%l_max, this%n_max))
+         allocate(this%QR_factor( size(this%r_basis), this%n_max, 0:this%l_max))
+         allocate(this%QR_tau(this%n_max, 0:this%l_max))
 
          ! per l
          do l = 0, l_ub
@@ -2715,8 +2715,8 @@ module descriptors_module
             call initialise(LA_BL_ti(l), matmul(covariance_basis(l, :, :), overlap_basis(l, :, :)))
             call LA_Matrix_QR_Factorise(LA_BL_ti(l), Q, R, error)
 
-            this%QR_factor(l, :, :) = LA_BL_ti(l)%factor
-            this%QR_tau(l, :) = LA_BL_ti(l)%tau
+            this%QR_factor(:, :, l) = LA_BL_ti(l)%factor
+            this%QR_tau(:, l) = LA_BL_ti(l)%tau
 
             call finalise(LA_covariance_basis)
             call finalise(LA_overlap_basis)
@@ -2727,8 +2727,8 @@ module descriptors_module
             !    this%BL_ti(l, :, :) = this%BL_ti(0, :, :)
             ! enddo
             do l = 0, this%l_max
-               this%QR_factor(l, :, :) = this%QR_factor(0, :, :)
-               this%QR_tau(l, :) = this%QR_tau(0, :)
+               this%QR_factor(:, :, l) = this%QR_factor(:, :, 0)
+               this%QR_tau(:, l) = this%QR_tau(:, 0)
             enddo
          endif
 
@@ -7668,7 +7668,7 @@ module descriptors_module
                radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
             enddo
             !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
-            call Matrix_QR_Solve(this%QR_factor(0, :, :), this%QR_tau(0, :), radial_fun(0, :), radial_coefficient(0, :))
+            call Matrix_QR_Solve(this%QR_factor(:, :, 0), this%QR_tau(:, 0), radial_fun(0, :), radial_coefficient(0, :))
             ! alternative approach: don't invert L^T and multiply at the end. Doesn't work as well for POLY basis
             !radial_coefficient = matmul(radial_coefficient, this%cholesky_overlap_basis(0, :, :))
          endif
@@ -7782,13 +7782,13 @@ module descriptors_module
             else
                do l = 0, this%l_max
                   !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
-                  call Matrix_QR_Solve(this%QR_factor(l, :, :), this%QR_tau(l, :), radial_fun(l, :), radial_coefficient(l, :))
+                  call Matrix_QR_Solve(this%QR_factor(:, :, l), this%QR_tau(:, l), radial_fun(l, :), radial_coefficient(l, :))
                   !radial_coefficient(l, :) = matmul(radial_coefficient(l, :), this%cholesky_overlap_basis(l, :, :))
                enddo
                if(my_do_grad_descriptor) then
                   !grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
                   do l = 0, this%l_max
-                     call Matrix_QR_Solve(this%QR_factor(l, :, :), this%QR_tau(l, :), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
+                     call Matrix_QR_Solve(this%QR_factor(:, :, l), this%QR_tau(:, l), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
                   enddo
                   grad_radial_coefficient = grad_radial_coefficient * f_cut + radial_coefficient * df_cut
                endif
