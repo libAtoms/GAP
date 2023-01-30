@@ -388,7 +388,7 @@ module descriptors_module
       integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
-      real(dp), dimension(:,:,:), allocatable :: cholesky_overlap_basis, BL_ti
+      real(dp), dimension(:,:,:), allocatable :: cholesky_overlap_basis
       real(dp), dimension(:, :), allocatable :: transform_basis
 
       logical :: global = .false.
@@ -398,7 +398,6 @@ module descriptors_module
       logical :: initialised = .false.
 
       character(len=STRING_LENGTH) :: radial_basis
-      type(LA_Matrix), dimension(:), allocatable :: LA_BL_ti
       real(dp), dimension(:,:,:), allocatable :: QR_factor
       real(dp), dimension(:,:), allocatable :: QR_tau
    endtype soap
@@ -7304,59 +7303,6 @@ module descriptors_module
       enddo
    endsubroutine form_gs_index
 
-   ! subroutine QR_SOLVE_VECTOR(factor, tau, vector, vec_result)
-   !    ! This routine is copied here from linear algebra as I can't make LA_Matrix work with OMP_NUM_THREADS > 1
-   !    ! nasty solution but it works... can be improved in future
-   !    real(dp), dimension(:), intent(in) :: vector
-   !    real(dp), dimension(:), intent(out) :: vec_result
-   !    real(dp), dimension(:, :), intent(in) :: factor
-   !    real(dp), dimension(:), intent(in)    :: tau
-
-   !    integer :: n, m, o,  l, lwork, info, i, j
-   !    real(dp), dimension(:), allocatable :: work
-   !    real(dp), dimension(:, :), allocatable :: matrix, my_result
-
-   !    !reshape vector into matrix
-   !    n = size(vector)
-   !    allocate(matrix(n, 1))
-   !    matrix = reshape(vector,(/n,1/))
-
-   !    ! sizes, n is already set
-   !    o = 1
-   !    m = size(factor, 2)
-
-   !    allocate(my_result(n, o))
-   !    my_result = matrix
-
-   !    ! copied this directly from LA_Matrix_QR_Solve_Matrix in linearalgebra
-   !    lwork = -1
-   !    allocate(work(1))
-   !    call dormqr('L', 'T', n, o, m, factor, n, tau, my_result, n, work, lwork, info)
-   !    lwork = nint(work(1))
-   !    deallocate(work)
-
-   !    allocate(work(lwork))
-   !    call dormqr('L', 'T', n, o, m, factor, n, tau, my_result, n, work, lwork, info)
-   !    deallocate(work)
-
-   !    if( info /= 0 ) then
-   !       print*, "paramater", info, "had an illegal value"
-   !    endif
-
-   !    do i = 1, o
-   !       do j = m, 2, -1
-   !          my_result(j,i) = my_result(j,i)/factor(j,j)
-   !          my_result(1:j-1,i) = my_result(1:j-1,i) - my_result(j,i)*factor(1:j-1,j)
-   !       enddo
-   !       my_result(1,i) = my_result(1,i) / factor(1,1)
-   !    enddo
-
-   !    !result = my_result(1:m,:)
-   !    vec_result = my_result(1:m, 1)
-   !    deallocate(my_result)
-   !    deallocate(matrix)
-   ! endsubroutine
-
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 
       type real_2d_array
@@ -7405,11 +7351,6 @@ module descriptors_module
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
 
-      type(LA_Matrix), dimension(:), allocatable, save :: LA_BL_ti
-      real(dp), dimension(:,:), allocatable :: Q, R
-      real(dp), dimension(:,:,:), allocatable, save :: QR_factor
-      real(dp), dimension(:,:), allocatable, save :: QR_tau
-
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i)
@@ -7448,34 +7389,6 @@ module descriptors_module
             species_map(this%species_Z(i_species)) = i_species
          endif
       enddo
-
-      ! setup radial basis
-      ! if (.not. this%radial_basis == "ORIGINAL" .and. .false.) then
-      !    ! perform QR factorisation once
-      !    allocate(LA_BL_ti(0:this%l_max))
-      !    allocate(Q(size(this%r_basis), this%n_max), R(this%n_max, this%n_max))
-      !    do l = 0, this%l_max
-      !       call initialise(LA_BL_ti(l)) !, this%BL_ti(l, :, :))
-      !       call LA_Matrix_QR_Factorise(LA_BL_ti(l), Q, R, error)
-      !    enddo
-      !    if (allocated(Q)) deallocate(Q)
-      !    if (allocated(R)) deallocate(R)
-
-      !    ! extract factor and tau as these are only bits needed for QR_solve
-      !    allocate(QR_factor(0:this%l_max, size(this%r_basis), this%n_max))
-      !    allocate(QR_tau(0:this%l_max, this%n_max))
-      !    do l = 0, this%l_max
-      !       QR_factor(l, :, :) = LA_BL_ti(l)%factor
-      !       QR_tau(l, :) = LA_BL_ti(l)%tau
-      !    enddo
-
-      !    !deallocate LA_BL_ti
-      !    do l = 0, this%l_max
-      !       call finalise(LA_BL_ti(l))
-      !    enddo
-      !    deallocate(LA_BL_ti)
-
-      ! endif
 
       my_do_descriptor = optional_default(.false., do_descriptor)
       my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
@@ -7714,7 +7627,7 @@ module descriptors_module
 
 
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
-!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay, QR_factor, QR_tau) &
+!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
@@ -7755,13 +7668,7 @@ module descriptors_module
                radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
             enddo
             !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
-            !call QR_SOLVE_VECTOR(QR_factor(0, :, :), QR_tau(0, :), radial_fun(0, :), radial_coefficient(0, :))
-            !print*, "jpd47 correct :", radial_coefficient(0, :)
             call Matrix_QR_Solve(this%QR_factor(0, :, :), this%QR_tau(0, :), radial_fun(0, :), radial_coefficient(0, :))
-            !print*, "jpd47 subroutine using this%:", radial_coefficient(0, :)
-
-            ! call LA_Matrix_QR_Solve_Vector(this%LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
-            ! print*, "jpd47 new :", radial_coefficient(0, :)
             ! alternative approach: don't invert L^T and multiply at the end. Doesn't work as well for POLY basis
             !radial_coefficient = matmul(radial_coefficient, this%cholesky_overlap_basis(0, :, :))
          endif
@@ -7875,15 +7782,13 @@ module descriptors_module
             else
                do l = 0, this%l_max
                   !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
-                  !call QR_SOLVE_VECTOR(QR_factor(l, :, :), QR_tau(l, :), radial_fun(l, :), radial_coefficient(l, :))
                   call Matrix_QR_Solve(this%QR_factor(l, :, :), this%QR_tau(l, :), radial_fun(l, :), radial_coefficient(l, :))
                   !radial_coefficient(l, :) = matmul(radial_coefficient(l, :), this%cholesky_overlap_basis(l, :, :))
                enddo
                if(my_do_grad_descriptor) then
                   !grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
                   do l = 0, this%l_max
-                     !call QR_SOLVE_VECTOR(QR_factor(l, :, :), QR_tau(l, :), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
-                     call Matrix_QR_Solve(QR_factor(l, :, :), QR_tau(l, :), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
+                     call Matrix_QR_Solve(this%QR_factor(l, :, :), this%QR_tau(l, :), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
                   enddo
                   grad_radial_coefficient = grad_radial_coefficient * f_cut + radial_coefficient * df_cut
                endif
@@ -8436,8 +8341,6 @@ module descriptors_module
       if(allocated(rs_index)) deallocate(rs_index)
       if(allocated(i_desc)) deallocate(i_desc)
       if (allocated(gs_index)) deallocate(gs_index)
-      if (allocated(QR_factor)) deallocate(QR_factor)
-      if (allocated(QR_tau)) deallocate(QR_tau)
 
       call system_timer('soap_calc')
 
