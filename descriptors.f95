@@ -2576,7 +2576,7 @@ module descriptors_module
 
       if (this%radial_basis == "ORIGINAL") then
          allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
-            covariance_basis(1, this%n_max,this%n_max), overlap_basis(1, this%n_max,this%n_max), this%cholesky_overlap_basis(1, this%n_max,this%n_max))
+            covariance_basis(this%n_max,this%n_max, 1), overlap_basis(this%n_max,this%n_max, 1), this%cholesky_overlap_basis(this%n_max,this%n_max, 1))
 
          this%r_basis(1) = 0.0_dp
          do i = 2, this%n_max
@@ -2585,8 +2585,8 @@ module descriptors_module
 
          do i = 1, this%n_max
             do j = 1, this%n_max
-               covariance_basis(1, j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
-               overlap_basis(1, j,i) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
+               covariance_basis(j,i, 1) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
+               overlap_basis(j,i,1) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
                   sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
                   alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
                   ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
@@ -2596,16 +2596,16 @@ module descriptors_module
          !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
          overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
 
-         call initialise(LA_covariance_basis, covariance_basis(1, :, :))
-         call initialise(LA_overlap_basis,overlap_basis(1, :, :))
-         call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(1, :, :))
+         call initialise(LA_covariance_basis, covariance_basis(:, :, 1))
+         call initialise(LA_overlap_basis,overlap_basis(:, :, 1))
+         call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(:, :, 1))
          do i = 1, this%n_max
             do j = 1, i-1 !i + 1, this%n_max
-               this%cholesky_overlap_basis(1,j,i) = 0.0_dp    ! lower triangular
+               this%cholesky_overlap_basis(j,i,1) = 0.0_dp    ! lower triangular
             enddo
          enddo
 
-         call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis(1,:,:),this%transform_basis)
+         call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis(:, :, 1),this%transform_basis)
 
          call finalise(LA_covariance_basis)
          call finalise(LA_overlap_basis)
@@ -2625,9 +2625,9 @@ module descriptors_module
 
 
          ! allocations
-         allocate(covariance_basis(0:this%l_max, n_radial_grid, this%n_max))
-         allocate(overlap_basis(0:this%l_max, this%n_max,this%n_max))
-         allocate(this%cholesky_overlap_basis(0:this%l_max, this%n_max,this%n_max))
+         allocate(covariance_basis(n_radial_grid, this%n_max, 0:this%l_max))
+         allocate(overlap_basis(this%n_max,this%n_max, 0:this%l_max))
+         allocate(this%cholesky_overlap_basis(this%n_max,this%n_max, 0:this%l_max))
          allocate(LA_BL_ti(0:this%l_max))
          allocate(Q(n_radial_grid, this%n_max), R(this%n_max, this%n_max))
 
@@ -2639,7 +2639,7 @@ module descriptors_module
                do j = 1, this%n_max
                   N_beta = ((cutoff_basis**(2*j+7))/((j+3)*(2*j+5)*(2*j+7)))**0.5_dp
                   S_alpha_beta = (2*cutoff_basis**(i+j+7))/((5+i+j)*(6+i+j)*(7+i+j))
-                  overlap_basis(0,j,i) = S_alpha_beta/(N_alpha*N_beta)
+                  overlap_basis(j,i, 0) = S_alpha_beta/(N_alpha*N_beta)
                enddo
             enddo
 
@@ -2647,7 +2647,7 @@ module descriptors_module
             do i = 1, this%n_max
                N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
                do j = 1, n_radial_grid
-                  covariance_basis(0, j, i) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
+                  covariance_basis(j, i, 0) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
                enddo
             enddo
 
@@ -2670,7 +2670,7 @@ module descriptors_module
                      alpha_gto = alpha_ln(l, i) + alpha_ln(l, j)
                      u = alpha_gto*cutoff_basis**2
                      t = l + 1.5_dp
-                     overlap_basis(l, i, j) = 0.5*cutoff_basis**(2*t)*u**(-t)* ( gamma(t) - gamma_incomplete_upper(t, u) )
+                     overlap_basis(i, j, l) = 0.5*cutoff_basis**(2*t)*u**(-t)* ( gamma(t) - gamma_incomplete_upper(t, u) )
                   enddo
                enddo
             enddo
@@ -2679,7 +2679,7 @@ module descriptors_module
             do l = 0, this%l_max
                do i = 1, this%n_max
                   do j = 1, n_radial_grid
-                     covariance_basis(l, j, i) = this%r_basis(j)**l * exp(-alpha_ln(l, i)*this%r_basis(j)**2)
+                     covariance_basis(j, i, l) = this%r_basis(j)**l * exp(-alpha_ln(l, i)*this%r_basis(j)**2)
                   enddo
                enddo
             enddo
@@ -2696,22 +2696,22 @@ module descriptors_module
          ! per l
          do l = 0, l_ub
             ! cholesky factorisation
-            call initialise(LA_covariance_basis, covariance_basis(l, :, :))
-            call initialise(LA_overlap_basis,overlap_basis(l, :, :))
-            call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(l, :, :))
+            call initialise(LA_covariance_basis, covariance_basis(:, :, l))
+            call initialise(LA_overlap_basis,overlap_basis(:, :, l))
+            call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(:, :, l))
             do i = 1, this%n_max
                do j = 1, i-1 !i + 1, this%n_max
-                  this%cholesky_overlap_basis(l, j,i) = 0.0_dp    ! lower triangular
+                  this%cholesky_overlap_basis(j,i, l) = 0.0_dp    ! lower triangular
                enddo
             enddo
 
             !find inverse of L^T, NOTE: reusing overlap basis in a confusing way here
-            overlap_basis(l, :, :) = transpose(this%cholesky_overlap_basis(l, :, :))
-            call dtrtri("U", "N", this%n_max, overlap_basis(l, :, :), this%n_max, i)
+            overlap_basis(:, :, l) = transpose(this%cholesky_overlap_basis(:, :, l))
+            call dtrtri("U", "N", this%n_max, overlap_basis(:, :, l), this%n_max, i)
             ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
             !this%BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
 
-            call initialise(LA_BL_ti(l), matmul(covariance_basis(l, :, :), overlap_basis(l, :, :)))
+            call initialise(LA_BL_ti(l), matmul(covariance_basis(:, :, l), overlap_basis(:, :, l)))
             call LA_Matrix_QR_Factorise(LA_BL_ti(l), Q, R, error)
 
             this%QR_factor(:, :, l) = LA_BL_ti(l)%factor
@@ -7666,7 +7666,7 @@ module descriptors_module
             ! original version
             radial_fun(0,:) = 0.0_dp
             radial_fun(0,1) = 1.0_dp
-            radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis(1, :, :))
+            radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis(:, :, 1))
          else
             ! uncommented old version that I think should work...
             do a = 1, size(this%r_basis)
