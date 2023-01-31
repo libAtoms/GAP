@@ -7493,10 +7493,12 @@ module descriptors_module
          enddo
       enddo
 
-      allocate(QR_factor(size(this%r_basis), this%n_max, 0:this%l_max))
-      do l = 0, this%l_max
-         QR_factor(:, :, l) = this%QR_factor(:, :, l)
-      enddo
+      if (this%radial_basis /= "ORIGINAL") then
+         allocate(QR_factor(size(this%r_basis), this%n_max, 0:this%l_max))
+         do l = 0, this%l_max
+            QR_factor(:, :, l) = this%QR_factor(:, :, l)
+         enddo
+      endif
 
       do l = 0, this%l_max
          allocate(SphericalY_ij(l)%m(-l:l))
