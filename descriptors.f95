@@ -7598,6 +7598,9 @@ module descriptors_module
       logical :: original
       integer, dimension(:, :), allocatable :: coupling_inds
       real, dimension(:), allocatable :: sym_facs
+      real(dp), external :: ddot
+      ! real, dimension(0:50) :: sc_times
+      integer :: na, nb, nc, nd, ix
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
@@ -7609,6 +7612,8 @@ module descriptors_module
 
       INIT_ERROR(error)
 
+      ! sc_times = 0.0
+      ! call cpu_time(sc_times(0))
       call system_timer('soap_calc')
 
       if(.not. this%initialised) then
@@ -7630,10 +7635,13 @@ module descriptors_module
       if (len(trim(this%Z_map_str)) > 0 ) original = .false.
 
       !  form W mixing matrices
+      ! call cpu_time(sc_times(1))
       call form_W(this, W, sym_desc, error)
       K1 = size(W(1)%mm(0,:))
       K2 = size(W(2)%mm(0,:))
       if (.not. this%coupling)   call form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
+      ! call cpu_time(sc_times(2))
+      ! print*, "jpd47_timings: forming W and coupling_inds took", sc_times(2)-sc_times(1)
 
       do i_species = 1, this%n_species
          if(this%species_Z(i_species) == 0) then
@@ -7943,13 +7951,16 @@ module descriptors_module
          global_fourier_so3_i_array = 0.0_dp
       endif ! this%global
 
+      ! call cpu_time(sc_times(3))
+      ! print*, "jpd47_timings: all allocation took", sc_times(3)-sc_times(2)
+
 !$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, sym_desc, W, K1, K2, max_n_neigh) &
 !$omp shared(dXG_r, dXG_i, dYG_r, dYG_i, norm_radial_decay, coupling_inds, sym_facs, original) &
 !$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ic, ir, ig, ik, k) &
 !$omp private(c_tmp, r_tmp, tlpo) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
 !$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
-!$omp private(radial_decay, dradial_decay) &
+!$omp private(radial_decay, dradial_decay, na, nb, nc, nd, ix) &
 !$omp reduction(+:global_fourier_so3_r_array,global_fourier_so3_i_array)
 
 
@@ -7959,6 +7970,7 @@ module descriptors_module
          else
             i_desc_i = i_desc(i)
          endif
+
 
          if(.not.this%global) then
             if(my_do_descriptor) then
@@ -8026,6 +8038,9 @@ module descriptors_module
 
             i_species = species_map(at%Z(j))
             if( i_species == 0 ) cycle
+
+            ! jpd47
+            ! call cpu_time(sc_times(4))
 
             if(.not. this%global .and. my_do_grad_descriptor) then
                descriptor_out%x(i_desc_i)%ii(n_i) = j
@@ -8110,6 +8125,10 @@ module descriptors_module
                enddo ! a
             enddo ! l
 
+            ! jpd47 density expansion coefficients
+            ! call cpu_time(sc_times(5))
+            ! sc_times(6) = sc_times(6) + sc_times(5) - sc_times(4)
+
             if(my_do_grad_descriptor .and. original) then
                do k = 1, 3
                   do l = 0, this%l_max
@@ -8151,7 +8170,12 @@ module descriptors_module
                   enddo ! l
                enddo ! k
             endif ! my_do_grad_descriptor
+
+            !jpd47 gradient expansion coefficients
+            ! call cpu_time(sc_times(7))
+            ! sc_times(8) = sc_times(8) + sc_times(7) - sc_times(5)
          enddo ! n
+
 
 
          if(this%global .and. my_do_grad_descriptor) then
@@ -8233,10 +8257,15 @@ module descriptors_module
          else
             !elementwise coupling between density channels. For use with tensor-reduced compression.
             do l = 0, this%l_max
+               ! jpd47 timing
+               ! call cpu_time(sc_times(20))
+
                tlpo = 1.0_dp
                if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
-               Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
-               Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+               ! Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+               ! Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+               call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
+               call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
                if (this%sym_mix) then
                   Y_r(2, l)%mm = Y_r(1, l)%mm
                   Y_i(2, l)%mm = Y_i(1, l)%mm
@@ -8245,11 +8274,16 @@ module descriptors_module
                   Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
                endif
 
+               !jpd47 timing
+               ! call cpu_time(sc_times(19))
+               ! sc_times(18) = sc_times(18) + sc_times(19)-sc_times(20)
+
                i_pow = l + 1
                do ik = 1, SIZE(sym_facs)
                   ia = coupling_inds(ik, 1)
                   jb = coupling_inds(ik, 2)
-                  descriptor_i(i_pow) = (dot_product(Y_r(1, l)%mm(:, ia), Y_r(2, l)%mm(:, jb)) + dot_product(Y_i(1, l)%mm(:, ia), Y_i(2, l)%mm(:, jb))) * sym_facs(ik)
+                  !descriptor_i(i_pow) = (dot_product(Y_r(1, l)%mm(:, ia), Y_r(2, l)%mm(:, jb)) + dot_product(Y_i(1, l)%mm(:, ia), Y_i(2, l)%mm(:, jb))) * sym_facs(ik)
+                  descriptor_i(i_pow) = (ddot(2*l+1, Y_r(1, l)%mm(:, ia), 1, Y_r(2, l)%mm(:, jb), 1) + ddot(2*l+1, Y_i(1, l)%mm(:, ia), 1, Y_i(2, l)%mm(:, jb), 1)) * sym_facs(ik)
                   if (do_two_l_plus_one) descriptor_i(i_pow)  = descriptor_i(i_pow) * tlpo
                   i_pow = i_pow + this%l_max + 1
                enddo
@@ -8267,6 +8301,10 @@ module descriptors_module
             endif
             descriptor_out%x(i_desc_i)%data(d) = this%covariance_sigma0
          endif
+
+         ! jpd47 power spec formation
+         ! call cpu_time(sc_times(9))
+         ! sc_times(10) = sc_times(10) + sc_times(9) - sc_times(7)
 
          !new gradients calcuation
          if (my_do_grad_descriptor) then
@@ -8311,6 +8349,26 @@ module descriptors_module
                         enddo
                      enddo
                   enddo !l
+
+            !special case for exactly diagonal symmetric coupling - testing how fast I can make this
+            elseif(.not. this%coupling .and. sym_desc .and. this%R_mix .and. this%Z_mix) then
+               do l = 0, this%l_max
+                  tlpo = 2.0_dp !merged factor of 2 from symmetry into tlpo
+                  if (do_two_l_plus_one) tlpo = 2.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                  i_pow = l + 1
+
+                  do ik = 1, this%K
+                     do ix = 1, 3
+                        ir = (ik-1)*3 + ix
+                        do na = 1, 2*l+1
+                           r_tmp(ix) = r_tmp(ix) + dY_r(2, l, n_i)%mm(na,ir)*Y_r(1, l)%mm(na, ik)+ dY_i(2, l, n_i)%mm(na,ir)*Y_i(1, l)%mm(na, ik)
+                        enddo
+                     enddo
+
+                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo
+                     i_pow = i_pow + this%l_max + 1
+                  enddo
+               enddo
 
             elseif(.not. this%coupling ) then
                do l = 0, this%l_max
@@ -8380,11 +8438,23 @@ module descriptors_module
                   endif
                   descriptor_out%x(i_desc_i)%grad_data(:,:,0) = descriptor_out%x(i_desc_i)%grad_data(:,:,0) - descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
                endif
+
             enddo !n_i
          endif
 
+         !jpd47 gradients
+         ! call cpu_time(sc_times(11))
+         ! sc_times(12) = sc_times(12) + sc_times(11) - sc_times(9)
       enddo ! i
 !$omp end parallel do
+
+      ! print*, "jpd47 timing: forming X_r took", sc_times(6)
+      ! print*, "jpd47 timing: forming dY_r took", sc_times(8)
+      ! print*, "jpd47 timing: forming power spec took", sc_times(10)
+      ! print*, "jpd47 timing: forming Y=XW took", sc_times(18)
+      ! print*, "jpd47 timing: forming gradients took", sc_times(12)
+
+
 
 !$omp parallel default(none) shared(this, max_n_neigh) private(i_species, a, l, n_i, ub)
       if(allocated(fourier_so3_r)) then
@@ -8886,6 +8956,9 @@ module descriptors_module
       if (allocated(sym_facs)) deallocate(sym_facs)
 
       call system_timer('soap_calc')
+      ! call cpu_time(sc_times(50))
+      ! print*, "jpd47 timing: TOTAL took", sc_times(50) - sc_times(0)
+      ! jpd47 conclusion from extensive timing tests is that break
 
    endsubroutine soap_calc
 
