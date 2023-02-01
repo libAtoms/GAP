@@ -2513,7 +2513,7 @@ module descriptors_module
 
       call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
       call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
-      call param_register(params, 'radial_basis', 'ORIGINAL', this%radial_basis, help_string="Radial basis functions to use. Options are ORIGINAL, POLY and GTO")
+      call param_register(params, 'radial_basis', '', this%radial_basis, help_string="Radial basis functions to use. Options are EQUISPACED_GAUSS, POLY and GTO (default for xml_version > 1987654320")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -2522,6 +2522,13 @@ module descriptors_module
 
       ! backwards compatibility: the default used to be different before this version number
       if( xml_version < 1426512068 ) this%central_reference_all_species = .true.
+
+      !backwards compatibility: only EQUISPACED_GAUSS allowed for old versions. default is GTO for new versions.
+      if( xml_version < 1987654321) then
+         this%radial_basis = "EQUISPACED_GAUSS"
+      elseif (this%radial_basis == "") then
+         this%radial_basis = "GTO"
+      endif
 
       allocate(this%species_Z(0:this%n_species))
       allocate(this%Z(this%n_Z))
@@ -2574,7 +2581,7 @@ module descriptors_module
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
-      if (this%radial_basis == "ORIGINAL") then
+      if (this%radial_basis == "EQUISPACED_GAUSS") then
          allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
             covariance_basis(this%n_max,this%n_max, 1), overlap_basis(this%n_max,this%n_max, 1), this%cholesky_overlap_basis(this%n_max,this%n_max, 1))
 
@@ -2685,7 +2692,7 @@ module descriptors_module
             enddo
 
          else
-            RAISE_ERROR("soap_initialise: radial_basis not recognised: ORIGINAL, POLY or GTO" ,error)
+            RAISE_ERROR("soap_initialise: radial_basis not recognised: EQUISPACED_GAUSS, POLY or GTO" ,error)
          endif
 
          !allocate(this%BL_ti(0:this%l_max, n_radial_grid, this%n_max))
@@ -7493,7 +7500,7 @@ module descriptors_module
          enddo
       enddo
 
-      if (this%radial_basis /= "ORIGINAL") then
+      if (this%radial_basis /= "EQUISPACED_GAUSS") then
          allocate(QR_factor(size(this%r_basis), this%n_max, 0:this%l_max))
          do l = 0, this%l_max
             QR_factor(:, :, l) = this%QR_factor(:, :, l)
@@ -7662,7 +7669,7 @@ module descriptors_module
             endif
          endif
 
-         if (this%radial_basis == "ORIGINAL") then
+         if (this%radial_basis == "EQUISPACED_GAUSS") then
             ! original version
             radial_fun(0,:) = 0.0_dp
             radial_fun(0,1) = 1.0_dp
@@ -7780,7 +7787,7 @@ module descriptors_module
                enddo
             enddo
 
-            if (this%radial_basis == "ORIGINAL") then
+            if (this%radial_basis == "EQUISPACED_GAUSS") then
                radial_coefficient = matmul( radial_fun, this%transform_basis )
                if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
                radial_coefficient = radial_coefficient * f_cut
