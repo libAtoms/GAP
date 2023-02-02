@@ -57,6 +57,7 @@ module descriptors_module
    use clusters_module
    use connection_module
    use angular_functions_module
+   use gamma_module
 
    implicit none
 
@@ -387,7 +388,8 @@ module descriptors_module
       integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
-      real(dp), dimension(:,:), allocatable :: transform_basis,cholesky_overlap_basis
+      real(dp), dimension(:,:,:), allocatable :: cholesky_overlap_basis
+      real(dp), dimension(:, :), allocatable :: transform_basis
 
       logical :: global = .false.
       logical :: central_reference_all_species = .false.
@@ -403,6 +405,9 @@ module descriptors_module
       integer :: mix_shift = 0
 
       character(len=STRING_LENGTH) :: Z_map_str
+      character(len=STRING_LENGTH) :: radial_basis
+      real(dp), dimension(:,:,:), allocatable :: QR_factor
+      real(dp), dimension(:,:), allocatable :: QR_tau
    endtype soap
 
 
@@ -2469,10 +2474,16 @@ module descriptors_module
 
       type(Dictionary) :: params
       real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
-      real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, cholesky_overlap_basis
-      integer :: i, j, xml_version
+      real(dp) ::  N_alpha, S_alpha_beta, N_beta
+      real(dp), dimension(:,:,:), allocatable :: covariance_basis, overlap_basis
+      integer :: i, j, xml_version, info, n_radial_grid
+
+      real(dp), dimension(:, :), allocatable ::  alpha_ln, Q, R
+      real(dp) :: u, alpha_gto, t, Rg
+      integer :: l, n, l_ub
 
       type(LA_Matrix) :: LA_covariance_basis, LA_overlap_basis
+      type(LA_matrix), dimension(:), allocatable :: LA_BL_ti
       character(len=STRING_LENGTH) :: species_Z_str
       logical :: has_n_species, has_species_Z, has_central_reference_all_species
 
@@ -2517,6 +2528,7 @@ module descriptors_module
       call param_register(params, 'K', '0', this%K, help_string="Number of mixing channels to create")
       call param_register(params, 'mix_shift', '0', this%mix_shift, help_string="shift for random number seed used to generate mixing weights")
       call param_register(params, 'Z_map', '', this%Z_map_str, help_string="string defining the Zmap")
+      call param_register(params, 'radial_basis', '', this%radial_basis, help_string="Radial basis functions to use. Options are EQUISPACED_GAUSS, POLY and GTO (default for xml_version > 1987654320")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -2525,6 +2537,13 @@ module descriptors_module
 
       ! backwards compatibility: the default used to be different before this version number
       if( xml_version < 1426512068 ) this%central_reference_all_species = .true.
+
+      !backwards compatibility: only EQUISPACED_GAUSS allowed for old versions. default is GTO for new versions.
+      if( xml_version < 1987654321) then
+         this%radial_basis = "EQUISPACED_GAUSS"
+      elseif (this%radial_basis == "") then
+         this%radial_basis = "GTO"
+      endif
 
       allocate(this%species_Z(0:this%n_species))
       allocate(this%Z(this%n_Z))
@@ -2577,60 +2596,175 @@ module descriptors_module
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
-      allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
-         covariance_basis(this%n_max,this%n_max), overlap_basis(this%n_max,this%n_max), this%cholesky_overlap_basis(this%n_max,this%n_max))
+      if (this%radial_basis == "EQUISPACED_GAUSS") then
+         allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
+            covariance_basis(this%n_max,this%n_max, 1), overlap_basis(this%n_max,this%n_max, 1), this%cholesky_overlap_basis(this%n_max,this%n_max, 1))
 
-      !this%r_basis(this%n_max) = cutoff_basis
-      !do i = this%n_max-1, 1, -1
-      !   this%r_basis(i)  = this%r_basis(i+1) - spacing_basis
-      !enddo
-
-      this%r_basis(1) = 0.0_dp
-      do i = 2, this%n_max
-         this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
-      enddo
-
-
-      do i = 1, this%n_max
-         do j = 1, this%n_max
-            covariance_basis(j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
-            !overlap_basis(j,i) = exp(-0.5_dp * alpha_basis* (this%r_basis(i) - this%r_basis(j))**2) * ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) )
-            !print*, 'A', exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) )
-            !print*, 'B', sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j))
-            !print*, 'C', alpha_basis*exp(0.5_dp * alpha_basis * (this%r_basis(i) + this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 )
-            !print*, 'D', ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) )
-            !overlap_basis(j,i) = exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
-            !   ( sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
-            !   alpha_basis*exp(0.5_dp * alpha_basis * (this%r_basis(i) + this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
-            !   ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
-
-            overlap_basis(j,i) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
-               sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
-               alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
-               ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
+         this%r_basis(1) = 0.0_dp
+         do i = 2, this%n_max
+            this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
          enddo
-      enddo
 
-      !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
-      overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
-
-      call initialise(LA_covariance_basis,covariance_basis)
-      call initialise(LA_overlap_basis,overlap_basis)
-      call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
-      do i = 1, this%n_max
-         do j = 1, i-1 !i + 1, this%n_max
-            this%cholesky_overlap_basis(j,i) = 0.0_dp
+         do i = 1, this%n_max
+            do j = 1, this%n_max
+               covariance_basis(j,i, 1) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
+               overlap_basis(j,i,1) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
+                  sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
+                  alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
+                  ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
+            enddo
          enddo
-      enddo
 
-      call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis,this%transform_basis)
+         !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
+         overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
 
-      call finalise(LA_covariance_basis)
-      call finalise(LA_overlap_basis)
+         call initialise(LA_covariance_basis, covariance_basis(:, :, 1))
+         call initialise(LA_overlap_basis,overlap_basis(:, :, 1))
+         call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(:, :, 1))
+         do i = 1, this%n_max
+            do j = 1, i-1 !i + 1, this%n_max
+               this%cholesky_overlap_basis(j,i,1) = 0.0_dp    ! lower triangular
+            enddo
+         enddo
 
-      if(allocated(covariance_basis)) deallocate(covariance_basis)
-      if(allocated(overlap_basis)) deallocate(overlap_basis)
-      if(allocated(cholesky_overlap_basis)) deallocate(cholesky_overlap_basis)
+         call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis(:, :, 1),this%transform_basis)
+
+         call finalise(LA_covariance_basis)
+         call finalise(LA_overlap_basis)
+
+         if(allocated(covariance_basis)) deallocate(covariance_basis)
+         if(allocated(overlap_basis)) deallocate(overlap_basis)
+
+      else
+         ! fine radial grid to fit radial coeficients
+         n_radial_grid = 3 * this%n_max
+         allocate(this%r_basis(n_radial_grid))
+         spacing_basis = cutoff_basis / n_radial_grid
+         this%r_basis(1) = 0.0_dp
+         do i = 2, n_radial_grid
+            this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
+         enddo
+
+
+         ! allocations
+         allocate(covariance_basis(n_radial_grid, this%n_max, 0:this%l_max))
+         allocate(overlap_basis(this%n_max,this%n_max, 0:this%l_max))
+         allocate(this%cholesky_overlap_basis(this%n_max,this%n_max, 0:this%l_max))
+         allocate(LA_BL_ti(0:this%l_max))
+         allocate(Q(n_radial_grid, this%n_max), R(this%n_max, this%n_max))
+
+         if (this%radial_basis == "POLY") then
+            l_ub = 0
+         ! form the overlap matrix and do cholesky decomposition
+            do i = 1, this%n_max
+               N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
+               do j = 1, this%n_max
+                  N_beta = ((cutoff_basis**(2*j+7))/((j+3)*(2*j+5)*(2*j+7)))**0.5_dp
+                  S_alpha_beta = (2*cutoff_basis**(i+j+7))/((5+i+j)*(6+i+j)*(7+i+j))
+                  overlap_basis(j,i, 0) = S_alpha_beta/(N_alpha*N_beta)
+               enddo
+            enddo
+
+            ! form the "covariance matrix"
+            do i = 1, this%n_max
+               N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
+               do j = 1, n_radial_grid
+                  covariance_basis(j, i, 0) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
+               enddo
+            enddo
+
+         elseif (this%radial_basis == "GTO") then
+            l_ub = this%l_max
+            allocate(alpha_ln(0:this%l_max+1, this%n_max))
+
+            spacing_basis = cutoff_basis/this%n_max
+            do l = 0, this%l_max
+               do n = 1, this%n_max
+                  Rg = spacing_basis * n
+                  alpha_ln(l, n) = -Rg**(-2) * (log(0.001_dp) - l*log(Rg))
+               enddo
+            enddo
+
+            !form the overlap matrices
+            do l = 0, this%l_max
+               do i = 1, this%n_max
+                  do j = 1, this%n_max
+                     alpha_gto = alpha_ln(l, i) + alpha_ln(l, j)
+                     u = alpha_gto*cutoff_basis**2
+                     t = l + 1.5_dp
+                     overlap_basis(i, j, l) = 0.5*cutoff_basis**(2*t)*u**(-t)* ( gamma(t) - gamma_incomplete_upper(t, u) )
+                  enddo
+               enddo
+            enddo
+
+            !form the covariance matrices
+            do l = 0, this%l_max
+               do i = 1, this%n_max
+                  do j = 1, n_radial_grid
+                     covariance_basis(j, i, l) = this%r_basis(j)**l * exp(-alpha_ln(l, i)*this%r_basis(j)**2)
+                  enddo
+               enddo
+            enddo
+
+         else
+            RAISE_ERROR("soap_initialise: radial_basis not recognised: EQUISPACED_GAUSS, POLY or GTO" ,error)
+         endif
+
+         !allocate(this%BL_ti(0:this%l_max, n_radial_grid, this%n_max))
+         ! extract factor and tau as these are only bits needed for QR_solve
+         allocate(this%QR_factor( size(this%r_basis), this%n_max, 0:this%l_max))
+         allocate(this%QR_tau(this%n_max, 0:this%l_max))
+
+         ! per l
+         do l = 0, l_ub
+            ! cholesky factorisation
+            call initialise(LA_covariance_basis, covariance_basis(:, :, l))
+            call initialise(LA_overlap_basis,overlap_basis(:, :, l))
+            call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(:, :, l))
+            do i = 1, this%n_max
+               do j = 1, i-1 !i + 1, this%n_max
+                  this%cholesky_overlap_basis(j,i, l) = 0.0_dp    ! lower triangular
+               enddo
+            enddo
+
+            !find inverse of L^T, NOTE: reusing overlap basis in a confusing way here
+            overlap_basis(:, :, l) = transpose(this%cholesky_overlap_basis(:, :, l))
+            call dtrtri("U", "N", this%n_max, overlap_basis(:, :, l), this%n_max, i)
+            ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
+            !this%BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
+
+            call initialise(LA_BL_ti(l), matmul(covariance_basis(:, :, l), overlap_basis(:, :, l)))
+            call LA_Matrix_QR_Factorise(LA_BL_ti(l), Q, R, error)
+
+            this%QR_factor(:, :, l) = LA_BL_ti(l)%factor
+            this%QR_tau(:, l) = LA_BL_ti(l)%tau
+
+            call finalise(LA_covariance_basis)
+            call finalise(LA_overlap_basis)
+         enddo
+
+         if (l_ub == 0 .and. this%l_max > 0) then
+            do l = 1, this%l_max
+               this%QR_factor(:, :, l) = this%QR_factor(:, :, 0)
+               this%QR_tau(:, l) = this%QR_tau(:, 0)
+            enddo
+         endif
+
+
+         if (allocated(covariance_basis)) deallocate(covariance_basis)
+         if (allocated(overlap_basis)) deallocate(overlap_basis)
+         if (allocated(Q)) deallocate(Q)
+         if (allocated(R)) deallocate(R)
+
+         if (allocated(LA_BL_ti)) then
+            do l = 0, this%l_max
+               call finalise(LA_BL_ti(l))
+            enddo
+            deallocate(LA_BL_ti)
+         endif
+      endif
+
+
 
       this%initialised = .true.
 
@@ -2639,6 +2773,7 @@ module descriptors_module
    subroutine soap_finalise(this,error)
       type(soap), intent(inout) :: this
       integer, optional, intent(out) :: error
+      integer :: l
 
       INIT_ERROR(error)
 
@@ -2675,6 +2810,9 @@ module descriptors_module
       if(allocated(this%cholesky_overlap_basis)) deallocate(this%cholesky_overlap_basis)
       if(allocated(this%species_Z)) deallocate(this%species_Z)
       if(allocated(this%Z)) deallocate(this%Z)
+
+      if (allocated(this%QR_factor)) deallocate(this%QR_factor)
+      if (allocated(this%QR_tau)) deallocate(this%QR_tau)
 
       this%initialised = .false.
 
@@ -7529,8 +7667,6 @@ module descriptors_module
    endsubroutine form_W
 
 
-
-
    ! main branch currently ~1000 lines long, would be nice not to blow this up
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 
@@ -7600,13 +7736,16 @@ module descriptors_module
       real, dimension(:), allocatable :: sym_facs
       real(dp), external :: ddot
       integer :: na, ix
+      ! Create a thread private QR_factor here as dormqr modifies it and restores it during solve
+      ! and this doesn't work with OMP threading, hence the thread private copy.
+      real(dp), dimension(:,:,:), allocatable, save :: QR_factor
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
-!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, dY_r, dY_i, Pl_g1, Pl_g2, l_tmp, dX_r, dX_i)
+!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, QR_factor, dY_r, dY_i, Pl_g1, Pl_g2, l_tmp, dX_r, dX_i)
 !$omp threadprivate(dT_i, dT_r)
 
       INIT_ERROR(error)
@@ -7724,7 +7863,7 @@ module descriptors_module
       allocate(descriptor_i(d))
       if(my_do_grad_descriptor) allocate(grad_descriptor_i(d,3))
 
-      allocate(radial_fun(0:this%l_max, this%n_max), radial_coefficient(0:this%l_max, this%n_max))
+      allocate(radial_fun(0:this%l_max, size(this%r_basis)), radial_coefficient(0:this%l_max, this%n_max))
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
       !allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species))
       allocate(SphericalY_ij(0:this%l_max))
@@ -7747,7 +7886,7 @@ module descriptors_module
 
 
       if(my_do_grad_descriptor) then
-         allocate(grad_radial_fun(0:this%l_max, this%n_max), grad_radial_coefficient(0:this%l_max, this%n_max))
+         allocate(grad_radial_fun(0:this%l_max, size(this%r_basis)), grad_radial_coefficient(0:this%l_max, this%n_max))
          allocate(grad_SphericalY_ij(0:this%l_max))
       endif
 
@@ -7756,6 +7895,12 @@ module descriptors_module
           allocate(gradsphericalycartesian_all_t(0:this%l_max, -this%l_max:this%l_max, 3))
       endif
 
+      if (this%radial_basis /= "EQUISPACED_GAUSS") then
+         allocate(QR_factor(size(this%r_basis), this%n_max, 0:this%l_max))
+         do l = 0, this%l_max
+            QR_factor(:, :, l) = this%QR_factor(:, :, l)
+         enddo
+      endif
 
       do l = 0, this%l_max
          allocate(SphericalY_ij(l)%m(-l:l))
@@ -7997,9 +8142,21 @@ module descriptors_module
             endif
          endif
 
-         radial_fun(0,:) = 0.0_dp
-         radial_fun(0,1) = 1.0_dp
-         radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
+         if (this%radial_basis == "EQUISPACED_GAUSS") then
+            ! original version
+            radial_fun(0,:) = 0.0_dp
+            radial_fun(0,1) = 1.0_dp
+            radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis(:, :, 1))
+         else
+            ! uncommented old version that I think should work...
+            do a = 1, size(this%r_basis)
+               radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
+            enddo
+            !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
+            call Matrix_QR_Solve(QR_factor(:, :, 0), this%QR_tau(:, 0), radial_fun(0, :), radial_coefficient(0, :))
+            ! alternative approach: don't invert L^T and multiply at the end. Doesn't work as well for POLY basis
+            !radial_coefficient = matmul(radial_coefficient, this%cholesky_overlap_basis(0, :, :))
+         endif
 
          !zero the coefficients and initialise counter
          do l = 0, this%l_max
@@ -8031,6 +8188,7 @@ module descriptors_module
             i_species = species_map(at%Z(j))
             if( i_species == 0 ) cycle
 
+
             if(.not. this%global .and. my_do_grad_descriptor) then
                descriptor_out%x(i_desc_i)%ii(n_i) = j
                descriptor_out%x(i_desc_i)%pos(:,n_i) = at%pos(:,j) + matmul(at%lattice,shift_ij)
@@ -8051,7 +8209,7 @@ module descriptors_module
             endif
             f_cut = f_cut * radial_decay
 
-            do a = 1, this%n_max
+            do a = 1, size(this%r_basis)
                arg_bess = 2.0_dp * this%alpha * r_ij * this%r_basis(a)
                exp_p = exp( -this%alpha*( r_ij + this%r_basis(a) )**2 )
                exp_m = exp( -this%alpha*( r_ij - this%r_basis(a) )**2 )
@@ -8093,9 +8251,25 @@ module descriptors_module
                enddo
             enddo
 
-            radial_coefficient = matmul( radial_fun, this%transform_basis )
-            if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
-            radial_coefficient = radial_coefficient * f_cut
+            if (this%radial_basis == "EQUISPACED_GAUSS") then
+               radial_coefficient = matmul( radial_fun, this%transform_basis )
+               if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
+               radial_coefficient = radial_coefficient * f_cut
+            else
+               do l = 0, this%l_max
+                  !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
+                  call Matrix_QR_Solve(QR_factor(:, :, l), this%QR_tau(:, l), radial_fun(l, :), radial_coefficient(l, :))
+                  !radial_coefficient(l, :) = matmul(radial_coefficient(l, :), this%cholesky_overlap_basis(l, :, :))
+               enddo
+               if(my_do_grad_descriptor) then
+                  !grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
+                  do l = 0, this%l_max
+                     call Matrix_QR_Solve(QR_factor(:, :, l), this%QR_tau(:, l), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
+                  enddo
+                  grad_radial_coefficient = grad_radial_coefficient * f_cut + radial_coefficient * df_cut
+               endif
+               radial_coefficient = radial_coefficient * f_cut
+            endif
 
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
             if(my_do_grad_descriptor) gradsphericalycartesian_all_t = GradSphericalYCartesian_all(this%l_max, d_ij)
@@ -8540,7 +8714,7 @@ module descriptors_module
       if (allocated(Pl_g1)) deallocate(Pl_g1)
       if (allocated(Pl_g2)) deallocate(Pl_g2)
       if (allocated(Pl)) deallocate(Pl)
-
+      if (allocated(QR_factor)) deallocate(QR_factor)
 !$omp end parallel
 
       if(this%global) then
