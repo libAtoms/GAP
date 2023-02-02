@@ -2764,8 +2764,6 @@ module descriptors_module
          endif
       endif
 
-
-
       this%initialised = .true.
 
    endsubroutine soap_initialise
@@ -8496,11 +8494,11 @@ module descriptors_module
                      enddo
                   enddo !l
 
-            !special case for exactly diagonal symmetric coupling - testing how fast I can make this
-            elseif(.not. this%coupling .and. sym_desc .and. this%R_mix .and. this%Z_mix) then
+            !special case for diagonal coupling only - testing how fast I can make this
+            elseif(.not. this%coupling .and. this%R_mix .and. this%Z_mix) then
                do l = 0, this%l_max
-                  tlpo = 2.0_dp !merged factor of 2 from symmetry into tlpo
-                  if (do_two_l_plus_one) tlpo = 2.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                  tlpo = 1.0_dp
+                  if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
                   i_pow = l + 1
 
                   do ik = 1, this%K
@@ -8511,6 +8509,18 @@ module descriptors_module
                            r_tmp(ix) = r_tmp(ix) + dY_r(2, l, n_i)%mm(na,ir)*Y_r(1, l)%mm(na, ik) + dY_i(2, l, n_i)%mm(na,ir)*Y_i(1, l)%mm(na, ik)
                         enddo
                      enddo
+
+                     ! either multiply by factor of 2 for symmetric or do other way around for asym
+                     if (this%sym_mix) then
+                        r_tmp(:) = r_tmp(:) * 2.0_dp
+                     else
+                        do ix = 1, 3
+                           ir = (ik-1)*3 + ix
+                           do na = 1, 2*l+1
+                              r_tmp(ix) = r_tmp(ix) + dY_r(1, l, n_i)%mm(na,ir)*Y_r(2, l)%mm(na, ik) + dY_i(1, l, n_i)%mm(na,ir)*Y_i(2, l)%mm(na, ik)
+                           enddo
+                        enddo
+                     endif
 
                      grad_descriptor_i(i_pow, :) = r_tmp * tlpo
                      i_pow = i_pow + this%l_max + 1
