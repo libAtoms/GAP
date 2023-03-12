@@ -100,6 +100,8 @@ QMC.
 The above example has the keys ``dft_energy`` for example, so when it is
 used in fitting, the appropriate key names need to be specified.
 
+
+.. _isolated atom:
 Isolated atom
 ###################
 
