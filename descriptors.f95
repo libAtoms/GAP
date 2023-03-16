@@ -9,7 +9,7 @@
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
 ! HND X   his employment for the U.S. Government, and are not subject
 ! HND X   to copyright in the USA.
-! HND X
+! HND X©
 ! HND X   GAP is published and distributed under the
 ! HND X      Academic Software License v1.0 (ASL)
 ! HND X
@@ -2539,11 +2539,10 @@ module descriptors_module
       if( xml_version < 1426512068 ) this%central_reference_all_species = .true.
 
       !backwards compatibility: only EQUISPACED_GAUSS allowed for old versions. default is GTO for new versions.
-      if( xml_version < 1987654321) then
+      if (this%radial_basis == "") then
          this%radial_basis = "EQUISPACED_GAUSS"
-      elseif (this%radial_basis == "") then
-         this%radial_basis = "GTO"
       endif
+
 
       allocate(this%species_Z(0:this%n_species))
       allocate(this%Z(this%n_Z))
@@ -7774,6 +7773,7 @@ module descriptors_module
       K2 = size(W(2)%mm(0,:))
       if (.not. this%coupling)   call form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
 
+      species_map = 0
       do i_species = 1, this%n_species
          if(this%species_Z(i_species) == 0) then
             species_map = 1
@@ -7781,6 +7781,7 @@ module descriptors_module
             species_map(this%species_Z(i_species)) = i_species
          endif
       enddo
+
 
       my_do_descriptor = optional_default(.false., do_descriptor)
       my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
