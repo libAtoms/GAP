@@ -21,6 +21,15 @@ Getting started & Usage
     accelerated-aimd_installation.rst
     accelerated-aimd-input-reference.rst
     accelerated-aimd_decision-making.rst
+    accelerated-aimd-castep-inputs.rst
+
+Examples
+********
+
+.. toctree::
+    :maxdepth: 2
+
+    accelerated-aimd_example_SiC.rst
 
 
 Program structures and design

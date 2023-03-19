@@ -154,11 +154,18 @@ Defaults
 
 .. _defaults:
 
-The following input file contains the default values set explicitly
+The following input file contains the default values set explicitly. *n.b. this is not allowing refitting, due to* ``can_update: false``
 
 .. code-block:: yaml
     
-    # nb. partial input only
+    can_update: false
+    check_interval: 1
+    num_initial_steps: 0
+    tolerances:
+      ediff: 0.03
+      fmax: null
+      frmse: null
+      vmax: null
     refit:
       function_name: null
       previous_data: []

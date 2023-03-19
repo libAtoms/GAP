@@ -100,10 +100,10 @@ QMC.
 The above example has the keys ``dft_energy`` for example, so when it is
 used in fitting, the appropriate key names need to be specified.
 
-
-.. _isolated atom:
 Isolated atom
 ###################
+
+.. _isolated atom:
 
 Most of the time, it makes sense to fit an interatomic potential to
 the **binding energy**, i.e. the total energy minus the energy of

@@ -24,9 +24,10 @@ previous model is available.
 
 In order to activate this set ``num_initial_steps > 0`` in the input file.
 
-.. _fixed interval:
-Fixed Interval Decision Making 
+Fixed Interval Decision Making
 ==============================
+
+.. _fixed interval:
 
 Ab-initio calculations are performed at fixed intervals. Set the fixed interval with the
 ``check_interval`` keywords in the input file.
@@ -34,9 +35,10 @@ Ab-initio calculations are performed at fixed intervals. Set the fixed interval 
 If any of the tolerance criteria are not met at this point, then the model is re-trained
 with the available data.
 
-.. _adaptive interval:
 Accuracy-Adapted Checking Interval
 ==================================
+
+.. _adaptive interval:
 
 This method adapts the interval between ab-initio steps according to a geometric factor
 parameter, within user-specified upper and lower bounds. You need to specify the starting
