@@ -20,10 +20,22 @@ class Tolerances:
 
     """
 
-    ediff: Optional[float]  # in eV
-    fmax: Optional[float]  # in eV/A
-    frmse: Optional[float]  # in eV/A
-    vmax: Optional[float]  # in eV
+    ediff: Optional[float] = None  # in eV
+    fmax: Optional[float] = None  # in eV/A
+    frmse: Optional[float] = None  # in eV/A
+    vmax: Optional[float] = None  # in eV
+
+    def __post_init__(self):
+        # checking of inputs
+        for key in ["ediff", "fmax", "frmse", "vmax"]:
+            value = self.get(key)
+            if value is None:
+                continue
+            if self.get(key) <= 0:
+                raise ValueError(f"Tolerance value `{key}` needs to be positive if set")
+
+        if not any([self.ediff, self.fmax, self.frmse, self.vmax]):
+            raise ValueError("At least one of the tolerances need to be set")
 
     def get(self, key: str):
         if not isinstance(key, str):
@@ -61,7 +73,7 @@ class Refit:
     """Refitting related settings"""
 
     # custom function
-    function_name: Optional[str]
+    function_name: Optional[str] = None
 
     # list of paths to XYZs
     previous_data: Optional[List[str]] = field(default_factory=list)
@@ -90,9 +102,28 @@ class Refit:
 class AdaptiveMethodSettings:
     """Settings for the adaptive method"""
 
-    n_min: Optional[int]
-    n_max: Optional[int]
-    factor: Optional[float]
+    n_min: int
+    n_max: int
+    factor: float
+
+    def __post_init__(self):
+        """Validating inputs"""
+        if self.n_min < 1:
+            raise ValueError("Adaptive method's minimum interval needs to be positive")
+        if self.n_max <= 1:
+            raise ValueError(
+                "Adaptive method's maximum interval needs to be greater than 1"
+            )
+        if self.factor <= 1:
+            raise ValueError(
+                "Adaptive method's increment factor needs to be greater than 1"
+            )
+
+        if self.n_min >= self.n_max:
+            raise ValueError(
+                "Adaptive method's maximum interval needs to be greater than it's "
+                "minimum"
+            )
 
 
 @marshmallow_dataclass.dataclass
