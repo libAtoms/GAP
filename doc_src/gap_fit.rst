@@ -2,6 +2,7 @@
 The gap_fit program
 *******************
 
+.. _gap_fit:
 
 In order to fit an interatomic potential to data with ``gap_fit``, you need
 

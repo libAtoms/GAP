@@ -29,7 +29,7 @@ Examples
 .. toctree::
     :maxdepth: 2
 
-    accelerated-aimd_example_SiC.rst
+    accelerated-aimd_example_Si16.rst
 
 
 Program structures and design
