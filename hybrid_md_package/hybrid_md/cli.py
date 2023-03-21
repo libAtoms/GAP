@@ -28,7 +28,7 @@ def main():
 
 @main.command("initialise")
 @click.argument("seed", type=click.STRING)
-@click.argument("md-iteration", type=click.INT)
+@click.argument("md-iteration", type=click.INT, default=0)
 def initialise(seed, md_iteration):
     """Initialisation of the Hybrid MD run.
 
