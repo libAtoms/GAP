@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Installation with CASTEP &mdash; GAP  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/soap.png"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Input file reference" href="accelerated-aimd-input-reference.html" />
+    <link rel="prev" title="Acceleration of Ab-initio MD with On-the-Fly GAP Models" href="accelerated-aimd.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> GAP
+            <img src="_static/soap.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+    
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation of QUIP, quippy and GAP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="accelerated-aimd.html#getting-started-usage">Getting started &amp; Usage</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Installation with CASTEP</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#linux-general-setup">Linux - general setup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#archer2-cluster">Archer2 cluster</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd-input-reference.html">Input file reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd_decision-making.html">Decision making</a></li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd-castep-inputs.html">Castep Input File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#examples">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#program-structures-and-design">Program structures and design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#extendability-development">Extendability &amp; Development</a></li>
+</ul>
+</li>
+</ul>
+
+    <p></p>
+    <ul>
+        <li><a href="genindex.html">Index</a></li>
+        <li><a href="py-modindex.html">Module Index</a></li>
+<!--        <li><a href="search.html">Search Page</a></li>-->
+<!--        <li><a href="_modules/index.html">Module Source Code</a></li>-->
+    </ul>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GAP</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a> &raquo;</li>
+      <li>Installation with CASTEP</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/accelerated-aimd_installation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="installation-with-castep">
+<span id="accelerated-aimd-installation"></span><h1>Installation with CASTEP<a class="headerlink" href="#installation-with-castep" title="Permalink to this heading"></a></h1>
+<p>You will need the following program components:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>QUIP with GAP</dt><dd><ul class="simple">
+<li><p>MPI-only library for linking to Castep</p></li>
+<li><p>OpenMP <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> program</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>CASTEP: Academic release v22 and above</p></li>
+<li><p>Python installation of <code class="docutils literal notranslate"><span class="pre">hybrid-md</span></code> - bundled with GAP</p></li>
+</ol>
+<p>The two builds of QUIP are needed due to the different parallelism supported by the fitting and evaluation.</p>
+<section id="linux-general-setup">
+<h2>Linux - general setup<a class="headerlink" href="#linux-general-setup" title="Permalink to this heading"></a></h2>
+<p>These are general instructions for a Linux machine, assuming the libraries needed
+for the respective packages are installed. See documentation of QUIP &amp; CASTEP for
+these.</p>
+<section id="quip-gap-installations">
+<h3>QUIP+GAP installations<a class="headerlink" href="#quip-gap-installations" title="Permalink to this heading"></a></h3>
+<p>Clone the code, make sure to include the subpackages as well using the <cite>–recursive</cite> flag.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># clone the QUIP repository</span>
+git<span class="w"> </span>clone<span class="w"> </span>--recursive<span class="w"> </span>https://github.com/libAtoms/QUIP.git
+<span class="nb">cd</span><span class="w"> </span>QUIP
+</pre></div>
+</div>
+<p>Build the OpenMP version for fitting</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># arch: any compiler + OpenMP</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">QUIP_ARCH</span><span class="o">=</span>linux_x86_64_gfortran_openmp
+
+<span class="c1"># configure: build - Make sure to say yes to GAP</span>
+make<span class="w"> </span>config
+
+<span class="c1"># build: the gap_fit program</span>
+make<span class="w"> </span>gap_programs
+
+<span class="c1"># copy the executable to your desired installation directory</span>
+cp<span class="w"> </span>./build/<span class="nv">$QUIP_ARCH</span>/gap_fit<span class="w"> </span>...your<span class="w"> </span>bin<span class="w"> </span>dir...
+</pre></div>
+</div>
+<p>Build an MPI library version for linking to Castep. Make sure to use the same compiler
+as for the Castep installation later on.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># still in the QUIP directory created above</span>
+
+<span class="c1"># remember this directory for configuring CASTEP</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">QUIP_ROOT</span><span class="o">=</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>
+
+<span class="c1"># arch: any compiler + MPI</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">QUIP_ARCH</span><span class="o">=</span>linux_x86_64_gfortran_openmpi
+
+<span class="c1"># configure build - Make sure to say yes to GAP</span>
+make<span class="w"> </span>config
+
+<span class="c1"># build: only the library</span>
+make<span class="w"> </span>libquip.a
+</pre></div>
+</div>
+</section>
+<section id="castep">
+<h3>Castep<a class="headerlink" href="#castep" title="Permalink to this heading"></a></h3>
+<p>See the installation notes and documentation in your CASTEP source distribution,
+the relevant part for this program is the inclusion of QUIP, which you can do by
+specifying <code class="docutils literal notranslate"><span class="pre">QUIP=system</span></code> in the main <code class="docutils literal notranslate"><span class="pre">Makefile</span></code> plus providing the
+<code class="docutils literal notranslate"><span class="pre">QUIP_ROOT</span></code> (root directory of QUIP repo) and <code class="docutils literal notranslate"><span class="pre">QUIP_ARCH</span></code> (the MPI one).
+These can be directly placed into the <code class="docutils literal notranslate"><span class="pre">Makefile</span></code> of CASTEP as well to be
+exported for easier resume of build or rebuild later.</p>
+<div class="highlight-makefile notranslate"><div class="highlight"><pre><span></span><span class="c"># make sure these are specified</span>
+<span class="nv">COMMS_ARCH</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>mpi
+<span class="nv">QUIP</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>system
+
+<span class="c"># example of explicitly setting the location of QUIP</span>
+<span class="k">export </span><span class="nv">QUIP_ROOT</span><span class="o">=</span>...directory<span class="w"> </span>from<span class="w"> </span>above...
+<span class="k">export </span><span class="nv">QUIP_ARCH</span><span class="o">=</span>linux_x86_64_gfortran_openmpi
+</pre></div>
+</div>
+<p>Having set these, just build and install CASTEP.</p>
+</section>
+<section id="hybrid-md-python-package">
+<h3><code class="docutils literal notranslate"><span class="pre">hybrid-md</span></code> Python package<a class="headerlink" href="#hybrid-md-python-package" title="Permalink to this heading"></a></h3>
+<p>Simply install in the package from source, found in the <code class="docutils literal notranslate"><span class="pre">GAP/hybrid_md_package/</span></code> directory of this repo.</p>
+<p>This is located at <code class="docutils literal notranslate"><span class="pre">QUIP/src/GAP/hybrid_md_package/</span></code> if you are looking at the QUIP source downloaded above.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
+</pre></div>
+</div>
+</section>
+</section>
+<section id="archer2-cluster">
+<h2>Archer2 cluster<a class="headerlink" href="#archer2-cluster" title="Permalink to this heading"></a></h2>
+<p>These are specific and tested instructions the UK’s Archer2 <a class="reference external" href="https://www.archer2.ac.uk">https://www.archer2.ac.uk</a> computer cluster.</p>
+<p>An important gotcha on Archer2 is that the built-in maths libraries of the compiler are linking MPI by default, which
+breaks the setup for the <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> program, so we need to build that explicitly without MPI, see below.</p>
+<p>Edit the CASTEP Makefile to include the following</p>
+<div class="highlight-makefile notranslate"><div class="highlight"><pre><span></span><span class="nv">COMMS_ARCH</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>mpi
+<span class="nv">FFT</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>fftw3
+<span class="nv">BUILD</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>fast
+<span class="nv">MATHLIBS</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>mkl<span class="w"> </span><span class="c1"># optional</span>
+</pre></div>
+</div>
+<p>Full installation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># create bin directory for executables</span>
+mkdir<span class="w"> </span>bin
+
+<span class="c1"># Clone QUIP</span>
+git<span class="w"> </span>clone<span class="w"> </span>--recursive<span class="w"> </span>https://github.com/libAtoms/QUIP.git<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span>--single-branch
+
+<span class="c1"># load the correct modules</span>
+module<span class="w"> </span>load<span class="w"> </span>cray-python
+module<span class="w"> </span>switch<span class="w"> </span>PrgEnv-cray<span class="w"> </span>PrgEnv-gnu/8.1.0
+module<span class="w"> </span>load<span class="w"> </span>cpe/22.04
+module<span class="w"> </span>load<span class="w"> </span>cray-fftw
+module<span class="w"> </span>load<span class="w"> </span>mkl/2023.0.0<span class="w">  </span><span class="c1"># if using MKL for Castep</span>
+
+<span class="c1"># step 1: Python interpreter &amp; installation of hybrid-md</span>
+python<span class="w"> </span>-m<span class="w"> </span>virtualenv<span class="w"> </span>venv
+<span class="nb">source</span><span class="w"> </span>venv/bin/activate
+
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>./QUIP/src/GAP/hybrid_md_package/
+
+<span class="c1"># step 2: QUIP with MPI</span>
+<span class="nb">cd</span><span class="w"> </span>QUIP
+<span class="nb">export</span><span class="w"> </span><span class="nv">QUIP_ROOT</span><span class="o">=</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">QUIP_ARCH</span><span class="o">=</span>archer2_mpich
+make<span class="w"> </span>config<span class="w">   </span><span class="c1"># configure: build - Make sure to say yes to GAP</span>
+make<span class="w"> </span>libquip.a
+<span class="nb">cd</span><span class="w"> </span>../<span class="w"> </span><span class="c1"># back to the starting dir</span>
+
+<span class="c1"># step 3. CASTEP with linking QUIP</span>
+<span class="nb">cd</span><span class="w"> </span>CASTEP/
+make<span class="w"> </span>-j8
+cp<span class="w"> </span>obj/linux_x86_64_gfortran10-XT--mpi/castep.mpi<span class="w"> </span>../bin/
+<span class="nb">cd</span><span class="w"> </span>../<span class="w"> </span><span class="c1"># back to the starting dir</span>
+
+<span class="c1"># step 4. Install gap_fit</span>
+
+<span class="c1"># IMPORTANT!! unload comms modules -&gt; no MPI</span>
+module<span class="w"> </span>load<span class="w"> </span>craype-network-none
+module<span class="w"> </span>remove<span class="w"> </span>cray-mpich
+
+<span class="nb">cd</span><span class="w"> </span>QUIP
+<span class="nb">export</span><span class="w"> </span><span class="nv">QUIP_ARCH</span><span class="o">=</span>archer2_openmp
+make<span class="w"> </span>gap_programs
+cp<span class="w"> </span>build/archer2_openmp/gap_fit<span class="w"> </span>../bin/
+<span class="nb">cd</span><span class="w"> </span>../<span class="w"> </span><span class="c1"># back to the starting dir</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="accelerated-aimd.html" class="btn btn-neutral float-left" title="Acceleration of Ab-initio MD with On-the-Fly GAP Models" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="accelerated-aimd-input-reference.html" class="btn btn-neutral float-right" title="Input file reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019-2022, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

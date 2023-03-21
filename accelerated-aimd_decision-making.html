@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decision making &mdash; GAP  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/soap.png"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Castep Input File" href="accelerated-aimd-castep-inputs.html" />
+    <link rel="prev" title="Input file reference" href="accelerated-aimd-input-reference.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> GAP
+            <img src="_static/soap.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+    
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation of QUIP, quippy and GAP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="accelerated-aimd.html#getting-started-usage">Getting started &amp; Usage</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd_installation.html">Installation with CASTEP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd-input-reference.html">Input file reference</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Decision making</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#initial-steps">Initial steps</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#fixed-interval-decision-making">Fixed Interval Decision Making</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#accuracy-adapted-checking-interval">Accuracy-Adapted Checking Interval</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-development">Further development</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd-castep-inputs.html">Castep Input File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#examples">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#program-structures-and-design">Program structures and design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#extendability-development">Extendability &amp; Development</a></li>
+</ul>
+</li>
+</ul>
+
+    <p></p>
+    <ul>
+        <li><a href="genindex.html">Index</a></li>
+        <li><a href="py-modindex.html">Module Index</a></li>
+<!--        <li><a href="search.html">Search Page</a></li>-->
+<!--        <li><a href="_modules/index.html">Module Source Code</a></li>-->
+    </ul>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GAP</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a> &raquo;</li>
+      <li>Decision making</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/accelerated-aimd_decision-making.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="decision-making">
+<span id="accelerated-aimd-decision-making"></span><h1>Decision making<a class="headerlink" href="#decision-making" title="Permalink to this heading"></a></h1>
+<p>Decision making methods are governing which forces are used at each step, and when to
+refit a model. This is a key part of any acceleration and on-the-fly model improvement
+cycle.</p>
+<p>We currently supply two methods, which directly compare the GAP and ab-initio energy
+and forces. One is using a fixed interval for performing ab-initio calculations, while
+the other one adapts to the accuracy of the model. Both make use of the tolerances set
+by the user in the input file for deciding when to retrain the model.</p>
+<p>For general calculations, particularly ones starting from scratch, <strong>we recommend using
+the accuracy-adapted decision making method.</strong></p>
+<section id="initial-steps">
+<h2>Initial steps<a class="headerlink" href="#initial-steps" title="Permalink to this heading"></a></h2>
+<p>Regardless of the decision making method, the method allows for a number of initial
+ab-initio MD steps to be performed. This is useful for starting from scratch, where no
+previous model is available.</p>
+<p>In order to activate this set <code class="docutils literal notranslate"><span class="pre">num_initial_steps</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> in the input file.</p>
+</section>
+<section id="fixed-interval-decision-making">
+<h2>Fixed Interval Decision Making<a class="headerlink" href="#fixed-interval-decision-making" title="Permalink to this heading"></a></h2>
+<p id="fixed-interval">Ab-initio calculations are performed at fixed intervals. Set the fixed interval with the
+<code class="docutils literal notranslate"><span class="pre">check_interval</span></code> keywords in the input file.</p>
+<p>If any of the tolerance criteria are not met at this point, then the model is re-trained
+with the available data.</p>
+</section>
+<section id="accuracy-adapted-checking-interval">
+<h2>Accuracy-Adapted Checking Interval<a class="headerlink" href="#accuracy-adapted-checking-interval" title="Permalink to this heading"></a></h2>
+<p id="adaptive-interval">This method adapts the interval between ab-initio steps according to a geometric factor
+parameter, within user-specified upper and lower bounds. You need to specify the starting
+interval, factor, and the bounds.</p>
+<p>Upon meeting the desired tolerances (i.e. being below the limits) at checking steps, the
+interval until the next one is increased, otherwise the model is re-trained with the
+newly available observations and the interval decreased by the factor specified.</p>
+<p>This method is turned on by supplying the <code class="docutils literal notranslate"><span class="pre">adaptive_method_parameters:</span> <span class="pre">...</span></code> input
+block in the decision making input file.</p>
+</section>
+<section id="further-development">
+<h2>Further development<a class="headerlink" href="#further-development" title="Permalink to this heading"></a></h2>
+<p>Further developments are planned and are very welcome. There are lots of open avenues that can be explored with the framework provided here. Some of these the current developers have thought of, but that is surely a small subset of what people can and want to use this for.</p>
+<p>See a few examples below. If you are interested in collaborating on any of these, or have any other idea then please feel free to reach out, we are more than happy to work together or help others get started with the code.</p>
+<ul class="simple">
+<li><p>usage of bonding/structural information: trigger refitting when atomic connectivity is changed, or when the dynamics gets closer to potential bond breaking. Might be useful for modelling reactive systems, etc.</p></li>
+<li><p>use similarity to a database, say through SOAP descriptor distance, trigger data acquisition when this hits a threshold of moving further from the previous data</p></li>
+<li><p>integration of other ML and ab-initio codes (some in the making already)</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="accelerated-aimd-input-reference.html" class="btn btn-neutral float-left" title="Input file reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="accelerated-aimd-castep-inputs.html" class="btn btn-neutral float-right" title="Castep Input File" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019-2022, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

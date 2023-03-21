@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Input file reference &mdash; GAP  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/soap.png"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Decision making" href="accelerated-aimd_decision-making.html" />
+    <link rel="prev" title="Installation with CASTEP" href="accelerated-aimd_installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> GAP
+            <img src="_static/soap.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+    
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation of QUIP, quippy and GAP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="accelerated-aimd.html#getting-started-usage">Getting started &amp; Usage</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd_installation.html">Installation with CASTEP</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Input file reference</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#core-mandatory-parameters">Core &amp; Mandatory parameters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#tolerance-section">Tolerance section</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#accuracy-adapted-method-section">Accuracy-Adapted method section</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#refitting-specific-settings">Refitting-specific settings</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd_decision-making.html">Decision making</a></li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd-castep-inputs.html">Castep Input File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#examples">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#program-structures-and-design">Program structures and design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#extendability-development">Extendability &amp; Development</a></li>
+</ul>
+</li>
+</ul>
+
+    <p></p>
+    <ul>
+        <li><a href="genindex.html">Index</a></li>
+        <li><a href="py-modindex.html">Module Index</a></li>
+<!--        <li><a href="search.html">Search Page</a></li>-->
+<!--        <li><a href="_modules/index.html">Module Source Code</a></li>-->
+    </ul>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GAP</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a> &raquo;</li>
+      <li>Input file reference</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/accelerated-aimd-input-reference.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="input-file-reference">
+<span id="accelerated-aimd-input-reference"></span><h1>Input file reference<a class="headerlink" href="#input-file-reference" title="Permalink to this heading"></a></h1>
+<p>The acceleration code has a single input file, which defines the parameters of the
+decision making and refitting. Everything else is handled in the ab-initio code.</p>
+<p>The file should be called as <code class="docutils literal notranslate"><span class="pre">&lt;SEED&gt;.hybrid-md-input.yaml</span></code> where the <code class="docutils literal notranslate"><span class="pre">&lt;SEED&gt;</span></code> is
+the calculation’s filename prefix supplied by the ab-initio code as well.</p>
+<p>See the possible contents and a couple of example below. For runnable example, see
+the simulation examples.</p>
+<section id="core-mandatory-parameters">
+<h2>Core &amp; Mandatory parameters<a class="headerlink" href="#core-mandatory-parameters" title="Permalink to this heading"></a></h2>
+<p>A minimal example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># this is a complete seed.hybrid-md-input.yaml files</span>
+<span class="nt">can_update</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">check_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="nt">num_initial_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="nt">tolerances</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ediff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.005</span><span class="w">  </span><span class="c1"># eV</span>
+</pre></div>
+</div>
+<p>This sets the following:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">can_update:</span> <span class="pre">true</span></code>: the model can be updated (default false)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">check_interval:</span> <span class="pre">5</span></code>: interval between ab-initio calculations (see <a class="reference internal" href="accelerated-aimd_decision-making.html#fixed-interval"><span class="std std-ref">Fixed interval</span></a>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">num_initial_steps:</span> <span class="pre">2</span></code>: the first 2 steps are ab-initio and used to train the first model</p></li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">tolerances:</span></code> block of tolerances for accepting the result</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">ediff:</span> <span class="pre">0.005</span></code>: 5 meV/atom is the maximum allowed for continuations with the same model</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="tolerance-section">
+<h2>Tolerance section<a class="headerlink" href="#tolerance-section" title="Permalink to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># nb. partial input only</span>
+<span class="nt">tolerances</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ediff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span><span class="w">   </span><span class="c1"># eV</span>
+<span class="w">  </span><span class="nt">fmax</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">    </span><span class="c1"># eV/A</span>
+<span class="w">  </span><span class="nt">frmse</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.100</span><span class="w">  </span><span class="c1"># eV/A</span>
+<span class="w">  </span><span class="nt">vmax</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">    </span><span class="c1"># eV (virial)</span>
+</pre></div>
+</div>
+<p>Tolerances can be specified for the following quantitities:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ediff</span></code>: energy per atom difference</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fmax</span></code>: force-component maximum absolute difference (in eV/Å)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">frmse</span></code>: RMSE of force components (in eV/Å)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vmax</span></code>: maximum virial stress difference, in eV</p></li>
+</ul>
+<p>At least one of these needs to be set, specifying <code class="docutils literal notranslate"><span class="pre">null</span></code> and omitting the parameter
+are equivalent. When checking them, the ones turned on are all used and the result needs
+to be below all of them to pass the check.</p>
+</section>
+<section id="accuracy-adapted-method-section">
+<h2>Accuracy-Adapted method section<a class="headerlink" href="#accuracy-adapted-method-section" title="Permalink to this heading"></a></h2>
+<p>Section of parameters for the <a class="reference internal" href="accelerated-aimd_decision-making.html#adaptive-interval"><span class="std std-ref">Accuracy-adapted checking interval mode</span></a>. The existence
+of the block turns this decision making method on.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># nb. partial input only</span>
+<span class="nt">check_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="nt">adaptive_method_parameters</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">n_min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">  </span><span class="nt">n_max</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5000</span>
+<span class="w">  </span><span class="nt">factor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.3</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">check_interval:</span> <span class="pre">10</span></code>: initial checking interval to start with</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">n_min</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">n_max</span></code>: bounds for the number of steps between ab-initio steps</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">factor:</span> <span class="pre">1.3</span></code>: the geometric factor for increasing and decreasing the checking interval</p></li>
+</ul>
+</section>
+<section id="refitting-specific-settings">
+<h2>Refitting-specific settings<a class="headerlink" href="#refitting-specific-settings" title="Permalink to this heading"></a></h2>
+<p>Parameters for controlling the GAP model to be trained when the model is updated.</p>
+<p>You can use the pre-set SOAP parameters, or supply your own entirely.</p>
+<p>By default, the trained model includes a 2-body and a SOAP descriptor for all species, both with 5Å cutoff. <em>n.b. This may fail if you only have a single atom of any element, since there will be no data to train the self-interaction 2-body part for this element.</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># nb. partial input only</span>
+<span class="nt">refit</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">e0_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;isolated&quot;</span>
+<span class="w">  </span><span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">e0_method</span></code> sets the method for GAP to choose the element-specific constant shift.</dt><dd><ul>
+<li><p>default is <code class="docutils literal notranslate"><span class="pre">average</span></code></p></li>
+<li><p>see <a class="reference internal" href="gap_fit.html#id1"><span class="std std-ref">gap_fit page</span></a> for further information</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">num_threads:</span> <span class="pre">128</span></code> tells the program to use 128 OMP threads for the fitting, this is set temporarily only and is reset to the previous value after fitting. Does not affect the parallelism of the ab-initio code. <em>n.b. this only single-node fitting is supported for GAP models at the moment for the acceleration program.</em></p></li>
+</ul>
+<p>One can additionally set <code class="docutils literal notranslate"><span class="pre">e0</span></code> in this section for passing explicit values, as in the <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> program.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># nb. partial input only</span>
+<span class="nt">refit</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">e0_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;isolated&quot;</span>
+<span class="w">  </span><span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128</span>
+</pre></div>
+</div>
+<section id="previous-data">
+<h3>Previous data<a class="headerlink" href="#previous-data" title="Permalink to this heading"></a></h3>
+<p>Previous data can be included in the model training, through specifying a list of xyz filenames under the <code class="docutils literal notranslate"><span class="pre">previous_data</span></code> parameter. These are expected to have their energy, force, and virial results saved with the same keywords as how the ab-initio code is saving them: <code class="docutils literal notranslate"><span class="pre">QM_energy</span></code>, <code class="docutils literal notranslate"><span class="pre">QM_forces</span></code>, <code class="docutils literal notranslate"><span class="pre">QM_virial</span></code>, respectively.</p>
+</section>
+<section id="descriptor-parameters">
+<h3>Descriptor Parameters<a class="headerlink" href="#descriptor-parameters" title="Permalink to this heading"></a></h3>
+<p>You can choose the descriptor parameters in multiple ways:</p>
+<ul class="simple">
+<li><p>using pre-set SOAP parameter values: <code class="docutils literal notranslate"><span class="pre">preset_soap_param:</span> <span class="pre">&quot;fast&quot;</span> <span class="pre">|</span> <span class="pre">&quot;medium&quot;</span> <span class="pre">|</span> <span class="pre">&quot;accurate&quot;</span></code>, which then includes a 2-body as well</p></li>
+<li><p>using an explicit descriptor string: <code class="docutils literal notranslate"><span class="pre">descriptor_str:</span> <span class="pre">&quot;...&quot;</span></code> In this case the 2-body descriptor is not added.</p></li>
+</ul>
+</section>
+<section id="other-parameters">
+<h3>Other parameters<a class="headerlink" href="#other-parameters" title="Permalink to this heading"></a></h3>
+<p>The rest of the parameters, which are mostly mimicking the keywords of <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code>. See the <a class="reference internal" href="#id1"><span class="std std-ref">Defaults</span></a> section for the for the default values of these.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gp_name</span></code> name of model XML file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">default_sigma</span></code> default kernel regularisation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">extra_gap_opts</span></code> anything else to pass to <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">function_name</span></code> allows the user to specify any python function installed in their environment by module import path for handling the refitting of the model. If this is set, then this function is used and everything else is ignored (though that function can see these parameters). This is an advanced developer feature.</p></li>
+</ul>
+</section>
+<section id="defaults">
+<h3>Defaults<a class="headerlink" href="#defaults" title="Permalink to this heading"></a></h3>
+<p id="id1">The following input file contains the default values set explicitly. <em>n.b. this is not allowing refitting, due to</em> <code class="docutils literal notranslate"><span class="pre">can_update:</span> <span class="pre">false</span></code></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">can_update</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">check_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">num_initial_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">tolerances</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ediff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.03</span>
+<span class="w">  </span><span class="nt">fmax</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">frmse</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">vmax</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="nt">refit</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">function_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">previous_data</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">  </span><span class="nt">preset_soap_param</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;fast&quot;</span>
+<span class="w">  </span><span class="nt">gp_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;GAP.xml&quot;</span>
+<span class="w">  </span><span class="nt">default_sigma</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0.005</span><span class="nv"> </span><span class="s">0.050</span><span class="nv"> </span><span class="s">0.1</span><span class="nv"> </span><span class="s">1.0&quot;</span>
+<span class="w">  </span><span class="nt">descriptor_str</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">extra_gap_opts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sparse_jitter=1.0e-8&quot;</span>
+<span class="w">  </span><span class="nt">e0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">e0_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;average&quot;</span>
+<span class="w">  </span><span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="accelerated-aimd_installation.html" class="btn btn-neutral float-left" title="Installation with CASTEP" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="accelerated-aimd_decision-making.html" class="btn btn-neutral float-right" title="Decision making" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019-2022, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

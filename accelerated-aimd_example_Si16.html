@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Si16 - Walkthrough of a Simple Calculation &mdash; GAP  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/soap.png"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Castep Input File" href="accelerated-aimd-castep-inputs.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> GAP
+            <img src="_static/soap.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+    
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation of QUIP, quippy and GAP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#getting-started-usage">Getting started &amp; Usage</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="accelerated-aimd.html#examples">Examples</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Si16 - Walkthrough of a Simple Calculation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#first-calculation">First calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#accuracy-adapted-checking-interval">Accuracy-Adapted Checking Interval</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#continue-a-calculation">Continue a calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#re-use-previous-data-set-your-own-gap-parameters">Re-use previous data &amp; Set your own GAP parameters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#what-next">What next</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#program-structures-and-design">Program structures and design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd.html#extendability-development">Extendability &amp; Development</a></li>
+</ul>
+</li>
+</ul>
+
+    <p></p>
+    <ul>
+        <li><a href="genindex.html">Index</a></li>
+        <li><a href="py-modindex.html">Module Index</a></li>
+<!--        <li><a href="search.html">Search Page</a></li>-->
+<!--        <li><a href="_modules/index.html">Module Source Code</a></li>-->
+    </ul>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GAP</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a> &raquo;</li>
+      <li>Si16 - Walkthrough of a Simple Calculation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/accelerated-aimd_example_Si16.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="si16-walkthrough-of-a-simple-calculation">
+<h1>Si16 - Walkthrough of a Simple Calculation<a class="headerlink" href="#si16-walkthrough-of-a-simple-calculation" title="Permalink to this heading"></a></h1>
+<p>This is a simple walkthrough of an experiment that one can try out, even on a laptop.</p>
+<p>We will be running MD of a small Si cell.</p>
+<section id="first-calculation">
+<h2>First calculation<a class="headerlink" href="#first-calculation" title="Permalink to this heading"></a></h2>
+<p>We will start out by running a short MD, starting with 3 steps of ab-initio calculations, training a model
+on that, and later only doing ab-initio calculations at every 10th step. We are running a total of 50 MD steps.</p>
+<p>Write the following in the input file <code class="docutils literal notranslate"><span class="pre">si16.hybrid-md-input.yaml</span></code>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">can_update</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">check_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="nt">num_initial_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="nt">tolerances</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ediff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span><span class="w">  </span><span class="c1"># eV</span>
+</pre></div>
+</div>
+<p>You need <code class="docutils literal notranslate"><span class="pre">si16.cell</span></code> and <code class="docutils literal notranslate"><span class="pre">si16.param</span></code> files as well. See examples here, of 8 atom si.</p>
+<p><code class="docutils literal notranslate"><span class="pre">si16.cell</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>%BLOCK LATTICE_CART
+ 7.679180  0.000000  0.000000
+ 0.000000  7.679180  0.000000
+ 0.000000  0.000000  5.430000
+%ENDBLOCK LATTICE_CART
+
+%BLOCK POSITIONS_ABS
+Si  0.000000  0.000000  0.000000
+Si  1.919795  0.000000  1.357500
+Si  1.919795  1.919795  2.715000
+Si  0.000000  1.919795  4.072500
+Si  0.000000  3.839590  0.000000
+Si  1.919795  3.839590  1.357500
+Si  1.919795  5.759385  2.715000
+Si  0.000000  5.759385  4.072500
+Si  3.839590  0.000000  0.000000
+Si  5.759385  0.000000  1.357500
+Si  5.759385  1.919795  2.715000
+Si  3.839590  1.919795  4.072500
+Si  3.839590  3.839590  0.000000
+Si  5.759385  3.839590  1.357500
+Si  5.759385  5.759385  2.715000
+Si  3.839590  5.759385  4.072500
+%ENDBLOCK POSITIONS_ABS
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">si16.param</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>###############################################################
+# functional &amp; general settings
+###############################################################
+xc_functional   LDA
+basis_precision PRECISE  ! basis set size from presets
+fix_occupancy   true
+opt_strategy    speed    ! faster runtime with more memory use
+
+# allow continuation
+NUM_BACKUP_ITER = 10     ! interval between checkpoints (.check file)
+continuation: default    ! continuation if .check file exists
+
+###############################################################
+# MD settings
+###############################################################
+task             = molecular dynamics
+
+md_ensemble      = NVT
+md_thermostat    = Langevin
+md_num_iter      = 50      ! number of MD steps we will take
+md_temperature   = 300 K
+md_sample_iter   = 10      ! interval between dumping MD frames
+md_delta_t       = 1 fs
+
+###############################################################
+# Devel code: contains the `PP_HYBRID` method settings
+###############################################################
+%BLOCK DEVEL_CODE
+  ! turn on the PP &amp; acceleration modules
+  PP=T
+  MD: PP=T :ENDMD
+  PP_HYBRID=T
+
+  ! settings of model called through QUIP
+  pp:
+      QUIP=T
+      QUIP_PARAM_FILE=GAP.xml
+      quip_init_args:IP GAP:endquip_init_args
+  :endpp
+
+  ! settings of PP Hybrid MD
+
+  PP_HYBRID_EXEC:
+    hybrid-md
+  :endPP_HYBRID_EXEC
+%ENDBLOCK DEVEL_CODE
+</pre></div>
+</div>
+<p>Let’s run this!</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>castep.mpi<span class="w"> </span>si-0
+</pre></div>
+</div>
+<p>The code should produce the following:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>standard Castep outputs:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">si16.castep</span></code> main output file (worth reading)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">si16.md</span></code> MD trajectory</p></li>
+<li><p>a few more castep files, including a bibliography of the parts used</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GAP.xml</span></code> model and associated <code class="docutils literal notranslate"><span class="pre">GAP.xml.sparseX_&lt;time&gt;</span></code> sparse point files. <em>This is the latest model trained</em></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">train.xyz</span></code>: the assembled training set of the last model</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GAP.xml.fit-stderr.&lt;time&gt;</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">GAP.xml.fit-stdout.&lt;time&gt;</span></code> are the output streams of the <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> program. Worth taking a look at.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GAP_model-step000..-at-&lt;time&gt;/</span></code> directories with previous GAP models. The number in the name is when the model was replaced by the next one</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">si16.hybrid-md.xyz</span></code>: all ab-initio observations from this calculation, where forces are gradients of the energy and don’t include thermostat components.</p></li>
+</ul>
+</section>
+<section id="accuracy-adapted-checking-interval">
+<h2>Accuracy-Adapted Checking Interval<a class="headerlink" href="#accuracy-adapted-checking-interval" title="Permalink to this heading"></a></h2>
+<p>This was all well, but we can do much much better: once the model has some more training data then we likely don’t need to
+perform an ab-initio calculation every 10 steps. We can use our other decision making method, where the number of steps between
+checks are adapting to the accuracy of the model. See more at <a class="reference internal" href="accelerated-aimd_decision-making.html#adaptive-interval"><span class="std std-ref">Accuracy-adapted checking interval mode</span></a>.</p>
+<p>Let’s move to a new directory, change the <code class="docutils literal notranslate"><span class="pre">si16.hybrid-md-input.yaml</span></code> to the following, increase the number of MD steps we are taking
+(<code class="docutils literal notranslate"><span class="pre">md_num_iter</span> <span class="pre">=</span> <span class="pre">200</span></code> in <code class="docutils literal notranslate"><span class="pre">si16.param</span></code>), and run the program again. Best done in a different directory.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>can_update: true
+check_interval: 10
+num_initial_steps: 3
+tolerances:
+  ediff: 0.01  # eV
+adaptive_method_parameters:   # &lt;---
+  n_min: 5                    # &lt;---
+  n_max: 100                  # &lt;---
+  factor: 1.5                 # &lt;---
+</pre></div>
+</div>
+<p>This should produce a more interesting output, where the number of steps between ab-initio calculations is not fixed, but lowe initially and
+then increases towards the end of the calculation. We can look at the output, where an error table is shown:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>     Hybrid-MD: MD iteration      49                                    &lt;-- Hybrid-MD
+-------------+------------------+------------------+------------+-----+ &lt;-- Hybrid-MD
+   Parameter |      value       |     tolerance    |    units   | OK? | &lt;-- Hybrid-MD
+-------------+------------------+------------------+------------+-----+ &lt;-- Hybrid-MD
+     |Ediff| |       0.00228307 |       0.01000000 | eV/at      | Yes | &lt;-- Hybrid-MD
+ max |Fdiff| |       1.24702641 |              Off | eV/Å       |     | &lt;-- Hybrid-MD
+  force RMSE |       0.35238182 |              Off | eV/Å       |     | &lt;-- Hybrid-MD
+ max |Vdiff| |       0.00000000 |              Off | eV         |     | &lt;-- Hybrid-MD
+-------------+------------------+------------------+------------+-----+ &lt;-- Hybrid-MD
+                                                               No Refit &lt;-- Hybrid-MD
+-------------+------------------+------------------+------------+-----+ &lt;-- Hybrid-MD-Cumul
+ Cumulative RMSE       value            count:       11  |    units   | &lt;-- Hybrid-MD-Cumul
+-------------+------------------+------------------+------------+-----+ &lt;-- Hybrid-MD-Cumul
+      Energy                    0.03409695               | eV/atom    | &lt;-- Hybrid-MD-Cumul
+      Forces                    0.82637217               | eV/Å       | &lt;-- Hybrid-MD-Cumul
+      Virial                    0.00000000               | eV         | &lt;-- Hybrid-MD-Cumul
+-------------+------------------+------------------+------------+-----+ &lt;-- Hybrid-MD-Cumul
+              Hybrid-MD: INCREASE interval to      7 at iter       49   &lt;-- Hybrid-MD-Adapt
+</pre></div>
+</div>
+<p>Here we can see a checking step, where the tolerance was met, so we are not refitting and are continuing with the previous model,
+allowing for a longer interval until the next check. Otherwise we would refit and decrease the interval.</p>
+<p>One can see all decisions made quickly by <code class="docutils literal notranslate"><span class="pre">grep</span> <span class="pre">CREAS</span> <span class="pre">si16.castep</span></code>, which should produce something like:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Hybrid-MD: DECREASE interval to      6 at iter       13   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       19   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       24   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       29   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       34   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       39   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       44   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to      7 at iter       49   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     10 at iter       56   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     15 at iter       66   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     22 at iter       81   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to     14 at iter      103   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     21 at iter      117   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     31 at iter      138   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     46 at iter      169   &lt;-- Hybrid-MD-Adapt
+</pre></div>
+</div>
+<p>Where we can see how the interval quickly increased after some initial burn-in time. It is worth experimenting with the settings here,
+seeing what is the maximum <code class="docutils literal notranslate"><span class="pre">factor</span></code> and <code class="docutils literal notranslate"><span class="pre">n_max</span></code> value which produces stable MD, so one can speed the calculation up as much as possible.</p>
+</section>
+<section id="continue-a-calculation">
+<h2>Continue a calculation<a class="headerlink" href="#continue-a-calculation" title="Permalink to this heading"></a></h2>
+<p>If we don’t change anything in the directory where we ran our precious calculation, we can run the same again and
+continue where we left off. Well, at the last checkpoint. You can increase the number of MD steps to say 1000 now and
+see the results.</p>
+<p>As you can see below, the interval has hit the ceiling, then the model was re-trained once at step 384 and slowed down
+there, but hit the ceiling after again. Please note, that the number of steps is reset to 0 at the start of the MD run
+by Castep and only time is incremented, while concatenating to the same output file.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Hybrid-MD: DECREASE interval to      6 at iter       13   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       19   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       24   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       29   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       34   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       39   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to      5 at iter       44   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to      7 at iter       49   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     10 at iter       56   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     15 at iter       66   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     22 at iter       81   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to     14 at iter      103   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     21 at iter      117   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     31 at iter      138   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     46 at iter      169   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     69 at iter       15   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter       84   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter      184   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter      284   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: DECREASE interval to     66 at iter      384   &lt;-- Hybrid-MD-Adapt   # n.b. refitting the model here
+Hybrid-MD: INCREASE interval to     99 at iter      450   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter      549   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter      649   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter      749   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter      849   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    100 at iter      949   &lt;-- Hybrid-MD-Adapt
+</pre></div>
+</div>
+<p>From here, you can restart the calculation again any time and change the settings of the adaptive interval. Try what
+happens if you change the ceiling it to something much longer and let it run a longer calculation.</p>
+</section>
+<section id="re-use-previous-data-set-your-own-gap-parameters">
+<h2>Re-use previous data &amp; Set your own GAP parameters<a class="headerlink" href="#re-use-previous-data-set-your-own-gap-parameters" title="Permalink to this heading"></a></h2>
+<p>We can see above how to go from a single structure and a few lines of simple settings to close to 100x accelerated ab-initio MD
+plus a GAP model we can use for anything else as well.</p>
+<p>Let’s see how we can refine the model. We are running MD of Si here, we might want to tune the GAP model’s settings to
+the system. Along with that, we will allow the GAP model fitting to happen in parallel as well.</p>
+<p>Finally, we will include the previous calculation’s ab-initio observations, by copying the <code class="docutils literal notranslate"><span class="pre">si16.hybrid-md.xyz</span></code> file into
+the new job directory as <code class="docutils literal notranslate"><span class="pre">previous_si16.hybrid-md.xyz</span></code>.</p>
+<p>Let’s update the input file to the following:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">can_update</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">check_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="nt">num_initial_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">tolerances</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ediff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span><span class="w">  </span><span class="c1"># eV</span>
+<span class="nt">adaptive_method_parameters</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">n_min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w">  </span><span class="nt">n_max</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">  </span><span class="nt">factor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.5</span>
+<span class="nt">refit</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">e0_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;average&quot;</span>
+<span class="w">  </span><span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+<span class="w">  </span><span class="nt">descriptor_str</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;distance_Nb</span><span class="nv"> </span><span class="s">order=2</span><span class="nv"> </span><span class="s">n_sparse=20</span><span class="nv"> </span><span class="s">cutoff=5.5</span><span class="nv"> </span><span class="s">cutoff_transition_width=1.0</span><span class="nv"> </span><span class="s">compact_clusters</span><span class="nv"> </span><span class="s">covariance_type=ard_se</span><span class="nv"> </span><span class="s">theta_uniform=1.0</span><span class="nv"> </span><span class="s">sparse_method=uniform</span><span class="nv"> </span><span class="s">f0=0.0</span><span class="nv"> </span><span class="s">add_species=T</span><span class="nv"> </span><span class="s">delta=1.0</span><span class="nv"> </span><span class="s">:</span><span class="nv"> </span><span class="s">soap</span><span class="nv"> </span><span class="s">n_sparse=1000</span><span class="nv"> </span><span class="s">n_max=10</span><span class="nv"> </span><span class="s">l_max=4</span><span class="nv"> </span><span class="s">cutoff=5.0</span><span class="nv"> </span><span class="s">cutoff_transition_width=1.0</span><span class="nv"> </span><span class="s">atom_sigma=0.5</span><span class="nv"> </span><span class="s">add_species=True</span><span class="nv"> </span><span class="s">covariance_type=dot_product</span><span class="nv"> </span><span class="s">zeta=4</span><span class="nv"> </span><span class="s">sparse_method=cur_points</span><span class="nv"> </span><span class="s">delta=3.0</span><span class="nv"> </span><span class="s">&quot;</span>
+<span class="w">  </span><span class="nt">previous_data</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span>
+<span class="w">    </span><span class="s">&quot;previous_si16.hybrid-md.xyz&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">default_sigma</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0.005</span><span class="nv"> </span><span class="s">0.1</span><span class="nv"> </span><span class="s">0.05</span><span class="nv"> </span><span class="s">1.0&quot;</span>
+</pre></div>
+</div>
+<p>Let’s see what we have done in the refitting section</p>
+<ul class="simple">
+<li><p>increased the maximum number of steps between ab-initio evaluations to 200</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">num_threads:</span> <span class="pre">4</span></code> allows the <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> program to be executed with 4 OMP threads, while the main Castep program’s 4 MPI processes are waiting</p></li>
+<li><p>the <code class="docutils literal notranslate"><span class="pre">descriptor_str</span></code> line is settings the descriptors that GAP uses, these are cut down versions of the <a class="reference external" href="http://doi.org/10.1103/PhysRevX.8.041048">GAP-18 Si model</a></p></li>
+<li><p>the GP’s kernel regularisation is updated with <code class="docutils literal notranslate"><span class="pre">default_sigma</span></code>,  <a class="reference internal" href="gap_fit.html#gap-fit"><span class="std std-ref">see usage of gap_fit</span></a></p></li>
+</ul>
+<p>Additionally, we can rattle the Si structure at the start of the calculation. Castep can do this by adding <code class="docutils literal notranslate"><span class="pre">positions_noise</span> <span class="pre">0.1</span> <span class="pre">Ang</span></code>
+to the <code class="docutils literal notranslate"><span class="pre">si16.cell</span></code> input file.</p>
+<p>Having done all of these, run the calculation just as before and see the results.</p>
+<p>You will notice in the <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> program outputs that 4 threads are used and that the previous data is included.
+The calculation will start with a single ab-initio evaluation and model training, which is then followed by the
+interval between checking steps quickly increasing.</p>
+<p>See the relevant lines from <code class="docutils literal notranslate"><span class="pre">si16.castep</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Hybrid-MD: INCREASE interval to     15 at iter       11   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     22 at iter       26   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     33 at iter       48   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     49 at iter       81   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to     73 at iter      130   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    109 at iter      203   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    163 at iter      312   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    200 at iter      475   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    200 at iter      675   &lt;-- Hybrid-MD-Adapt
+Hybrid-MD: INCREASE interval to    200 at iter      875   &lt;-- Hybrid-MD-Adapt
+</pre></div>
+</div>
+</section>
+<section id="what-next">
+<h2>What next<a class="headerlink" href="#what-next" title="Permalink to this heading"></a></h2>
+<p>You have learnt how to use the method supplied and were able to perform some short MD with a model trained on the fly.
+You can expand this, by running more meaningful longer MD, or trying different temperatures, or include defects in the
+structure and investigate those.</p>
+<p>The real test and valuable next step is trying this out for your own systems of interest. Think of what small simulation
+you could do which you may already have the structures and settings for. Try plugging it into Castep and turn the
+MD acceleration on, follow the ideas and steps learnt here, and see if anything useful comes out of it.</p>
+<p>If you need any assistance, don’t hesitate to contact the authors of this package.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="accelerated-aimd-castep-inputs.html" class="btn btn-neutral float-left" title="Castep Input File" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019-2022, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

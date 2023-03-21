@@ -61,6 +61,7 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="accelerated-aimd.html">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a></li>
 </ul>
 
     <p></p>
@@ -121,7 +122,7 @@
 </style>
 <section id="the-gap-fit-program">
 <h1>The gap_fit program<a class="headerlink" href="#the-gap-fit-program" title="Permalink to this heading"></a></h1>
-<p>In order to fit an interatomic potential to data with <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code>, you need</p>
+<p id="gap-fit">In order to fit an interatomic potential to data with <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code>, you need</p>
 <ol class="arabic simple">
 <li><p>Data</p></li>
 <li><p>A definition of descriptors and kernels that serve as basis functions</p></li>
@@ -208,7 +209,7 @@ used in fitting, the appropriate key names need to be specified.</p>
 </section>
 <section id="isolated-atom">
 <h3>Isolated atom<a class="headerlink" href="#isolated-atom" title="Permalink to this heading"></a></h3>
-<p>Most of the time, it makes sense to fit an interatomic potential to
+<p id="id1">Most of the time, it makes sense to fit an interatomic potential to
 the <strong>binding energy</strong>, i.e. the total energy minus the energy of
 isolated atoms.  There are several mechanisms in <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> to aid
 this. The default behaviour is to look for a configuration among the

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acceleration of Ab-initio MD with On-the-Fly GAP Models &mdash; GAP  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/soap.png"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation with CASTEP" href="accelerated-aimd_installation.html" />
+    <link rel="prev" title="GAP models and databases" href="data.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> GAP
+            <img src="_static/soap.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+    
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation of QUIP, quippy and GAP</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gap_fit.html">The gap_fit program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">SOAP and GAP reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">GAP models and databases</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Acceleration of Ab-initio MD with On-the-Fly GAP Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#getting-started-usage">Getting started &amp; Usage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd_installation.html">Installation with CASTEP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd-input-reference.html">Input file reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd_decision-making.html">Decision making</a></li>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd-castep-inputs.html">Castep Input File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#examples">Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="accelerated-aimd_example_Si16.html">Si16 - Walkthrough of a Simple Calculation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#program-structures-and-design">Program structures and design</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#design-principles">Design Principles</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#extendability-development">Extendability &amp; Development</a></li>
+</ul>
+</li>
+</ul>
+
+    <p></p>
+    <ul>
+        <li><a href="genindex.html">Index</a></li>
+        <li><a href="py-modindex.html">Module Index</a></li>
+<!--        <li><a href="search.html">Search Page</a></li>-->
+<!--        <li><a href="_modules/index.html">Module Source Code</a></li>-->
+    </ul>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">GAP</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Acceleration of Ab-initio MD with On-the-Fly GAP Models</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/accelerated-aimd.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="acceleration-of-ab-initio-md-with-on-the-fly-gap-models">
+<span id="accelerated-aimd"></span><h1>Acceleration of Ab-initio MD with On-the-Fly GAP Models<a class="headerlink" href="#acceleration-of-ab-initio-md-with-on-the-fly-gap-models" title="Permalink to this heading"></a></h1>
+<p>This is the documentation of the <code class="docutils literal notranslate"><span class="pre">hybrid-md</span></code> package bundled with GAP, which   provides a general framework of
+accelerating Ab-initio MD (AIMD) with Machine Learning models generated “On-the-Fly”.</p>
+<p>The framework is intended to be agnostic of the AIMD code and the ML code as well. For the time being, an interface
+between the CASTEP code and GAP is available publicly, integration of other ab-initio codes and ML frameworks is in
+the making. If you would have any software/research ideas, or would like to contribute in any way, please feel free
+to reach out to with G. Csányi and T. K. Stenczel for further details.</p>
+<section id="getting-started-usage">
+<h2>Getting started &amp; Usage<a class="headerlink" href="#getting-started-usage" title="Permalink to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="accelerated-aimd_installation.html">Installation with CASTEP</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_installation.html#linux-general-setup">Linux - general setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_installation.html#archer2-cluster">Archer2 cluster</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="accelerated-aimd-input-reference.html">Input file reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd-input-reference.html#core-mandatory-parameters">Core &amp; Mandatory parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd-input-reference.html#tolerance-section">Tolerance section</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd-input-reference.html#accuracy-adapted-method-section">Accuracy-Adapted method section</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd-input-reference.html#refitting-specific-settings">Refitting-specific settings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="accelerated-aimd_decision-making.html">Decision making</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_decision-making.html#initial-steps">Initial steps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_decision-making.html#fixed-interval-decision-making">Fixed Interval Decision Making</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_decision-making.html#accuracy-adapted-checking-interval">Accuracy-Adapted Checking Interval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_decision-making.html#further-development">Further development</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="accelerated-aimd-castep-inputs.html">Castep Input File</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd-castep-inputs.html#castep-param-file">Castep param file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd-castep-inputs.html#example-castep-v23">Example: Castep v23</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd-castep-inputs.html#example-castep-v22">Example: Castep v22</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="accelerated-aimd_example_Si16.html">Si16 - Walkthrough of a Simple Calculation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_example_Si16.html#first-calculation">First calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_example_Si16.html#accuracy-adapted-checking-interval">Accuracy-Adapted Checking Interval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_example_Si16.html#continue-a-calculation">Continue a calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_example_Si16.html#re-use-previous-data-set-your-own-gap-parameters">Re-use previous data &amp; Set your own GAP parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="accelerated-aimd_example_Si16.html#what-next">What next</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="program-structures-and-design">
+<h2>Program structures and design<a class="headerlink" href="#program-structures-and-design" title="Permalink to this heading"></a></h2>
+<p>The program is intended to be user-accessible and extendable. CASTEP implements
+an interface to external force evaluation codes - including QUIP/GAP.</p>
+<section id="design-principles">
+<h3>Design Principles<a class="headerlink" href="#design-principles" title="Permalink to this heading"></a></h3>
+<p>The interface provides acceleration of an AIMD simulation, according to the following design principles:</p>
+<ol class="arabic simple">
+<li><p>MD is driven by the AIMD code (this is the main program)</p></li>
+<li><p>Decision making program independent of AIMD code</p></li>
+<li><p>ML code is used by the AIMD code only for force evaluation, and by decision making code for updating of models</p></li>
+<li><p>The system is agnostic of programming languages used, the decision making code could be implemented in any other language as long as the API is the same</p></li>
+</ol>
+</section>
+</section>
+<section id="extendability-development">
+<h2>Extendability &amp; Development<a class="headerlink" href="#extendability-development" title="Permalink to this heading"></a></h2>
+<p>Users can extend the framework in multiple ways:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>Build custom decision making routines: e.g.</dt><dd><ul class="simple">
+<li><p>system specific adaptations</p></li>
+<li><p>utilising confidence estimates of models</p></li>
+<li><p>any external tools working out when the model is extrapolating / could use more data: e.g. sample more when connectivity changes - bond break/form</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Support other AIMD codes: There are no specific requirements apart from an internal MD loop being available. Please get in touch with G. Csányi and T. K. Stenczel for further details.</p></li>
+<li><p>Support for other ML tools - the framework is not depending on GAP</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="data.html" class="btn btn-neutral float-left" title="GAP models and databases" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="accelerated-aimd_installation.html" class="btn btn-neutral float-right" title="Installation with CASTEP" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019-2022, Albert Bartok-Partay, Noam Bernstein, Gabor Csanyi and James Kermode.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
