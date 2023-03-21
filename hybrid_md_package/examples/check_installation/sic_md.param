@@ -1,0 +1,49 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021-2023.
+
+###############################################################
+# functional & general settings
+###############################################################
+CUT_OFF_ENERGY: 200 eV
+ELEC_ENERGY_TOL: 0.0001 eV
+FINITE_BASIS_CORR: 0
+FIX_OCCUPANCY = true
+backup_interval = 0
+calculate_stress = true
+popn_calculate   = false
+write_checkpoint = none
+
+###############################################################
+# MD settings
+###############################################################
+task             = molecular dynamics
+
+md_ensemble      = NVT
+md_thermostat    = Langevin
+md_num_iter      = 50
+md_temperature   = 100 K
+md_sample_iter   = 10
+md_delta_t       = 1 fs
+
+###############################################################
+# Devel code: contains the `PP_HYBRID` method settings
+###############################################################
+%BLOCK DEVEL_CODE
+  ! generally turns on PP, this is needed together with "PP_HYBRID=T"
+  PP=T
+  MD: PP=T :ENDMD
+
+  ! settings of model called through QUIP
+  pp:
+      QUIP=T
+      QUIP_PARAM_FILE=GAP.xml
+      quip_init_args:IP GAP:endquip_init_args
+  :endpp
+
+  ! settings of PP Hybrid MD
+  PP_HYBRID=T
+  PP_HYBRID_EXEC:
+    hybrid-md
+  :endPP_HYBRID_EXEC
+%ENDBLOCK DEVEL_CODE

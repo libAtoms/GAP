@@ -1,0 +1,50 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021-2023.
+
+###############################################################
+# functional & general settings
+###############################################################
+xc_functional   LDA
+basis_precision PRECISE  ! basis set size from presets
+fix_occupancy   true
+opt_strategy    speed    ! faster runtime with more memory use
+
+# allow continuation
+NUM_BACKUP_ITER = 10     ! interval between checkpoints (.check file)
+continuation: default    ! continuation if .check file exists
+
+###############################################################
+# MD settings
+###############################################################
+task             = molecular dynamics
+
+md_ensemble      = NVT
+md_thermostat    = Langevin
+md_num_iter      = 1000     ! set 1000 for the continuation after
+md_temperature   = 300 K
+md_sample_iter   = 10      ! interval between dumping MD frames
+md_delta_t       = 1 fs
+
+###############################################################
+# Devel code: contains the `PP_HYBRID` method settings
+###############################################################
+%BLOCK DEVEL_CODE
+  ! turn on the PP & acceleration modules
+  PP=T
+  MD: PP=T :ENDMD
+  PP_HYBRID=T
+
+  ! settings of model called through QUIP
+  pp:
+      QUIP=T
+      QUIP_PARAM_FILE=GAP.xml
+      quip_init_args:IP GAP:endquip_init_args
+  :endpp
+
+  ! settings of PP Hybrid MD
+
+  PP_HYBRID_EXEC:
+    hybrid-md
+  :endPP_HYBRID_EXEC
+%ENDBLOCK DEVEL_CODE

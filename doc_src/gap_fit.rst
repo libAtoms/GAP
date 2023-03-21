@@ -2,6 +2,7 @@
 The gap_fit program
 *******************
 
+.. _gap_fit:
 
 In order to fit an interatomic potential to data with ``gap_fit``, you need
 
@@ -102,6 +103,8 @@ used in fitting, the appropriate key names need to be specified.
 
 Isolated atom
 ###################
+
+.. _isolated atom:
 
 Most of the time, it makes sense to fit an interatomic potential to
 the **binding energy**, i.e. the total energy minus the energy of
