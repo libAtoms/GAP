@@ -54,10 +54,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#cutoff">cutoff</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#command-line-example">Command line example</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#command-line-options">Command line options</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#gap-options">GAP options</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#running-with-mpi">Running with MPI</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="#gap-options">GAP options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-with-mpi">Running with MPI</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
@@ -329,38 +327,32 @@ characterised in theform of a force variance.</p>
 </ul>
 </dd>
 </dl>
+</section>
 <section id="running-with-mpi">
-<h3>Running with MPI<a class="headerlink" href="#running-with-mpi" title="Permalink to this heading"></a></h3>
-<p>In order to run <cite>gap_fit</cite> with MPI, you need to configure and compile it
+<h2>Running with MPI<a class="headerlink" href="#running-with-mpi" title="Permalink to this heading"></a></h2>
+<p>In order to run <code class="docutils literal notranslate"><span class="pre">gap_fit</span></code> with MPI, you need to configure and compile it
 accordingly, see the <a class="reference external" href="http://github.com/libAtoms/QUIP">QUIP Readme</a> for more details.</p>
 <p>Choosing the sparse points is not parallelised, therefore you have to provide
 the sparse points for each descriptor in a separate file. The main workflow is:</p>
 <ol class="arabic simple">
-<li><dl class="simple">
-<dt>Calculate without MPI to get the sparseX output files.</dt><dd><ul class="simple">
-<li><p>Use <cite>sparsify_only_no_fit=T</cite> to just create the sparseX files (less memory needed).</p></li>
+<li><p>Calculate without MPI to get the sparseX output files.</p>
+<ul class="simple">
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">sparsify_only_no_fit=T</span></code> to just create the sparseX files (less memory needed).</p></li>
 </ul>
-</dd>
-</dl>
 </li>
-<li><dl class="simple">
-<dt>Convert output files to input files (<cite>$QUIP_ROOT/bin/gap_prepare_sparsex_input.py gp.xml</cite>).</dt><dd><ul class="simple">
-<li><p>Optional: Rename them to something shorter (e.g. <cite>1.input</cite>, <cite>2.input</cite> etc.).</p></li>
+<li><p>Convert output files to input files (<code class="docutils literal notranslate"><span class="pre">$QUIP_ROOT/bin/gap_prepare_sparsex_input.py</span> <span class="pre">gp.xml</span></code>).</p>
+<ul class="simple">
+<li><p>Optional: Rename them to something shorter (e.g. <code class="docutils literal notranslate"><span class="pre">1.input</span></code>, <code class="docutils literal notranslate"><span class="pre">2.input</span></code> etc.).</p></li>
 </ul>
-</dd>
-</dl>
 </li>
-<li><dl class="simple">
-<dt>Change input method (<cite>sparse_method=FILE sparse_file=1.input</cite>).</dt><dd><ul class="simple">
-<li><p>For more than one species use <cite>add_species=F</cite> and explicit input.</p></li>
-<li><p>Check the number of braces (<cite>gap={{$gap1}:{$gap2}:{$gap3}}</cite>).</p></li>
+<li><p>Change input method (<code class="docutils literal notranslate"><span class="pre">sparse_method=FILE</span> <span class="pre">sparse_file=1.input</span></code>).</p>
+<ul class="simple">
+<li><p>For more than one species use <code class="docutils literal notranslate"><span class="pre">add_species=F</span></code> and explicit input.</p></li>
+<li><p>Check the number of braces (<code class="docutils literal notranslate"><span class="pre">gap={{$gap1}:{$gap2}:{$gap3}}</span></code>).</p></li>
 </ul>
-</dd>
-</dl>
 </li>
-<li><p>Run with <cite>mpirun -np …</cite>  (or <cite>srun …</cite> for Slurm).</p></li>
+<li><p>Run with <code class="docutils literal notranslate"><span class="pre">mpirun</span> <span class="pre">-np</span> <span class="pre">…</span></code>  (or <code class="docutils literal notranslate"><span class="pre">srun</span> <span class="pre">…</span></code> for Slurm).</p></li>
 </ol>
-</section>
 </section>
 </section>
 
