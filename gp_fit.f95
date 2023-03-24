@@ -210,8 +210,8 @@ module gp_fit_module
                n_config_type = count(i_config_type == this%config_type)
 
                if( n_config_type < n_sparseX(i_config_type) ) then
-                  call print_warning('gpCoordinates_sparsify: number of data points ('//n_config_type//') less than the number of sparse points ('//n_sparseX(i_config_type)//'), &
-                  number of sparse points changed to '//n_config_type)
+                  call print_warning('gpCoordinates_sparsify: number of data points ('//n_config_type//') less than the number of sparse points ('//n_sparseX(i_config_type)//') &
+                  for config type ('//config_type//'), number of sparse points changed to '//n_config_type)
                   call print_warning('gpCoordinates_sparsify: affected descriptor : '//this%descriptor_str)
                   my_n_sparseX(i_config_type) = n_config_type
                else
