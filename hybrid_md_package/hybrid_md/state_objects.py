@@ -304,7 +304,7 @@ class HybridMD:
                 "max |Vdiff|",
                 self.xyz_this_run.get_vmax(),
                 self.get_tolerance("vmax"),
-                "eV",
+                "eV/at",
             ),
             separator,
             f"{refit_str:>72} <-- Hybrid-MD\n",
@@ -504,7 +504,7 @@ class SubStateXYZ(SeedAwareState):
         self.forces_pp = self._unpack_arrays(frames, "FF_forces")
 
         # virial : (n_frames, 6)
-        if "QM virial" in frames[0].info.keys():
+        if "QM_virial" in frames[0].info.keys():
             self.use_virial = True
             self.virial_pw = self._unpack_info(frames, "QM_virial")
             self.virial_pp = self._unpack_info(frames, "FF_virial")
@@ -539,7 +539,7 @@ class SubStateXYZ(SeedAwareState):
 
     def get_vmax(self):
         """maximum virial component difference"""
-        return np.max(np.abs(self.virial_pp[-1] - self.virial_pw[-1]))
+        return np.max(np.abs(self.virial_pp[-1] - self.virial_pw[-1])) / self.len_atoms
 
     # -----------------------------------------------------------------------------------
     # cumulative error measures
