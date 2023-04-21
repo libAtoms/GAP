@@ -1,3 +1,6 @@
+..
+   Copyright (c) Tamas K. Stenczel, 2023.
+
 .. _accelerated-aimd-decision-making:
 
 Decision making
