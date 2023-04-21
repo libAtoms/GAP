@@ -1,3 +1,6 @@
+..
+   Copyright (c) Tamas K. Stenczel, 2023.
+
 
 ********************
 Castep Input File
