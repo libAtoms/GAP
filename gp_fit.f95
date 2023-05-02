@@ -1,9 +1,9 @@
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ! HND X
 ! HND X   GAP (Gaussian Approximation Potental)
-! HND X   
 ! HND X
-! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi, 
+! HND X
+! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi,
 ! HND X   Copyright 2006-2021.
 ! HND X
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
@@ -14,7 +14,7 @@
 ! HND X      Academic Software License v1.0 (ASL)
 ! HND X
 ! HND X   GAP is distributed in the hope that it will be useful for non-commercial
-! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied 
+! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied
 ! HND X   warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 ! HND X   ASL for more details.
 ! HND X
@@ -49,7 +49,6 @@
 module gp_fit_module
 
    use iso_c_binding, only : C_NULL_CHAR
-   ! use libatoms_module
    use error_module
    use system_module
    use extendable_str_module
@@ -71,18 +70,18 @@ module gp_fit_module
 
    contains
 
-   subroutine gpCoordinates_sparsify_config_type(this, n_sparseX, default_all, sparseMethod, sparse_file, use_actual_gpcov, print_sparse_index, &
+   subroutine gpCoordinates_sparsify_config_type(this, n_sparseX, default_all, sparse_method, sparse_file, use_actual_gpcov, print_sparse_index, &
          unique_hash_tolerance, unique_descriptor_tolerance, error)
       type(gpCoordinates), intent(inout) :: this
       integer, dimension(:), intent(in) :: n_sparseX
       logical, intent(in) :: default_all
-      integer, optional, intent(in) :: sparseMethod
+      integer, intent(in), optional :: sparse_method
       character(len=STRING_LENGTH), intent(in), optional :: sparse_file, print_sparse_index
       logical, intent(in), optional :: use_actual_gpcov
       real(dp), intent(in), optional :: unique_descriptor_tolerance, unique_hash_tolerance
-      integer, optional, intent(out) :: error
+      integer, intent(out), optional :: error
 
-      integer :: my_sparseMethod, i, j, li, ui, i_config_type, n_config_type, d, n_x, n_sparse_file
+      integer :: my_sparse_method, i, j, li, ui, i_config_type, n_config_type, d, n_x, n_sparse_file
       integer, dimension(:), allocatable :: config_type_index, sparseX_index, my_n_sparseX
       real(dp), dimension(:,:), allocatable :: x, sparseX_array
       real(dp), dimension(:), allocatable :: x_hash
@@ -98,7 +97,7 @@ module gp_fit_module
 
       INIT_ERROR(error)
 
-      my_sparseMethod = optional_default(GP_SPARSE_RANDOM,sparseMethod)
+      my_sparse_method = optional_default(GP_SPARSE_RANDOM,sparse_method)
       my_sparse_file = optional_default("",sparse_file)
 
       my_unique_hash_tolerance = optional_default(1.0e-10_dp,unique_hash_tolerance)
@@ -109,7 +108,6 @@ module gp_fit_module
       endif
 
       d = size(this%x,1)
-      !n_x = size(this%x,2)
       n_x = count(EXCLUDE_CONFIG_TYPE /= this%config_type)
 
       allocate(my_n_sparseX(size(n_sparseX)))
@@ -136,7 +134,6 @@ module gp_fit_module
       ! Update the config type if they're equivalent.
       do j = 2, n_x
          if( abs( x_hash(j-1) - x_hash(j) ) < my_unique_hash_tolerance ) then
-            !if ( sum( ( this%x(:,x_index(j))-this%x(:,x_index(j-1)) )**2 ) < my_unique_descriptor_tolerance ) then
             if ( maxval( abs( this%x(:,x_index(j))-this%x(:,x_index(j-1)) ) ) < my_unique_descriptor_tolerance ) then
                this%config_type(x_index(j-1)) = EXCLUDE_CONFIG_TYPE
             endif
@@ -149,31 +146,10 @@ module gp_fit_module
       ! need to update n_x once duplicates are removed
       n_x = count(EXCLUDE_CONFIG_TYPE /= this%config_type)
 
-      if(my_sparseMethod == GP_SPARSE_UNIQ) then
+      if(my_sparse_method == GP_SPARSE_UNIQ) then
          RAISE_ERROR('gpCoordinates_sparsify: UNIQ is no longer in use, please use NONE instead.',error)
 
-      !   allocate(x(d,n_x))
-      !   allocate(x_index(n_x))
-      !   allocate(x_unique(n_x))
-
-      !   !x = this%x
-      !   !x_index = (/(i,i=1,n_x)/)
-      !   j = 0
-      !   do i = 1, size(this%x,2)
-      !      if( this%config_type(i) /= EXCLUDE_CONFIG_TYPE ) then
-      !         j = j + 1
-      !         x(:,j) = this%x(:,i)
-      !         x_index(j) = i
-      !      endif
-      !   enddo
-
-      !   call heap_sort(x,i_data=x_index)
-      !   call uniq(x,unique=x_unique)
-      !   this%n_sparseX = count(x_unique)
-
-      !   call print('UNIQ type sparsification specified. The number of sparse points was changed to '//this%n_sparseX//' from '//n_sparseX//'.')
-
-      elseif(my_sparseMethod == GP_SPARSE_NONE) then
+      elseif(my_sparse_method == GP_SPARSE_NONE) then
 
          allocate(x_index(n_x))
 
@@ -189,8 +165,8 @@ module gp_fit_module
 
          call print('NONE type sparsification specified. The number of sparse points was changed to '//this%n_sparseX//' from '//n_sparseX//'.')
 
-      elseif(my_sparseMethod == GP_SPARSE_FILE .or. my_sparseMethod == GP_SPARSE_INDEX_FILE) then
-         this%n_sparseX = count_entries_in_sparse_file(my_sparse_file, my_sparseMethod, d, error)
+      elseif(my_sparse_method == GP_SPARSE_FILE .or. my_sparse_method == GP_SPARSE_INDEX_FILE) then
+         this%n_sparseX = count_entries_in_sparse_file(my_sparse_file, my_sparse_method, d, error)
       else
          do i_config_type = 1, size(n_sparseX)
             if(default_all) then
@@ -218,7 +194,7 @@ module gp_fit_module
                   my_n_sparseX(i_config_type) = n_sparseX(i_config_type)
                endif
             endif
-         
+
             if(default_all) exit
          enddo
          this%n_sparseX = sum(my_n_sparseX)
@@ -232,16 +208,15 @@ module gp_fit_module
       call reallocate(this%sparseCutoff, this%n_sparseX, zero = .true.)
       this%sparseCutoff = 1.0_dp
 
-      if( my_sparseMethod /= GP_SPARSE_FILE .and. my_sparseMethod /= GP_SPARSE_INDEX_FILE) then
+      if( my_sparse_method /= GP_SPARSE_FILE .and. my_sparse_method /= GP_SPARSE_INDEX_FILE) then
          ui = 0
          do i_config_type = 1, size(my_n_sparseX)
-            
-            if( my_sparseMethod == GP_SPARSE_NONE) exit
+
+            if( my_sparse_method == GP_SPARSE_NONE) exit
 
             if(default_all) then
 
                allocate(config_type_index(n_x), sparseX_index(this%n_sparseX))
-               !config_type_index = (/(i,i=1,n_x)/)
                j = 0
                do i = 1, size(this%x,2)
                   if( this%config_type(i) /= EXCLUDE_CONFIG_TYPE ) then
@@ -264,8 +239,8 @@ module gp_fit_module
                li = ui + 1
                ui = ui + my_n_sparseX(i_config_type)
             endif
-            
-            select case(my_sparseMethod)
+
+            select case(my_sparse_method)
             case(GP_SPARSE_RANDOM)
                call fill_random_integer(sparseX_index, n_config_type)
             case(GP_SPARSE_PIVOT)
@@ -283,7 +258,6 @@ module gp_fit_module
                call print('Started kmedoids clustering')
                if(use_actual_gpcov) then
                   call bisect_kmedoids(dm, my_n_sparseX(i_config_type), med = sparseX_index)
-                  !call bisect_kmedoids(dm, my_n_sparseX(i_config_type), c = c, med = sparseX_index)
                else
                   if(this%covariance_type == COVARIANCE_DOT_PRODUCT) then
                      call bisect_kmedoids(this%x(:,config_type_index), my_n_sparseX(i_config_type), med = sparseX_index, is_distance_matrix = .false.)
@@ -326,7 +300,7 @@ module gp_fit_module
                call cur_decomposition(this%x(:,config_type_index), sparseX_index)
                call print("Finished CUR decomposition")
             case default
-               RAISE_ERROR('gpCoordinates_sparsify: '//my_sparseMethod//' method is unknown', error)
+               RAISE_ERROR('gpCoordinates_sparsify: '//my_sparse_method//' method is unknown', error)
             endselect
             this%sparseX_index(li:ui) = config_type_index(sparseX_index)
             deallocate(config_type_index,sparseX_index)
@@ -334,7 +308,7 @@ module gp_fit_module
             if(default_all) exit
          enddo
 
-      elseif(my_sparseMethod == GP_SPARSE_INDEX_FILE) then
+      elseif(my_sparse_method == GP_SPARSE_INDEX_FILE) then
          call print('Started reading sparse indices from file '//trim(my_sparse_file))
          call fread_array_i(size(this%sparseX_index),this%sparseX_index(1),trim(my_sparse_file)//C_NULL_CHAR)
          call print('Finished reading sparse indices from file, '//size(this%sparseX_index)//' of them.')
@@ -343,7 +317,7 @@ module gp_fit_module
       if(allocated(this%covarianceDiag_sparseX_sparseX)) deallocate(this%covarianceDiag_sparseX_sparseX)
       allocate(this%covarianceDiag_sparseX_sparseX(this%n_sparseX))
 
-      if(my_sparseMethod == GP_SPARSE_FILE) then
+      if(my_sparse_method == GP_SPARSE_FILE) then
          call print('Started reading sparse descriptors from file '//trim(my_sparse_file))
          allocate(sparseX_array(d+1,this%n_sparseX))
          call fread_array_d(size(sparseX_array),sparseX_array(1,1),trim(my_sparse_file)//C_NULL_CHAR)
@@ -353,14 +327,12 @@ module gp_fit_module
          deallocate(sparseX_array)
          call print('Finished reading sparse descriptors from file, '//size(this%sparseCutoff)//'  of them.')
       else
-         if(my_sparseMethod == GP_SPARSE_NONE) this%sparseX_index = x_index
+         if(my_sparse_method == GP_SPARSE_NONE) this%sparseX_index = x_index
 
          call sort_array(this%sparseX_index)
          if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
-            if(allocated(this%sparseX)) deallocate(this%sparseX)
-            allocate(this%sparseX(maxval(this%x_size(this%sparseX_index)),this%n_sparseX))
-            if(allocated(this%sparseX_size)) deallocate(this%sparseX_size)
-            allocate(this%sparseX_size(this%n_sparseX))
+            call reallocate(this%sparseX, maxval(this%x_size(this%sparseX_index)), this%n_sparseX)
+            call reallocate(this%sparseX_size, this%n_sparseX)
             this%sparseX(:,:) = this%x(1:maxval(this%x_size(this%sparseX_index)),this%sparseX_index)
             this%sparseX_size = this%x_size(this%sparseX_index)
          else
@@ -380,14 +352,7 @@ module gp_fit_module
          endif
       endif
 
-
-      if(allocated(x)) deallocate(x)
-      if(allocated(x_index)) deallocate(x_index)
-      if(allocated(x_unique)) deallocate(x_unique)
-      if(allocated(my_n_sparseX)) deallocate(my_n_sparseX)
-
       this%sparsified = .true.
-
    endsubroutine gpCoordinates_sparsify_config_type
 
    function count_entries_in_sparse_file(sparse_file, sparse_method, d, error) result(res)
@@ -422,19 +387,19 @@ module gp_fit_module
       end select
    end function count_entries_in_sparse_file
 
-   subroutine gpFull_sparsify_array_config_type(this, n_sparseX, default_all, sparseMethod, sparse_file, use_actual_gpcov, print_sparse_index, &
+   subroutine gpFull_sparsify_array_config_type(this, n_sparseX, default_all, sparse_method, sparse_file, use_actual_gpcov, print_sparse_index, &
          unique_hash_tolerance, unique_descriptor_tolerance, error)
       type(gpFull), intent(inout) :: this
       integer, dimension(:,:), intent(in) :: n_sparseX
       logical, dimension(:), intent(in) :: default_all
-      integer, dimension(:), optional, intent(in) :: sparseMethod
+      integer, dimension(:), intent(in), optional :: sparse_method
       character(len=STRING_LENGTH), dimension(:), intent(in), optional :: sparse_file, print_sparse_index
       logical, intent(in), optional :: use_actual_gpcov
-      real(dp), dimension(:), optional, intent(in) :: unique_hash_tolerance, unique_descriptor_tolerance
-      integer, optional, intent(out) :: error
+      real(dp), dimension(:), intent(in), optional :: unique_hash_tolerance, unique_descriptor_tolerance
+      integer, intent(out), optional :: error
 
       integer :: i
-      integer, dimension(:), allocatable :: my_sparseMethod
+      integer, dimension(:), allocatable :: my_sparse_method
       character(len=STRING_LENGTH), dimension(:), allocatable :: my_sparse_file
 
       INIT_ERROR(error)
@@ -443,22 +408,18 @@ module gp_fit_module
          RAISE_ERROR('gpFull_sparsify_array: object not initialised',error)
       endif
 
-      allocate(my_sparseMethod(this%n_coordinate))
+      allocate(my_sparse_method(this%n_coordinate))
       allocate(my_sparse_file(this%n_coordinate))
-      my_sparseMethod = optional_default((/ (GP_SPARSE_RANDOM, i=1,this%n_coordinate) /),sparseMethod)
+      my_sparse_method = optional_default((/ (GP_SPARSE_RANDOM, i=1,this%n_coordinate) /),sparse_method)
       my_sparse_file = optional_default((/ ("", i=1,this%n_coordinate) /),sparse_file)
 
       do i = 1, this%n_coordinate
          call gpCoordinates_sparsify_config_type(this%coordinate(i),n_sparseX(:,i), default_all(i), &
-            sparseMethod=my_sparseMethod(i), sparse_file=my_sparse_file(i), use_actual_gpcov=use_actual_gpcov, &
+            sparse_method=my_sparse_method(i), sparse_file=my_sparse_file(i), use_actual_gpcov=use_actual_gpcov, &
             print_sparse_index = print_sparse_index(i), &
             unique_hash_tolerance=unique_hash_tolerance(i), unique_descriptor_tolerance=unique_descriptor_tolerance(i), &
             error = error)
       enddo
-
-      if(allocated(my_sparseMethod)) deallocate(my_sparseMethod)
-      if(allocated(my_sparse_file)) deallocate(my_sparse_file)
-
    endsubroutine gpFull_sparsify_array_config_type
 
    function kernel_distance_matrix(this, config_type_index, covariance_only) result(k_nn)
@@ -483,12 +444,12 @@ module gp_fit_module
       else
          n = size(this%x,2)
       endif
- 
+
       allocate(k_self(n))
 
       allocate(k_nn(n,n), stat=stat)
       if(stat /= 0) call system_abort('kernel_distance_matrix: could not allocate matrix.')
- 
+
 !$omp parallel do default(none) shared(this,n,config_type_index,k_self) private(i,ii)
       do i = 1, n
          if(present(config_type_index)) then
@@ -524,8 +485,8 @@ module gp_fit_module
             k_nn(j,i) = k_nn(j,i) / sqrt(k_self(i)*k_self(j))
 
             if (do_kernel_distance) then
-              ! now convert to distance
-              k_nn(j,i) = sqrt(2.0_dp * (1.0_dp - k_nn(j,i)))
+               ! now convert to distance
+               k_nn(j,i) = sqrt(2.0_dp * (1.0_dp - k_nn(j,i)))
             endif
 
             ! finally, symmetrise
@@ -551,7 +512,7 @@ module gp_fit_module
       integer, dimension(:), intent(out) :: index_out
       integer, dimension(:), intent(in), optional :: config_type_index
       logical, intent(in), optional :: use_actual_gpcov
- 
+
       real(dp), dimension(:), allocatable :: score, k_self !, xI_xJ
       real(dp), dimension(:,:), allocatable :: k_mn, k_mm_k_m
       real(dp), dimension(1,1) :: k_mm
@@ -559,9 +520,9 @@ module gp_fit_module
       integer, dimension(1) :: j_loc
       logical, dimension(:), allocatable :: not_yet_added
       logical :: do_use_actual_gpcov
- 
+
       type(LA_Matrix) :: LA_k_mm
- 
+
       call system_timer('sparse_covariance')
       if(present(config_type_index)) then
          n = size(config_type_index)
@@ -576,21 +537,21 @@ module gp_fit_module
       else
          call print("sparse_covariance using manual 'covariance'")
       endif
- 
+
       allocate(k_mn(m,n), score(n), k_mm_k_m(m,n), k_self(n), not_yet_added(n))
       k_mn = 0.0_dp
       not_yet_added = .true.
- 
+
       !allocate(xI_xJ(this%d))
- 
+
       j = 1
       index_out(j) = 1 !ceiling(ran_uniform() * n)
       not_yet_added(index_out(j)) = .false.
- 
+
       k_mm = 1.0_dp+1.0e-6_dp
       zeta_int = nint(this%zeta)
       call initialise(LA_k_mm,k_mm)
- 
+
 !$omp parallel do default(none) shared(this,n,config_type_index,k_self,do_use_actual_gpcov,zeta_int) private(i,ii,i_p)
       do i = 1, n
          if(present(config_type_index)) then
@@ -626,7 +587,7 @@ module gp_fit_module
       enddo
 
       do j = 1, m-1
- 
+
          if(present(config_type_index)) then
             jj = config_type_index(index_out(j))
          else
@@ -666,11 +627,11 @@ module gp_fit_module
             endif
             endif
             k_mn(j,i) = k_mn(j,i) / sqrt(k_self(i)*k_self(index_out(j)))
- 
+
             call Matrix_Solve(LA_k_mm,k_mn(1:j,i),k_mm_k_m(1:j,i))
             score(i) = sum( k_mn(1:j,i) * k_mm_k_m(1:j,i) )
          enddo
- 
+
          j_loc = minloc(score, mask=not_yet_added)
          jj = j_loc(1)
          index_out(j+1) = jj
@@ -680,13 +641,13 @@ module gp_fit_module
             call print('Initial score: '//score)
          endif
          call print('Min score: '//minval(score))
- 
+
          !k_mm(1:j_i,j_i+1) = k_mn(1:j_i,j)
          !k_mm(j_i+1,1:j_i) = k_mn(1:j_i,j)
          !k_mm(j_i+1,j_i+1) = 1.0_dp
          call LA_Matrix_Expand_Symmetrically(LA_k_mm,(/k_mn(1:j,jj),1.0_dp+1.0e-6_dp/))
          !call initialise(LA_k_mm,k_mm(1:j_i+1,1:j_i+1))
- 
+
       enddo
       call print('Final score: '//score)
       call print('Min score: '//minval(score))
@@ -695,7 +656,7 @@ module gp_fit_module
       !if(allocated(xI_xJ)) deallocate(xI_xJ)
       call finalise(LA_k_mm)
       call system_timer('sparse_covariance')
- 
+
    endsubroutine sparse_covariance
 
 end module gp_fit_module

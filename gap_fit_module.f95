@@ -1484,7 +1484,7 @@ contains
     end if
 
     call gp_sparsify(this%my_gp,n_sparseX=this%config_type_n_sparseX,default_all=(this%n_sparseX/=0), &
-       sparseMethod=this%sparse_method, sparse_file=this%sparse_file, &
+       sparse_method=this%sparse_method, sparse_file=this%sparse_file, &
        use_actual_gpcov=this%sparse_use_actual_gpcov, print_sparse_index = this%print_sparse_index, &
        unique_hash_tolerance=this%unique_hash_tolerance, unique_descriptor_tolerance=this%unique_descriptor_tolerance)
 
