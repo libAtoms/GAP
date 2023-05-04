@@ -73,7 +73,7 @@ module gp_fit_module
 
    subroutine gpCoordinates_sparsify_config_type(this, n_sparseX, default_all, task_manager, sparse_method, sparse_file, &
          use_actual_gpcov, print_sparse_index, unique_hash_tolerance, unique_descriptor_tolerance, error)
-      type(gpCoordinates), intent(inout) :: this
+      type(gpCoordinates), intent(inout), target :: this
       integer, dimension(:), intent(in) :: n_sparseX
       logical, intent(in) :: default_all
       type(task_manager_type), intent(in) :: task_manager
@@ -88,6 +88,9 @@ module gp_fit_module
       real(dp), dimension(:,:), allocatable :: sparseX_array
       real(dp), pointer, dimension(:,:) :: dm
       integer, dimension(:), allocatable :: x_index
+
+      integer, dimension(:), pointer :: config_type_ptr, x_size_ptr
+      real(dp), dimension(:,:), pointer :: x_ptr
 
       character(len=STRING_LENGTH) :: my_sparse_file
       type(Inoutput) :: inout_sparse_index
@@ -107,11 +110,15 @@ module gp_fit_module
          end if
       end if
 
-      d = size(this%x,1)
+      x_ptr => this%x
+      x_size_ptr => this%x_size
+      config_type_ptr => this%config_type
+
+      d = size(x_ptr, 1)
       allocate(my_n_sparseX(size(n_sparseX)), source=0)
 
-      call exclude_duplicates(this%x, this%config_type, unique_descriptor_tolerance, unique_hash_tolerance, error)
-      n_x = count(EXCLUDE_CONFIG_TYPE /= this%config_type)
+      call exclude_duplicates(x_ptr, config_type_ptr, unique_descriptor_tolerance, unique_hash_tolerance, error)
+      n_x = count(EXCLUDE_CONFIG_TYPE /= config_type_ptr)
 
       if(my_sparse_method == GP_SPARSE_UNIQ) then
          RAISE_ERROR('gpCoordinates_sparsify: UNIQ is no longer in use, please use NONE instead.',error)
@@ -121,8 +128,8 @@ module gp_fit_module
          allocate(x_index(n_x))
 
          j = 0
-         do i = 1, size(this%x,2)
-            if( this%config_type(i) /= EXCLUDE_CONFIG_TYPE ) then
+         do i = 1, size(x_ptr,2)
+            if( config_type_ptr(i) /= EXCLUDE_CONFIG_TYPE ) then
                j = j + 1
                x_index(j) = i
             endif
@@ -150,7 +157,7 @@ module gp_fit_module
             else
                if( n_sparseX(i_config_type) == 0 ) cycle
 
-               n_config_type = count(i_config_type == this%config_type)
+               n_config_type = count(i_config_type == config_type_ptr)
 
                if( n_config_type < n_sparseX(i_config_type) ) then
                   call print_warning('gpCoordinates_sparsify: number of data points ('//n_config_type//') less than the number of sparse points ('//n_sparseX(i_config_type)//'), &
@@ -185,8 +192,8 @@ module gp_fit_module
 
                allocate(config_type_index(n_x), sparseX_index(this%n_sparseX))
                j = 0
-               do i = 1, size(this%x,2)
-                  if( this%config_type(i) /= EXCLUDE_CONFIG_TYPE ) then
+               do i = 1, size(x_ptr,2)
+                  if( config_type_ptr(i) /= EXCLUDE_CONFIG_TYPE ) then
                      j = j + 1
                      config_type_index(j) = i
                   endif
@@ -198,10 +205,10 @@ module gp_fit_module
             else
                if( my_n_sparseX(i_config_type) == 0 ) cycle
 
-               n_config_type = count(i_config_type == this%config_type)
+               n_config_type = count(i_config_type == config_type_ptr)
 
                allocate(config_type_index(n_config_type),sparseX_index(my_n_sparseX(i_config_type)))
-               config_type_index = find(i_config_type == this%config_type)
+               config_type_index = find(i_config_type == config_type_ptr)
 
                li = ui + 1
                ui = ui + my_n_sparseX(i_config_type)
@@ -212,9 +219,9 @@ module gp_fit_module
                call fill_random_integer(sparseX_index, n_config_type)
             case(GP_SPARSE_PIVOT)
                if(this%covariance_type == COVARIANCE_DOT_PRODUCT) then
-                  call pivot(this%x(:,config_type_index), sparseX_index)
+                  call pivot(x_ptr(:,config_type_index), sparseX_index)
                else
-                  call pivot(this%x(:,config_type_index), sparseX_index, theta = this%theta)
+                  call pivot(x_ptr(:,config_type_index), sparseX_index, theta = this%theta)
                endif
             case(GP_SPARSE_CLUSTER)
                if(use_actual_gpcov) then
@@ -227,21 +234,21 @@ module gp_fit_module
                   call bisect_kmedoids(dm, my_n_sparseX(i_config_type), med = sparseX_index)
                else
                   if(this%covariance_type == COVARIANCE_DOT_PRODUCT) then
-                     call bisect_kmedoids(this%x(:,config_type_index), my_n_sparseX(i_config_type), med = sparseX_index, is_distance_matrix = .false.)
+                     call bisect_kmedoids(x_ptr(:,config_type_index), my_n_sparseX(i_config_type), med = sparseX_index, is_distance_matrix = .false.)
                   else
-                     call bisect_kmedoids(this%x(:,config_type_index), my_n_sparseX(i_config_type), med = sparseX_index, theta = this%theta, is_distance_matrix = .false.)
+                     call bisect_kmedoids(x_ptr(:,config_type_index), my_n_sparseX(i_config_type), med = sparseX_index, theta = this%theta, is_distance_matrix = .false.)
                   endif
                endif
                call print('Finished kmedoids clustering')
                if(use_actual_gpcov) deallocate(dm)
             case(GP_SPARSE_UNIFORM)
-               call select_uniform(this%x(:,config_type_index), sparseX_index)
+               call select_uniform(x_ptr(:,config_type_index), sparseX_index)
             case(GP_SPARSE_KMEANS)
                call print('Started kmeans clustering')
                if(this%covariance_type == COVARIANCE_DOT_PRODUCT) then
-                  call cluster_kmeans(this%x(:,config_type_index), sparseX_index)
+                  call cluster_kmeans(x_ptr(:,config_type_index), sparseX_index)
                else
-                  call cluster_kmeans(this%x(:,config_type_index), sparseX_index, theta = this%theta)
+                  call cluster_kmeans(x_ptr(:,config_type_index), sparseX_index, theta = this%theta)
                endif
                call print('Finished kmeans clustering')
             case(GP_SPARSE_COVARIANCE)
@@ -249,9 +256,9 @@ module gp_fit_module
             case(GP_SPARSE_FUZZY)
                call print('Started fuzzy cmeans clustering')
                if(this%covariance_type == COVARIANCE_DOT_PRODUCT) then
-                  call cluster_fuzzy_cmeans(this%x(:,config_type_index), sparseX_index, fuzziness=2.0_dp)
+                  call cluster_fuzzy_cmeans(x_ptr(:,config_type_index), sparseX_index, fuzziness=2.0_dp)
                else
-                  call cluster_fuzzy_cmeans(this%x(:,config_type_index), sparseX_index, theta=this%theta,fuzziness=2.0_dp)
+                  call cluster_fuzzy_cmeans(x_ptr(:,config_type_index), sparseX_index, theta=this%theta,fuzziness=2.0_dp)
                endif
                call print('Finished fuzzy cmeans clustering')
             case(GP_SPARSE_CUR_COVARIANCE)
@@ -264,7 +271,7 @@ module gp_fit_module
                deallocate(dm)
             case(GP_SPARSE_CUR_POINTS)
                call print("Started CUR decomposition")
-               call cur_decomposition(this%x(:,config_type_index), sparseX_index)
+               call cur_decomposition(x_ptr(:,config_type_index), sparseX_index)
                call print("Finished CUR decomposition")
             case default
                RAISE_ERROR('gpCoordinates_sparsify: '//my_sparse_method//' method is unknown', error)
@@ -298,12 +305,12 @@ module gp_fit_module
 
          call sort_array(this%sparseX_index)
          if(this%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
-            call reallocate(this%sparseX, maxval(this%x_size(this%sparseX_index)), this%n_sparseX)
+            call reallocate(this%sparseX, maxval(x_size_ptr(this%sparseX_index)), this%n_sparseX)
             call reallocate(this%sparseX_size, this%n_sparseX)
-            this%sparseX(:,:) = this%x(1:maxval(this%x_size(this%sparseX_index)),this%sparseX_index)
-            this%sparseX_size = this%x_size(this%sparseX_index)
+            this%sparseX(:,:) = x_ptr(1:maxval(x_size_ptr(this%sparseX_index)),this%sparseX_index)
+            this%sparseX_size = x_size_ptr(this%sparseX_index)
          else
-            this%sparseX(:,:) = this%x(:,this%sparseX_index)
+            this%sparseX(:,:) = x_ptr(:,this%sparseX_index)
          endif
 
          this%covarianceDiag_sparseX_sparseX = this%covarianceDiag_x_x(this%sparseX_index)
