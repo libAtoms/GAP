@@ -83,27 +83,19 @@ module gp_fit_module
       real(dp), intent(in), optional :: unique_descriptor_tolerance, unique_hash_tolerance
       integer, intent(out), optional :: error
 
-      integer :: my_sparse_method, i, j, li, ui, i_config_type, n_config_type, d, n_x, n_sparse_file
+      integer :: my_sparse_method, i, j, li, ui, i_config_type, n_config_type, d, n_x
       integer, dimension(:), allocatable :: config_type_index, sparseX_index, my_n_sparseX
-      real(dp), dimension(:,:), allocatable :: x, sparseX_array
-      real(dp), dimension(:), allocatable :: x_hash
+      real(dp), dimension(:,:), allocatable :: sparseX_array
       real(dp), pointer, dimension(:,:) :: dm
       integer, dimension(:), allocatable :: x_index
-      logical, dimension(:), allocatable :: x_unique
 
       character(len=STRING_LENGTH) :: my_sparse_file
       type(Inoutput) :: inout_sparse_index
-      logical :: exist_sparse_file
-
-      real(dp) :: my_unique_hash_tolerance, my_unique_descriptor_tolerance
 
       INIT_ERROR(error)
 
       my_sparse_method = optional_default(GP_SPARSE_RANDOM,sparse_method)
       my_sparse_file = optional_default("",sparse_file)
-
-      my_unique_hash_tolerance = optional_default(1.0e-10_dp,unique_hash_tolerance)
-      my_unique_descriptor_tolerance = optional_default(1.0e-10_dp,unique_descriptor_tolerance)
 
       if( .not. this%initialised ) then
          RAISE_ERROR('gpCoordinates_sparsify: : object not initialised',error)
@@ -116,42 +108,9 @@ module gp_fit_module
       end if
 
       d = size(this%x,1)
-      n_x = count(EXCLUDE_CONFIG_TYPE /= this%config_type)
+      allocate(my_n_sparseX(size(n_sparseX)), source=0)
 
-      allocate(my_n_sparseX(size(n_sparseX)))
-      my_n_sparseX = 0
-
-      ! Remove duplicates
-      allocate(x_hash(n_x))
-      allocate(x_index(n_x))
-
-      ! Compute 1-norm hash on all descriptors that we want to include, and the mapping to the full vector
-      j = 0
-      do i = 1, size(this%x,2)
-         if( this%config_type(i) /= EXCLUDE_CONFIG_TYPE ) then
-            j = j + 1
-            x_hash(j) = sum(abs(this%x(:,i)))
-            x_index(j) = i
-         endif
-      enddo
-
-      ! Sort hashes
-      call heap_sort(x_hash,i_data=x_index)
-
-      ! Compare neighbouring hashes. If they're within tolerance, compare the corresponding descriptors using the eucledian norm.
-      ! Update the config type if they're equivalent.
-      do j = 2, n_x
-         if( abs( x_hash(j-1) - x_hash(j) ) < my_unique_hash_tolerance ) then
-            if ( maxval( abs( this%x(:,x_index(j))-this%x(:,x_index(j-1)) ) ) < my_unique_descriptor_tolerance ) then
-               this%config_type(x_index(j-1)) = EXCLUDE_CONFIG_TYPE
-            endif
-         endif
-      enddo
-
-      deallocate(x_hash)
-      deallocate(x_index)
-
-      ! need to update n_x once duplicates are removed
+      call exclude_duplicates(this%x, this%config_type, unique_descriptor_tolerance, unique_hash_tolerance, error)
       n_x = count(EXCLUDE_CONFIG_TYPE /= this%config_type)
 
       if(my_sparse_method == GP_SPARSE_UNIQ) then
@@ -362,6 +321,52 @@ module gp_fit_module
 
       this%sparsified = .true.
    endsubroutine gpCoordinates_sparsify_config_type
+
+   subroutine exclude_duplicates(x, config_type, unique_descriptor_tolerance, unique_hash_tolerance, error)
+      real(dp), dimension(:,:), intent(in) :: x
+      integer, dimension(:), intent(inout) :: config_type
+      real(dp), intent(in), optional :: unique_descriptor_tolerance, unique_hash_tolerance
+      integer, intent(out), optional :: error
+
+      integer :: i, j, n_x
+      real(dp) :: my_unique_hash_tolerance, my_unique_descriptor_tolerance
+      real(dp) :: max_diff
+
+      integer, dimension(:), allocatable :: x_index
+      real(dp), dimension(:), allocatable :: x_hash
+
+      INIT_ERROR(error)
+
+      my_unique_hash_tolerance = optional_default(1.0e-10_dp, unique_hash_tolerance)
+      my_unique_descriptor_tolerance = optional_default(1.0e-10_dp, unique_descriptor_tolerance)
+
+      n_x = count(config_type /= EXCLUDE_CONFIG_TYPE)
+      allocate(x_hash(n_x))
+      allocate(x_index(n_x))
+
+      ! Compute 1-norm hash on all descriptors that we want to include, and the mapping to the full vector
+      j = 0
+      do i = 1, size(x,2)
+         if (config_type(i) /= EXCLUDE_CONFIG_TYPE) then
+            j = j + 1
+            x_hash(j) = sum(abs(x(:,i)))
+            x_index(j) = i
+         end if
+      end do
+
+      call heap_sort(x_hash, i_data=x_index)
+
+      ! Compare neighbouring hashes. If they're within tolerance, compare the corresponding descriptors using the eucledian norm.
+      ! Update the config type if they're equivalent.
+      do j = 2, n_x
+         if (abs(x_hash(j-1) - x_hash(j)) < my_unique_hash_tolerance) then
+            max_diff = maxval(abs(x(:,x_index(j)) - x(:,x_index(j-1))))
+            if (max_diff < my_unique_descriptor_tolerance) then
+               config_type(x_index(j-1)) = EXCLUDE_CONFIG_TYPE
+            end if
+         end if
+      end do
+   end subroutine exclude_duplicates
 
    function count_entries_in_sparse_file(sparse_file, sparse_method, d, error) result(res)
       character(len=*), intent(in) :: sparse_file
