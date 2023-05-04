@@ -1,0 +1,3 @@
+[submodule "soap_turbo"]
+	path = soap_turbo
+	url = https://github.com/libAtoms/soap_turbo.git

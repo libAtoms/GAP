@@ -2,6 +2,7 @@
 The gap_fit program
 *******************
 
+.. _gap_fit:
 
 In order to fit an interatomic potential to data with ``gap_fit``, you need
 
@@ -29,8 +30,9 @@ forces, and optionally virial stress. All of these are specified in
 the extended XYZ file. Following the definition of the extended XYZ
 file, the energy needs to be in units of eV, the forces in units of
 eV/A and the virial stress in units of eV (this is the regular stress
-multiplied by the volume). The atomic positions need to be in
-Angstroms, and the periodic unit cell is specified by three cartesian
+multiplied by the volume). Watch out for the definition of the sign of
+the stress! For example VASP uses the opposite sign convention to QUIP.
+The atomic positions need to be in Angstroms, and the periodic unit cell is specified by three cartesian
 lattice vectors.
 
 An example structure in extended XYZ format::
@@ -47,7 +49,7 @@ value of the mandatory ``Properties`` key specifies the names and types
 of the columns in the rest of the configuration. ``S`` stands for
 'string', ``R`` stands for 'real', ``I`` is for 'integer' and ``L`` is for
 logical. Columns ``species`` and ``pos`` (atom types and cartesian
-positions, respectively) are mandatory. 
+positions, respectively) are mandatory.
 
 **All structures in the extended XYZ format need a periodic lattice
 unit cell (and defined by the ``Lattice`` key), even if a particular
@@ -77,7 +79,7 @@ of the potential energy surface.
 
 The type of data included can vary from configuration to
 configuration, there is no restriction on having to include the same
-type of data for all configurations. 
+type of data for all configurations.
 
 Data field names
 ####################
@@ -94,13 +96,15 @@ several types of energies and related quantities in the same XYZ, and
 selected the one you want to fit to on the command line. For example,
 energies computed with different DFT functionals can be stored in the
 same XYZ file, or even with a completely different method such as
-QMC. 
+QMC.
 
 The above example has the keys ``dft_energy`` for example, so when it is
-used in fitting, the appropriate key names need to be specified. 
+used in fitting, the appropriate key names need to be specified.
 
 Isolated atom
 ###################
+
+.. _isolated atom:
 
 Most of the time, it makes sense to fit an interatomic potential to
 the **binding energy**, i.e. the total energy minus the energy of
@@ -126,25 +130,25 @@ Note that if you create a dataset where the specified energies are
 already binding energies, you should still specify 0.0 as the isolated atom
 energy (either via a configuration, preferred, or on the command
 line), otherwise the interatomic potential might (depending on the
-descriptor) not formally be zero for isolated atoms. 
+descriptor) not formally be zero for isolated atoms.
 
+SOAP hyperparameters
+########################
 
+This section contains notes about choosing hyperparameters for the SOAP descriptor.
 
-Descriptors and Kernels
-***********************
+cutoff
+************
 
-blah blah
-
-blah blah
-
-
-
-Global fit parameters
-*********************
-
-blah blah
-
-blah blah
+Every finite range potential can be cast in the form of a sum over site
+energies or atomic energies, and the cut-off radius defines the range of
+this local term. The actual interaction range is of course twice the
+cut-off radius, because atoms up to this distance can potentially
+interact with one another via a many-body term centered on an atom in
+between them.  When we approximate a quantum mechanical potential
+energy (which is not formally local) using a local site energy with
+cut-off radius, the error we necessarily incur can be
+characterised in theform of a force variance.
 
 Command line example
 ********************
@@ -152,11 +156,11 @@ Command line example
 Here is an annotated fitting example.
 
 .. code-block:: bash
-		
+
   gap_fit atoms_filename=database.xyz # input data in extended XYZ format
     gap={                              # start of descriptor and kernel spec
     distance_Nb                       # first descriptor is interatomic distance based
-    order=2                           # descriptor is 2-body (i.e. a pair potential) 
+    order=2                           # descriptor is 2-body (i.e. a pair potential)
     cutoff=5.0                        # distance cutoff in the kernel, in Angstrom
     n_sparse=15                       # number of representative points, M in Sec. II
     covariance_type=ard_se            # form of kernel: squared exponential (Gaussian)
@@ -171,8 +175,8 @@ Here is an annotated fitting example.
     cutoff=5.0                        # distance cutoff in the kernel, in Angstrom
     radial_scaling=-0.5               # exponent of atom density scaling, power of distance
     cutoff_transition_width=1.0       # distance across which kernel is smoothly taken to zero, in Angstrom
-    central_weight=1.0                # relative weight of central atom in atom density for SOAP 
-    n_sparse=8000                     # number of representative points, M in Sec. II 
+    central_weight=1.0                # relative weight of central atom in atom density for SOAP
+    n_sparse=8000                     # number of representative points, M in Sec. II
     delta=0.2                         # scaling of kernel, per descriptor, here for SOAP it is per atom, in eV
     covariance_type=dot_product       # form of kernel
     zeta=4                            # power kernel is raised to - together with dot_product gives a polynomial kernel
@@ -193,25 +197,25 @@ Here is an annotated fitting example.
     ribbons:0.01:0.5:0.2:0.0
     }                                 # end of per configuration-group regularisation spec
    energy_parameter_name=energy       # name of the key in the input data file corresponding to the total energy
-   force_parameter_name=forces        # name of the key in the input data file corresponding to the forces 
-   virial_parameter_name=virial       # name of the key in the input data file corresponding to the virial stress 
+   force_parameter_name=forces        # name of the key in the input data file corresponding to the forces
+   virial_parameter_name=virial       # name of the key in the input data file corresponding to the virial stress
    sparse_jitter=1.0e-8               # extra diagonal regulariser
    do_copy_at_file=F                  # copy input data into potential XML file?
    sparse_separate_file=T             # write representative point data into a separate file not in the main potential XML
    gp_file=gap.xml                    # name of output potential XML file
    core_param_file=P_r6_innercut.xml  # name of XML file containing the baseline potential (QUIP format)
    core_ip_args={IP Glue}             # initialisation string to call baseline potential
- 
+
 
 Command line options
 ********************
 
-.. autofunction:: quippy.gap_fit_parse_command_line
+See `gap_fit --help` for description of options.
 
 GAP options
 ***********
 
-.. autofunction:: quippy.gap_fit_parse_gap_str
+This does not exist any more: `quippy.gap_fit_parse_gap_str`.
 
 ``sparse_method`` options are:
  - RANDOM: default, chooses n_sparse random datapoints
@@ -226,3 +230,27 @@ GAP options
  - INDEX_FILE: reads indices of sparse points from a file
  - CUR_COVARIANCE: CUR, based on the full covariance matrix
  - CUR_POINTS: CUR, based on the datapoints
+
+Running with MPI
+****************
+
+In order to run ``gap_fit`` with MPI, you need to configure and compile it
+accordingly, see the `QUIP Readme <http://github.com/libAtoms/QUIP>`_ for more details.
+
+Choosing the sparse points is not parallelised, therefore you have to provide
+the sparse points for each descriptor in a separate file. The main workflow is:
+
+#. Calculate without MPI to get the sparseX output files.
+
+   * Use ``sparsify_only_no_fit=T`` to just create the sparseX files (less memory needed).
+   
+#. Convert output files to input files (``$QUIP_ROOT/bin/gap_prepare_sparsex_input.py gp.xml``).
+
+   * Optional: Rename them to something shorter (e.g. ``1.input``, ``2.input`` etc.).
+   
+#. Change input method (``sparse_method=FILE sparse_file=1.input``).
+
+   * For more than one species use ``add_species=F`` and explicit input.
+   * Check the number of braces (``gap={{$gap1}:{$gap2}:{$gap3}}``).
+   
+#. Run with ``mpirun -np …``  (or ``srun …`` for Slurm).

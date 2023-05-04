@@ -1,0 +1,16 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021-2023.
+
+# Example input file for the first calculation
+#
+
+can_update: true
+check_interval: 10
+num_initial_steps: 3
+tolerances:
+  ediff: 0.01  # eV
+adaptive_method_parameters:
+  n_min: 5
+  n_max: 100
+  factor: 1.5

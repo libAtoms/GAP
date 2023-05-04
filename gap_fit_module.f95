@@ -1,10 +1,10 @@
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ! HND X
 ! HND X   GAP (Gaussian Approximation Potental)
-! HND X   
 ! HND X
-! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi, 
-! HND X   Copyright 2006-2021.
+! HND X
+! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi,
+! HND X   and Sascha Klawohn. Copyright 2006-2021.
 ! HND X
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
 ! HND X   his employment for the U.S. Government, and are not subject
@@ -14,7 +14,7 @@
 ! HND X      Academic Software License v1.0 (ASL)
 ! HND X
 ! HND X   GAP is distributed in the hope that it will be useful for non-commercial
-! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied 
+! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied
 ! HND X   warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 ! HND X   ASL for more details.
 ! HND X
@@ -44,6 +44,9 @@ module gap_fit_module
   use gp_fit_module
   use fox_wxml
   use potential_module
+  use ScaLAPACK_module
+  use task_manager_module
+  use MPI_context_module, only : is_root
 
   implicit none
 
@@ -63,12 +66,12 @@ module gap_fit_module
   type gap_fit
   !% everything from the command line
      type(Atoms), dimension(:), allocatable :: at
-     
+
      character(len=STRING_LENGTH) :: at_file='', core_ip_args = '', e0_str, local_property0_str, &
      energy_parameter_name, local_property_parameter_name, force_parameter_name, virial_parameter_name, &
      stress_parameter_name, hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
      config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name, &
-     local_property_mask_parameter_name
+     local_property_mask_parameter_name, condition_number_norm, linear_system_dump_file, config_file
 
      character(len=10240) :: command_line = ''
      real(dp), dimension(total_elements) :: e0, local_property0
@@ -79,12 +82,27 @@ module gap_fit_module
      integer :: e0_method = E0_ISOLATED
      logical :: do_core = .false., do_copy_at_file, has_config_type_sigma, sigma_per_atom = .true.
      logical :: sparsify_only_no_fit = .false.
-     integer :: n_frame, n_coordinate, n_ener, n_force, n_virial, n_hessian, n_local_property, min_save, n_species
-     type(extendable_str) :: quip_string
+     logical :: dryrun = .false.
+     integer :: n_frame = 0
+     integer :: n_coordinate = 0
+     integer :: n_ener = 0
+     integer :: n_force = 0
+     integer :: n_virial = 0
+     integer :: n_hessian = 0
+     integer :: n_local_property = 0
+     integer :: n_species = 0
+     integer :: min_save
+     integer :: mpi_blocksize_rows = 0
+     integer :: mpi_blocksize_cols = 0
+     type(extendable_str) :: quip_string, config_string
      type(Potential) :: core_pot
 
      type(gpFull) :: my_gp
      type(gpSparse) :: gp_sp
+
+     type(MPI_Context) :: mpi_obj
+     type(ScaLAPACK) :: ScaLAPACK_obj
+     type(task_manager_type) :: task_manager
 
      type(descriptor), dimension(:), allocatable :: my_descriptor
      character(len=STRING_LENGTH), dimension(200) :: gap_str
@@ -98,10 +116,10 @@ module gap_fit_module
 
      logical :: sparseX_separate_file
      logical :: sparse_use_actual_gpcov
-     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset
+     logical :: has_template_file, has_e0, has_local_property0, has_e0_offset, has_linear_system_dump_file, has_config_file
 
   endtype gap_fit
-     
+
   private
 
   public :: fit_n_from_xyz
@@ -113,6 +131,7 @@ module gap_fit_module
   public :: file_print_xml
 !  public :: print_sparse
   public :: set_baselines
+  public :: get_n_sparseX_for_files
   public :: parse_config_type_sigma
   public :: parse_config_type_n_sparseX
   public :: read_fit_xyz
@@ -122,12 +141,24 @@ module gap_fit_module
   public :: add_template_string
   public :: gap_fit_parse_command_line
   public :: gap_fit_parse_gap_str
+  public :: gap_fit_read_core_param_file
+
+  public :: gap_fit_init_mpi_scalapack
+  public :: gap_fit_init_task_manager
+  public :: gap_fit_distribute_tasks
+  public :: gap_fit_set_mpi_blocksizes
+
+  public :: gap_fit_is_root
+
+  public :: gap_fit_print_linear_system_dump_file
+  public :: gap_fit_estimate_memory
 
 contains
 
   subroutine gap_fit_parse_command_line(this)
   !% This subroutine parses the main command line options.
      type(gap_fit), intent(inout), target :: this
+
      type(Dictionary) :: params
 
      character(len=STRING_LENGTH), pointer :: at_file, e0_str, local_property0_str, &
@@ -135,21 +166,25 @@ contains
           energy_parameter_name, local_property_parameter_name, force_parameter_name, &
           virial_parameter_name, stress_parameter_name, hessian_parameter_name, &
           config_type_parameter_name, sigma_parameter_name, config_type_sigma_string, &
-          gp_file, template_file, force_mask_parameter_name, local_property_mask_parameter_name
+          gp_file, template_file, force_mask_parameter_name, condition_number_norm, &
+          linear_system_dump_file, config_file, local_property_mask_parameter_name
 
      character(len=STRING_LENGTH) ::  gap_str, verbosity, sparse_method_str, covariance_type_str, e0_method, &
         parameter_name_prefix
 
-     logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov
-     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_default_sigma
-     logical, pointer :: sparsify_only_no_fit
-     
+     logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov, sparsify_only_no_fit
+     logical, pointer :: dryrun
+     logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_config_file, has_default_sigma
+     logical :: mpi_print_all, file_exists
+
      real(dp), pointer :: e0_offset, sparse_jitter, hessian_delta
      real(dp), dimension(:), pointer :: default_sigma
      real(dp), pointer :: default_local_property_sigma
 
      integer :: rnd_seed
+     integer, pointer :: mpi_blocksize_rows, mpi_blocksize_cols
 
+     config_file => this%config_file
      at_file => this%at_file
      e0_str => this%e0_str
      local_property0_str => this%local_property0_str
@@ -178,22 +213,42 @@ contains
      gp_file => this%gp_file
      template_file => this%template_file
      sparsify_only_no_fit => this%sparsify_only_no_fit
-     
+     dryrun => this%dryrun
+     condition_number_norm => this%condition_number_norm
+     linear_system_dump_file => this%linear_system_dump_file
+     mpi_blocksize_rows => this%mpi_blocksize_rows
+     mpi_blocksize_cols => this%mpi_blocksize_cols
+
      call initialise(params)
-     
+
+     call param_register(params, 'config_file', '', config_file, has_value_target=has_config_file, &
+          help_string="File as alternative input (newlines converted to spaces)")
+
+     ! check if config file is given, ignore everything else
+     ! prepare parsing of config file or command line string later
+     if (param_read_args(params, ignore_unknown=.true., command_line=this%command_line)) then
+        if (has_config_file) then
+           inquire(file=config_file, exist=file_exists)
+           if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
+           call read(this%config_string, config_file, keep_lf=.true., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
+        end if
+     end if
+     if (.not. has_config_file) this%config_string = this%command_line
+     this%has_config_file = has_config_file
+
      call param_register(params, 'atoms_filename', '//MANDATORY//', at_file, has_value_target = has_at_file, help_string="XYZ file with fitting configurations", altkey="at_file")
      call param_register(params, 'gap', '//MANDATORY//', gap_str, has_value_target = has_gap, help_string="Initialisation string for GAPs")
      call param_register(params, 'e0', '0.0', e0_str, has_value_target = this%has_e0, &
           help_string="Atomic energy value to be subtracted from energies before fitting (and added back on after prediction). &
           & Specifiy a single number (used for all species) or by species: {Ti:-150.0:O:-320...}. energy = baseline + GAP + e0")
-     
+
      call param_register(params, 'local_property0', '0.0', local_property0_str, has_value_target = this%has_local_property0, &
           help_string="Local property value to be subtracted from the local property before fitting (and added back on after prediction). &
           & Specifiy a single number (used for all species) or by species: {H:20.0:Cl:35.0...}.")
-     
+
      call param_register(params, 'e0_offset', '0.0', e0_offset, has_value_target = this%has_e0_offset, &
           help_string="Offset of baseline. If zero, the offset is the average atomic energy of the input data or the e0 specified manually.")
-   
+
      call param_register(params, 'e0_method','isolated',e0_method, &
         help_string="Method to determine e0, if not explicitly specified. Possible options: isolated (default, each atom &
         present in the XYZ needs to have an isolated representative, with a valid energy), average (e0 is the average of &
@@ -201,56 +256,56 @@ contains
 
      call param_register(params, 'default_kernel_regularisation', '//MANDATORY//', default_sigma, has_value_target = has_default_sigma, &
          help_string="error in [energies forces virials hessians]", altkey="default_sigma")
-   
+
      call param_register(params, 'default_kernel_regularisation_local_property', '0.001', default_local_property_sigma, &
          help_string="error in local_property", altkey="default_local_property_sigma")
 
      call param_register(params, 'sparse_jitter', "1.0e-10", sparse_jitter, &
          help_string="Extra regulariser used to regularise the sparse covariance matrix before it is passed to the linear solver. Use something small, it really shouldn't affect your results, if it does, your sparse basis is still very ill-conditioned.")
-     
+
      call param_register(params, 'hessian_displacement', "1.0e-2", hessian_delta, &
          help_string="Finite displacement to use in numerical differentiation when obtaining second derivative for the Hessian covariance", altkey="hessian_delta")
-     
+
      call param_register(params, 'baseline_param_filename', 'quip_params.xml', core_param_file, &
          help_string="QUIP XML file which contains a potential to subtract from data (and added back after prediction)", altkey="core_param_file")
-     
+
      call param_register(params, 'baseline_ip_args', '', core_ip_args, has_value_target = this%do_core, &
           help_string=" QUIP init string for a potential to subtract from data (and added back after prediction)", altkey="core_ip_args")
-     
+
      call param_register(params, 'energy_parameter_name', 'energy', energy_parameter_name, &
           help_string="Name of energy property in the input XYZ file that describes the data")
-     
+
      call param_register(params, 'local_property_parameter_name', 'local_property', local_property_parameter_name, &
           help_string="Name of local_property (column) in the input XYZ file that describes the data")
-     
+
      call param_register(params, 'force_parameter_name', 'force', force_parameter_name, &
           help_string="Name of force property (columns) in the input XYZ file that describes the data")
-     
+
      call param_register(params, 'virial_parameter_name', 'virial', virial_parameter_name, &
           help_string="Name of virial property in the input XYZ file that describes the data")
 
      call param_register(params, 'stress_parameter_name', 'stress', stress_parameter_name, &
           help_string="Name of stress property (6-vector or 9-vector) in the input XYZ file that describes the data - stress values only used if virials are not available (opposite sign, standard Voigt order)")
-     
+
      call param_register(params, 'hessian_parameter_name', 'hessian', hessian_parameter_name, &
           help_string="Name of hessian property (column) in the input XYZ file that describes the data")
-     
+
      call param_register(params, 'config_type_parameter_name', 'config_type', config_type_parameter_name, &
           help_string="Allows grouping on configurations into. This option is the name of the key that indicates the configuration type in the input XYZ file. With the default, the key-value pair config_type=blah would place that configuration into the group blah.")
-     
+
      call param_register(params, 'kernel_regularisation_parameter_name', 'sigma', sigma_parameter_name, &
           help_string="kernel regularisation parameters for a given configuration in the database. &
           Overrides the command line values (both defaults and config-type-specific values). In the input XYZ file, it must be prepended by energy_, force_, virial_ or hessian_", altkey="sigma_parameter_name")
-     
+
      call param_register(params, 'force_mask_parameter_name', 'force_mask', force_mask_parameter_name, &
           help_string="To exclude forces on specific atoms from the fit. In the XYZ, it must be a logical column.")
-     
+
      call param_register(params, 'local_property_mask_parameter_name', 'local_property_mask', local_property_mask_parameter_name, &
           help_string="To exclude local_properties on specific atoms from the fit. In the XYZ, it must be a logical column.")
 
      call param_register(params, 'parameter_name_prefix', '', parameter_name_prefix, &
           help_string="Prefix that gets uniformly appended in front of {energy,local_property,force,virial,...}_parameter_name")
-     
+
      call param_register(params, 'config_type_kernel_regularisation', '', config_type_sigma_string, has_value_target = this%has_config_type_sigma, &
           help_string="What kernel regularisation values to choose for each type of data, when the configurations are grouped into config_types. Format: {configtype1:energy:force:virial:hessian:config_type2:energy:force:virial:hessian...}", altkey="config_type_sigma")
 
@@ -259,46 +314,70 @@ contains
           If >>T<<, they are interpreted as per-atom errors, and the variance will be scaled according to the number of atoms in the configuration. &
           If >>F<< they are treated as absolute errors and no scaling is performed. &
           NOTE: values specified on a per-configuration basis (see >>kernel_regularisation_parameter_name<<) are always absolute, not per-atom.", altkey="sigma_per_atom")
-   
+
      call param_register(params, 'do_copy_atoms_file', 'T', do_copy_at_file, &
           help_string="Copy the input XYZ file into the GAP XML file (should be set to False for NetCDF input).", altkey="do_copy_at_file")
-   
+
      call param_register(params, 'sparse_separate_file', 'T', sparseX_separate_file, &
           help_string="Save sparse point data in separate file in binary (use it for large datasets)")
-   
+
      call param_register(params, 'sparse_use_actual_gpcov', 'F', sparse_use_actual_gpcov, &
           help_string="Use actual GP covariance for sparsification methods")
-   
+
      call param_register(params, 'gap_file', 'gap_new.xml', gp_file, &
           help_string="Name of output XML file that will contain the fitted potential", altkey="gp_file")
-   
+
      call param_register(params, 'verbosity', 'NORMAL', verbosity, &
           help_string="Verbosity control. Options: NORMAL, VERBOSE, NERD, ANALYSIS.") ! changed name to ANALYSIS now that we are grown up
-   
+
      call param_register(params, "rnd_seed", "-1", rnd_seed, &
           help_string="Random seed.")
-   
-     call param_register(params, "openmp_chunk_size", "1", openmp_chunk_size, &
-          help_string="Chunk size in OpenMP scheduling")
-   
+
+     call param_register(params, "openmp_chunk_size", "0", openmp_chunk_size, &
+          help_string="Chunk size in OpenMP scheduling; 0: each thread gets a single block of similar size (default)")
+
      call param_register(params, 'do_ip_timing', 'F', do_ip_timing, &
           help_string="To enable or not timing of the interatomic potential.")
-   
+
      call param_register(params, 'template_file', 'template.xyz', template_file, has_value_target=this%has_template_file, &
           help_string="Template XYZ file for initialising object")
 
      call param_register(params, 'sparsify_only_no_fit', 'F', sparsify_only_no_fit, &
           help_string="If true, sparsification is done, but no fitting. print the sparse index by adding print_sparse_index=file.dat to the descriptor string.")
-     
-     if (.not. param_read_args(params, command_line=this%command_line)) then
-        call print("gap_fit")
+
+     call param_register(params, 'dryrun', 'F', dryrun, &
+          help_string="If true, exits after memory estimate, before major allocations.")
+
+     call param_register(params, 'condition_number_norm', ' ', condition_number_norm, &
+          help_string="Norm for condition number of matrix A; O: 1-norm, I: inf-norm, <space>: skip calculation (default)")
+
+     call param_register(params, 'linear_system_dump_file', '', linear_system_dump_file, has_value_target=this%has_linear_system_dump_file, &
+          help_string="Basename prefix of linear system dump files. Skipped if empty (default).")
+
+     call param_register(params, 'mpi_blocksize_rows', '0', mpi_blocksize_rows, &
+          help_string="Blocksize of MPI distributed matrix rows. Affects efficiency and memory usage slightly. Max if 0 (default).")
+
+     call param_register(params, 'mpi_blocksize_cols', '100', mpi_blocksize_cols, &
+          help_string="Blocksize of MPI distributed matrix cols. Affects efficiency and memory usage considerably. Max if 0. Default: 100")
+
+     call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
+          help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
+
+     if (.not. param_read_line(params, replace(string(this%config_string), quip_new_line, ' '))) then
         call system_abort('Exit: Mandatory argument(s) missing...')
      endif
+
      call print_title("Input parameters")
      call param_print(params)
      call print_title("")
      call finalise(params)
-     
+
+     if (mpi_print_all) then
+         call mpi_all_inoutput(mainlog, .true.)
+         call activate(mainlog)
+         call mpi_all_inoutput(errorlog, .true.)
+         call activate(errorlog)
+     end if
 
      if (len_trim(parameter_name_prefix) > 0) then
         energy_parameter_name = trim(parameter_name_prefix) // trim(energy_parameter_name)
@@ -306,15 +385,24 @@ contains
         force_parameter_name = trim(parameter_name_prefix) // trim(force_parameter_name)
         virial_parameter_name = trim(parameter_name_prefix) // trim(virial_parameter_name)
         hessian_parameter_name = trim(parameter_name_prefix) // trim(hessian_parameter_name)
+        stress_parameter_name = trim(parameter_name_prefix) // trim(stress_parameter_name)
         config_type_parameter_name = trim(parameter_name_prefix) // trim(config_type_parameter_name)
         sigma_parameter_name = trim(parameter_name_prefix) // trim(sigma_parameter_name)
         force_mask_parameter_name = trim(parameter_name_prefix) // trim(force_mask_parameter_name)
         local_property_mask_parameter_name = trim(parameter_name_prefix) // trim(local_property_mask_parameter_name)
         local_property_parameter_name = trim(parameter_name_prefix) // trim(local_property_parameter_name)
      endif
-   
-     if( len_trim(this%gp_file) > 216 ) then    ! The filename's length is limited to 255 char.s in some filesystem. 
-                                        ! Without this check, the fit would run but produce a core file and only a temporary xml file. 
+
+     if (sparsify_only_no_fit) then
+        force_parameter_name = '//IGNORE//'
+        virial_parameter_name = '//IGNORE//'
+        hessian_parameter_name = '//IGNORE//'
+        stress_parameter_name = '//IGNORE//'
+        call print_warning("sparsify_only_no_fit == T: force, virial, hessian, stress parameters are ignored.")
+     end if
+
+     if( len_trim(this%gp_file) > 216 ) then    ! The filename's length is limited to 255 char.s in some filesystem.
+                                        ! Without this check, the fit would run but produce a core file and only a temporary xml file.
                                         ! The limit is set to 216 as the sparse file can be 39 characters longer.
        call system_abort("gap_file's name "//this%gp_file//" is too long. Please start the fit again with a shorter name.")
      endif
@@ -582,7 +670,7 @@ contains
            this%covariance_type(i_coordinate) = COVARIANCE_ARD_SE
         case('dot_product')
            this%covariance_type(i_coordinate) = COVARIANCE_DOT_PRODUCT
-        case('bond_real_space')     
+        case('bond_real_space')
            this%covariance_type(i_coordinate) = COVARIANCE_BOND_REAL_SPACE
         case('pp')
            this%covariance_type(i_coordinate) = COVARIANCE_PP
@@ -595,7 +683,7 @@ contains
      call print('Descriptors have been parsed')
 
   endsubroutine gap_fit_parse_gap_str
-  
+
   subroutine read_fit_xyz(this)
 
     type(gap_fit), intent(inout) :: this
@@ -617,7 +705,7 @@ contains
        call system_abort("read_fit_xyz: at_file "//this%at_file//" could not be found")
     endif
 
-    call initialise(xyzfile,this%at_file)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
     this%n_frame = xyzfile%n_frame
 
     allocate(this%at(this%n_frame))
@@ -629,6 +717,10 @@ contains
     enddo
 
     call finalise(xyzfile)
+
+    if(this%n_frame <= 0) then
+      call system_abort("read_fit_xyz: "//this%n_frame//" frames read from "//this%at_file//".")
+   endif
 
   endsubroutine read_fit_xyz
 
@@ -659,6 +751,8 @@ contains
 
     type(gap_fit), intent(inout) :: this
 
+    logical :: do_collect_tasks, do_filter_tasks
+
     type(Atoms) :: at
 
     integer :: n_con
@@ -671,7 +765,13 @@ contains
     logical, pointer, dimension(:) :: force_mask, local_property_mask
     integer :: i, j, k
     integer :: n_descriptors, n_cross, n_hessian
+    integer :: n_current, n_last
 
+    do_collect_tasks = (this%task_manager%active .and. .not. this%task_manager%distributed)
+    do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
+
+    if (allocated(this%n_cross)) deallocate(this%n_cross)
+    if (allocated(this%n_descriptors)) deallocate(this%n_descriptors)
     allocate(this%n_cross(this%n_coordinate))
     allocate(this%n_descriptors(this%n_coordinate))
 
@@ -681,8 +781,13 @@ contains
     this%n_force = 0
     this%n_virial = 0
     this%n_hessian = 0
+    this%n_local_property = 0
+    n_last = 0
 
     do n_con = 1, this%n_frame
+       if (do_filter_tasks) then
+          if (this%task_manager%tasks(n_con)%worker_id /= this%task_manager%my_worker_id) cycle
+       end if
 
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
@@ -771,18 +876,25 @@ contains
           endif
        enddo
 
+       if (do_collect_tasks) then
+         n_current = this%n_ener + this%n_local_property + this%n_force + this%n_virial + this%n_hessian
+         call task_manager_add_task(this%task_manager, n_current - n_last)
+         n_last = n_current
+       end if
+
        call finalise(at)
     enddo
 
-    call print_title("Report on number of descriptors found")
-    do i = 1, this%n_coordinate
-       call print("---------------------------------------------------------------------")
-       call print("Descriptor: "//this%gap_str(i))
-       call print("Number of descriptors:                        "//this%n_descriptors(i))
-       call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
-    enddo
-    call print_title("")
-
+    if (.not. do_filter_tasks) then
+      call print_title("Report on number of descriptors found")
+      do i = 1, this%n_coordinate
+         call print("---------------------------------------------------------------------")
+         call print("Descriptor "//i//": "//this%gap_str(i))
+         call print("Number of descriptors:                        "//this%n_descriptors(i))
+         call print("Number of partial derivatives of descriptors: "//this%n_cross(i))
+      enddo
+      call print_title("")
+    end if
 
   end subroutine fit_n_from_xyz
 
@@ -795,16 +907,15 @@ contains
     type(descriptor_data) :: my_descriptor_data
 
     type(Atoms) :: at
-    integer :: d
-    integer :: n_con
+    integer :: d, n_con
     logical :: has_ener, has_force, has_virial, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
-       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_hessian_sigma, &
+       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_virial_component_sigma, has_hessian_sigma, &
        has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, has_local_property_mask, &
        exclude_atom
     real(dp) :: ener, ener_core, my_cutoff, energy_sigma, force_sigma, virial_sigma, hessian_sigma, local_property_sigma, &
        grad_covariance_cutoff, use_force_sigma
     real(dp), dimension(3) :: pos
-    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3
+    real(dp), dimension(3,3) :: virial, virial_core, stress_3_3, virial_component_sigma
     real(dp), dimension(6) :: stress_voigt
     real(dp), dimension(:), allocatable :: theta, theta_fac, hessian, hessian_core, grad_data
     real(dp), dimension(:), pointer :: force_atom_sigma
@@ -814,7 +925,7 @@ contains
     real(dp), dimension(:,:), allocatable :: f_core
     integer, dimension(:,:), allocatable :: force_loc, permutations
     integer :: ie, i, j, n, k, l, i_coordinate, n_hessian, n_energy_sigma, n_force_sigma, n_force_atom_sigma, &
-    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors
+    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors, n_virial_component_sigma
     integer, dimension(:), allocatable :: xloc, hessian_loc, local_property_loc
     integer, dimension(3,3) :: virial_loc
 
@@ -824,6 +935,20 @@ contains
     character(len=STRING_LENGTH), dimension(:), allocatable :: theta_string_array
 
     INIT_ERROR(error)
+
+    if (this%task_manager%active) then
+      if (.not. this%task_manager%distributed) then
+         call system_abort("fit_data_from_xyz: Tasks are not distributed.")
+      end if
+
+      do n_con = 1, this%n_frame
+         if (this%task_manager%tasks(n_con)%worker_id /= this%task_manager%my_worker_id) then
+           call finalise(this%at(n_con))
+         end if
+      end do
+    end if
+
+    this%my_gp%do_subY_subY = merge(gap_fit_is_root(this), .true., this%task_manager%active)
 
     my_cutoff = 0.0_dp
     call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian,this%sparse_jitter)
@@ -844,11 +969,11 @@ contains
     enddo
 
     call print_title("Report on number of target properties found in training XYZ:")
-    call print("Number of target energies (property name: "//trim(this%energy_parameter_name)//") found: "//this%n_ener)
-    call print("Number of target local_properties (property name: "//trim(this%local_property_parameter_name)//") found: "//this%n_local_property)
-    call print("Number of target forces (property name: "//trim(this%force_parameter_name)//") found: "//this%n_force)
-    call print("Number of target virials (property name: "//trim(this%virial_parameter_name)//") found: "//this%n_virial)
-    call print("Number of target Hessian eigenvalues (property name: "//trim(this%hessian_parameter_name)//") found: "//this%n_hessian)
+    call print("Number of target energies (property name: "//trim(this%energy_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_ener))
+    call print("Number of target local_properties (property name: "//trim(this%local_property_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_local_property))
+    call print("Number of target forces (property name: "//trim(this%force_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_force))
+    call print("Number of target virials (property name: "//trim(this%virial_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_virial))
+    call print("Number of target Hessian eigenvalues (property name: "//trim(this%hessian_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_hessian))
     call print_title("End of report")
 
     if( this%do_core ) call Initialise(this%core_pot, args_str=this%core_ip_args, param_str=string(this%quip_string))
@@ -857,15 +982,18 @@ contains
     n_force_sigma = 0
     n_force_atom_sigma = 0
     n_force_component_sigma = 0
+    n_virial_component_sigma=0
     n_hessian_sigma = 0
     n_virial_sigma = 0
     n_local_property_sigma = 0
 
     do n_con = 1, this%n_frame
+       if (.not. is_initialised(this%at(n_con))) cycle
 
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
        has_virial = get_value(this%at(n_con)%params,this%virial_parameter_name,virial)
+       has_virial_component_sigma = get_value(this%at(n_con)%params,'virial_component_'//trim(this%sigma_parameter_name),virial_component_sigma)
        has_stress_voigt = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_voigt)
        has_stress_3_3 = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_3_3)
        has_hessian = get_value(this%at(n_con)%params,"n_"//this%hessian_parameter_name,n_hessian)
@@ -1032,6 +1160,11 @@ contains
        else
           n_virial_sigma = n_virial_sigma + 1
        endif
+       if (has_virial_component_sigma) then
+          n_virial_component_sigma = n_virial_component_sigma + 9
+       else
+          virial_component_sigma = virial_sigma
+       endif
 
        if( .not. has_hessian_sigma ) then
           hessian_sigma = this%sigma(4,n_config_type)
@@ -1105,14 +1238,17 @@ contains
 
           ! Now symmetrise matrix
           virial = ( virial + transpose(virial) ) / 2.0_dp
-
+          virial_component_sigma = ( virial_component_sigma + transpose(virial_component_sigma) ) / 2.0_dp
           if( virial_sigma .feq. 0.0_dp ) then
              RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_sigma//"), should be greater than zero",error)
           endif
 
           do k = 1, 3
              do l = k, 3
-                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_sigma)
+                if( virial_component_sigma(l,k) .feq. 0.0_dp ) then
+                   RAISE_ERROR("fit_data_from_xyz: too small virial_sigma ("//virial_component_sigma(l,k)//"), should be greater than zero",error)
+                endif
+                virial_loc(l,k) = gp_addFunctionDerivative(this%my_gp,-virial(l,k),virial_component_sigma(l,k))
              enddo
           enddo
        endif
@@ -1223,11 +1359,11 @@ contains
           call set_cutoff( at, my_cutoff )
           do i_coordinate = 1, this%n_coordinate
              allocate( grad_data(descriptor_dimensions(this%my_descriptor(i_coordinate))) )
-             
+
              do i = 1, n_hessian
                 if( .not. assign_pointer(this%at(n_con),trim(this%hessian_parameter_name)//i, hessian_eigenvector_i) ) &
                 call system_abort("fit_data_from_xyz: could not find "//i//"th of "//n_hessian//" hessian eigenvector.")
-                
+
                 do j = -1, 1, 2
                    at%pos = this%at(n_con)%pos + j * this%hessian_delta * hessian_eigenvector_i
                    call calc_connect(at)
@@ -1237,7 +1373,7 @@ contains
                    !hessian_core(i) = hessian_core(i) + j * sum(f_hessian*hessian_eigenvector_i) / 2.0_dp / this%hessian_delta
 
                    allocate(xloc(size(my_descriptor_data%x)))
-                   
+
                    do k = 1, size(my_descriptor_data%x)
                       if( .not. my_descriptor_data%x(k)%has_data) cycle
                       xloc(k) = gp_addCoordinates(this%my_gp,my_descriptor_data%x(k)%data(:),i_coordinate, &
@@ -1258,7 +1394,7 @@ contains
                       hessian_loc(i), xloc(k), dcutoff_in=grad_covariance_cutoff)
 
                    enddo !k
-                   
+
                    deallocate(xloc)
                 enddo !j = -1, 1, 2
              enddo ! i = 1, n_hessian
@@ -1272,13 +1408,14 @@ contains
     enddo !n_frame
 
     call print_title("Report on per-configuration/per-atom sigma (error parameter) settings")
-    call print("Number of per-configuration setting of energy_"//trim(this%sigma_parameter_name)//" found:     "//n_energy_sigma)
-    call print("Number of per-configuration setting of force_"//trim(this%sigma_parameter_name)//" found:      "//n_force_sigma)
-    call print("Number of per-configuration setting of virial_"//trim(this%sigma_parameter_name)//" found:     "//n_virial_sigma)
-    call print("Number of per-configuration setting of hessian_"//trim(this%sigma_parameter_name)//" found:    "//n_hessian_sigma)
-    call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//n_local_property_sigma)
-    call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//n_force_atom_sigma)
-    call print("Number of per-component setting of force_component_"//trim(this%sigma_parameter_name)//" found:          "//n_force_component_sigma)
+    call print("Number of per-configuration setting of energy_"//trim(this%sigma_parameter_name)//" found:     "//sum(this%task_manager%MPI_obj, n_energy_sigma))
+    call print("Number of per-configuration setting of force_"//trim(this%sigma_parameter_name)//" found:      "//sum(this%task_manager%MPI_obj, n_force_sigma))
+    call print("Number of per-configuration setting of virial_"//trim(this%sigma_parameter_name)//" found:     "//sum(this%task_manager%MPI_obj, n_virial_sigma))
+    call print("Number of per-configuration setting of hessian_"//trim(this%sigma_parameter_name)//" found:    "//sum(this%task_manager%MPI_obj, n_hessian_sigma))
+    call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//sum(this%task_manager%MPI_obj, n_local_property_sigma))
+    call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_atom_sigma))
+    call print("Number of per-component setting of force_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_component_sigma))
+    call print("Number of per-component setting of virial_component_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_virial_component_sigma))
     call print_title("End of report")
 
     do i_coordinate = 1, this%n_coordinate
@@ -1330,7 +1467,7 @@ contains
              call system_abort("theta_fac can only contain one value or as many as dimensions the descriptor is")
           endif
           call gp_setThetaFactor(this%my_gp,i_coordinate,theta_fac,useSparseX=.false.)
-       
+
           deallocate(theta_fac)
           deallocate(theta_string_array)
        elseif( this%has_zeta(i_coordinate) ) then
@@ -1339,6 +1476,13 @@ contains
     enddo
 
     if( this%do_core ) call Finalise(this%core_pot)
+
+    ! @info move this check to gp_sparsify when implementing more methods
+    if (this%task_manager%active) then
+      if (any(this%sparse_method /= GP_SPARSE_FILE)) then
+         call system_abort("Only sparse_method FILE implemented for MPI.")
+      end if
+    end if
 
     call gp_sparsify(this%my_gp,n_sparseX=this%config_type_n_sparseX,default_all=(this%n_sparseX/=0), &
        sparseMethod=this%sparse_method, sparse_file=this%sparse_file, &
@@ -1440,7 +1584,7 @@ contains
     type(cinoutput) :: xyzfile
     type(atoms) :: at
 
-    call initialise(xyzfile,this%at_file)
+    call initialise(xyzfile,this%at_file,mpi=this%mpi_obj)
 
     call read(xyzfile,at,frame=0)
     !call get_weights(at,this%w_Z)
@@ -1482,7 +1626,7 @@ contains
 
      call xml_NewElement(xf,"GAP_data")
      call xml_AddAttribute(xf,"do_core",""//this%do_core)
-     
+
      do i = 1, size(this%e0)
         call xml_NewElement(xf,"e0")
         call xml_AddAttribute(xf,"Z",""//i)
@@ -1501,16 +1645,17 @@ contains
         call gp_printXML(this%gp_sp,xf,label=gp_label)
      endif
 
-     ! Print the command line used for the fitting
-     if(len(trim(this%command_line))> 0 ) then
+     ! Print the config string (from command line or config file) used for the fitting
+     ! Keep <command_line> for backwards compatibility
+     if(this%config_string%len > 0) then
         call xml_NewElement(xf,"command_line")
-        call xml_AddCharacters(xf,trim(this%command_line),parsed=.false.)
+        call xml_AddCharacters(xf,trim(string(this%config_string)),parsed=.false.)
         call xml_EndElement(xf,"command_line")
      endif
 
      if(this%do_copy_at_file) then
         ! Print the fitting configurations used for this potential.
-        if(len(trim(this%at_file)) > 0 ) call file_print_xml(this%at_file,xf)
+        if(len(trim(this%at_file)) > 0 ) call file_print_xml(this%at_file,xf,ws_significant=.false.)
      endif
 
      call xml_EndElement(xf,"GAP_params")
@@ -1560,13 +1705,14 @@ contains
      ! Delete the temporary file
      !call system_command('rm -f '//trim(gp_tmp_file))
      call frm_file(trim(gp_tmp_file)//C_NULL_CHAR)
-     
+
 
   endsubroutine gap_fit_print_xml
 
-  subroutine file_print_xml(this,xf)
+  subroutine file_print_xml(this,xf,ws_significant)
      character(len=*), intent(in) :: this
      type(xmlf_t), intent(inout) :: xf
+     logical, intent(in), optional :: ws_significant
 
      type(inoutput) :: atfile
      character(len=10240) :: line
@@ -1583,7 +1729,7 @@ contains
         elseif(iostat > 0) then
            call system_abort('file_print_xml: unkown error ('//iostat//') while reading '//trim(this))
         endif
-        call xml_AddCharacters(xf,trim(line),parsed=.false.)
+        call xml_AddCharacters(xf,trim(line),parsed=.false.,ws_significant=ws_significant)
         call xml_AddNewLine(xf)
      enddo
      call xml_EndElement(xf,"XYZ_data")
@@ -1631,6 +1777,26 @@ contains
 !
 !  endsubroutine print_sparse
 
+  subroutine get_n_sparseX_for_files(this)
+     type(gap_fit), intent(inout) :: this
+
+     integer :: i, n_sparseX, d
+
+     do i = 1, this%n_coordinate
+       if (all(this%sparse_method(i) /= [GP_SPARSE_FILE, GP_SPARSE_INDEX_FILE])) cycle
+
+       d = descriptor_dimensions(this%my_descriptor(i))
+       n_sparseX = count_entries_in_sparse_file(this%sparse_file(i), this%sparse_method(i), d)
+
+       if (this%n_sparseX(i) /= 0 .and. this%n_sparseX(i) /= n_sparseX) then
+         call system_abort("get_n_sparseX_for_files: Given n_sparse ("//this%n_sparseX(i)//") " &
+            // "does not match with file ("//n_sparseX//"). ")
+       end if
+
+       this%n_sparseX(i) = n_sparseX
+     end do
+  end subroutine get_n_sparseX_for_files
+
   subroutine parse_config_type_sigma(this)
     type(gap_fit), intent(inout) :: this
     character(len=STRING_LENGTH), dimension(200) :: config_type_sigma_fields
@@ -1662,7 +1828,7 @@ contains
        allocate(this%config_type(n_config_type))
        allocate(this%sigma(4,n_config_type))
 
-       do i = 1, n_config_type 
+       do i = 1, n_config_type
           this%config_type(i) = trim(config_type_sigma_fields(5*(i-1)+1))
           this%sigma(1,i) = string_to_real(config_type_sigma_fields(5*(i-1)+2))
           this%sigma(2,i) = string_to_real(config_type_sigma_fields(5*(i-1)+3))
@@ -1785,7 +1951,7 @@ contains
 
     allocate(this%species_Z(this%n_species))
     this%species_Z = species_present(1:this%n_species)
-    
+
   endsubroutine get_species_xyz
 
   subroutine add_multispecies_gaps(this)
@@ -1882,7 +2048,7 @@ contains
           call reallocate(has_theta_fac, n_gap_str,copy=.true.)
           call reallocate(has_theta_uniform, n_gap_str,copy=.true.)
           call reallocate(has_theta_file, n_gap_str,copy=.true.)
-          
+
           call reallocate(sparse_file, n_gap_str,copy=.true.)
           call reallocate(mark_sparse_atoms, n_gap_str,copy=.true.)
           call reallocate(sparse_method, n_gap_str,copy=.true.)
@@ -1906,7 +2072,7 @@ contains
           has_theta_fac(n_gap_str) = this%has_theta_fac(i_coordinate)
           has_theta_uniform(n_gap_str) = this%has_theta_uniform(i_coordinate)
           has_theta_file(n_gap_str) = this%has_theta_file(i_coordinate)
-          
+
           sparse_file(n_gap_str) = this%sparse_file(i_coordinate)
           mark_sparse_atoms(n_gap_str) = this%mark_sparse_atoms(i_coordinate)
           sparse_method(n_gap_str) = this%sparse_method(i_coordinate)
@@ -1933,7 +2099,7 @@ contains
     call reallocate(this%has_theta_fac, n_gap_str)
     call reallocate(this%has_theta_uniform, n_gap_str)
     call reallocate(this%has_theta_file, n_gap_str)
-    
+
     call reallocate(this%sparse_file, n_gap_str)
     call reallocate(this%mark_sparse_atoms, n_gap_str)
     call reallocate(this%sparse_method, n_gap_str)
@@ -1957,7 +2123,7 @@ contains
     this%has_theta_fac = has_theta_fac
     this%has_theta_uniform = has_theta_uniform
     this%has_theta_file = has_theta_file
-    
+
     this%sparse_file = sparse_file
     this%mark_sparse_atoms = mark_sparse_atoms
     this%sparse_method = sparse_method
@@ -1982,7 +2148,7 @@ contains
     if(allocated(has_theta_fac)) deallocate(has_theta_fac)
     if(allocated(has_theta_uniform)) deallocate(has_theta_uniform)
     if(allocated(has_theta_file)) deallocate(has_theta_file)
-    
+
     if(allocated(sparse_file)) deallocate(sparse_file)
     if(allocated(mark_sparse_atoms)) deallocate(mark_sparse_atoms)
     if(allocated(sparse_method)) deallocate(sparse_method)
@@ -1999,7 +2165,7 @@ contains
   subroutine add_template_string(this)
     type(gap_fit), intent(inout) :: this
     character(len=STRING_LENGTH) :: template_string=' '
-    character(len=STRING_LENGTH),dimension(:), allocatable :: lines_array    
+    character(len=STRING_LENGTH),dimension(:), allocatable :: lines_array
     type(inoutput) :: tempfile
     integer :: i,n_lines,total_length=0
 
@@ -2028,7 +2194,210 @@ contains
          this%gap_str(i) = trim(this%gap_str(i))//" atoms_template_string={"//trim(template_string)//"}"
        end do
     endif
-    
+
   end subroutine add_template_string
+
+  subroutine gap_fit_read_core_param_file(this)
+   type(gap_fit), intent(inout) :: this
+   if (this%do_core) then
+     call read(this%quip_string, file=trim(this%core_param_file), mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc, keep_lf=.true.)
+   end if
+ end subroutine gap_fit_read_core_param_file
+
+  subroutine gap_fit_init_mpi_scalapack(this)
+    type(gap_fit), intent(inout) :: this
+
+    call initialise(this%mpi_obj)
+    call initialise(this%ScaLAPACK_obj, this%mpi_obj, np_r=this%mpi_obj%n_procs, np_c=1)
+    if (this%mpi_obj%n_procs > 1 .and. .not. this%ScaLAPACK_obj%active) then
+      call system_abort('Init MPI+Scalapack: n_procs > 1 but ScaLAPACK is inactive.')
+    end if
+  end subroutine gap_fit_init_mpi_scalapack
+
+  subroutine gap_fit_init_task_manager(this)
+    type(gap_fit), intent(inout) :: this
+
+    this%task_manager%active = this%ScaLAPACK_obj%active
+    this%task_manager%MPI_obj = this%MPI_obj
+    this%task_manager%ScaLAPACK_obj = this%ScaLAPACK_obj
+
+    call task_manager_init_workers(this%task_manager, this%ScaLAPACK_obj%n_proc_rows)
+    call task_manager_init_tasks(this%task_manager, this%n_frame+1) ! mind special task
+    this%task_manager%my_worker_id = this%ScaLAPACK_obj%my_proc_row + 1 ! mpi 0-index to tm 1-index
+
+    if (.not. this%task_manager%active) return
+
+    call task_manager_init_idata(this%task_manager, 3)  ! space for nrows, blocksizes
+  end subroutine gap_fit_init_task_manager
+
+  subroutine gap_fit_distribute_tasks(this)
+    type(gap_fit), intent(inout) :: this
+
+    integer :: n_sparseX
+
+    if (.not. this%task_manager%active) return
+
+    n_sparseX = sum(this%config_type_n_sparseX)
+
+    ! add special task for Cholesky matrix addon to last worker
+    call task_manager_add_task(this%task_manager, n_sparseX, n_idata=2, worker_id=SHARED)
+    call task_manager_distribute_tasks(this%task_manager)
+    call task_manager_check_distribution(this%task_manager)
+  end subroutine gap_fit_distribute_tasks
+
+  function gap_fit_is_root(this, root) result(res)
+    type(gap_fit), intent(in) :: this
+    integer, intent(in), optional :: root
+    logical :: res
+    res = is_root(this%MPI_obj, root)
+  end function gap_fit_is_root
+
+  subroutine gap_fit_print_linear_system_dump_file(this)
+    type(gap_fit), intent(in) :: this
+    if (this%has_linear_system_dump_file) then
+      call gpFull_print_covariances_lambda_globalY(this%my_gp, this%linear_system_dump_file, &
+         this%mpi_obj%my_proc, do_Kmm=is_root(this%mpi_obj))
+    end if
+  end subroutine gap_fit_print_linear_system_dump_file
+
+  ! set blocksize, abort if ScaLAPACK would overflow 32bit integer
+  subroutine gap_fit_set_mpi_blocksizes(this)
+   type(gap_fit), intent(inout) :: this
+
+   integer(idp), parameter :: bit_limit = 2_idp**31
+
+   integer :: nrows, nrows0, trows, ncols, mb_A, nb_A, i
+   integer(idp) :: lwork1, lwork2, trows64, size_A_local
+
+   if (.not. this%task_manager%active) return
+
+   nrows0 = this%task_manager%unified_workload
+   ncols = sum(this%config_type_n_sparseX)
+
+   mb_A = this%mpi_blocksize_rows
+   if (mb_A == 0) then
+      call print("Defaulting mpi_blocksize_rows (arg = 0) ...", PRINT_VERBOSE)
+      mb_A = nrows0
+   end if
+   call print("mpi_blocksize_rows = "//mb_A, PRINT_VERBOSE)
+
+   nb_A = this%mpi_blocksize_cols
+   if (nb_A == 0) then
+      call print("Defaulting mpi_blocksize_cols (arg = 0) ...", PRINT_VERBOSE)
+      nb_A = ncols
+   end if
+   call print("mpi_blocksize_cols = "//nb_A, PRINT_VERBOSE)
+
+   nrows = increase_to_multiple(nrows0, mb_A)
+   call print("nrows = "//nrows, PRINT_VERBOSE)
+   i = nrows - nrows0
+   call print("distA extension: "//i//" "//ncols//" memory "//i2si(8_idp * i * ncols)//"B", PRINT_VERBOSE)
+
+   ! transfer nrows and blocksizes to gp_predict
+   this%task_manager%idata(1) = nrows
+   this%task_manager%idata(2) = mb_A
+   this%task_manager%idata(3) = nb_A
+
+   if (iwp == idp) return ! ignore 32bit checks for 64bit compilation
+
+
+   trows64 = int(nrows, idp) * this%task_manager%n_workers
+   trows = int(trows64, isp)
+   if (trows > bit_limit) then
+      call print_warning("Total rows of distributed matrix A is too large for 32bit integer: "//trows64//" = "//trows)
+   end if
+
+   lwork1 = get_lwork_pdgeqrf(this%ScaLAPACK_obj, trows, ncols, mb_A, nb_A)
+   call print("lwork_pdgeqrf = "//lwork1//" = "//int(lwork1, isp), PRINT_VERBOSE)
+   lwork2 = get_lwork_pdormqr(this%ScaLAPACK_obj, 'L', trows, 1, mb_A, nb_A, mb_A, 1)
+   call print("lwork_pdormqr = "//lwork2//" = "//int(lwork2, isp), PRINT_VERBOSE)
+   if (max(lwork1, lwork2) > bit_limit) then
+      call system_abort("mpi_blocksize_cols = "//nb_A//" is too large for 32bit work array in ScaLAPACK!" &
+         //"Set mpi_blocksize_cols to something smaller, see --help.")
+   end if
+
+   size_A_local = int(nrows, idp) * ncols
+   if (size_A_local > bit_limit) then
+      i = (trows64 * ncols + bit_limit - 1) / bit_limit
+      call system_abort("The local part of matrix A will have "//size_A_local//" entries. " &
+         // "This is too large for a 32bit integer calculation. " &
+         // "Use at least "//i//" MPI processes instead.")
+   end if
+
+  end subroutine gap_fit_set_mpi_blocksizes
+
+  subroutine gap_fit_estimate_memory(this)
+    type(gap_fit), intent(in) :: this
+
+    integer(idp), parameter :: rmem = storage_size(1.0_dp, idp) / 8_idp
+
+    integer :: i
+    integer(idp) :: s1, s2, entries
+    integer(idp) :: mem, memt, memp1  ! scratch, total, peak
+    integer(idp) :: sys_total_mem, sys_free_mem
+
+    call print_title("Memory Estimate (per process)")
+
+    call print("Descriptors")
+    memt = 0
+    do i = 1, this%n_coordinate
+      s1 = descriptor_dimensions(this%my_descriptor(i))
+
+      entries = s1 * this%n_descriptors(i)
+      mem = entries * rmem
+      memt = memt + mem
+      call print("Descriptor "//i//" :: x "//s1//" "//this%n_descriptors(i)//" memory "//i2si(mem)//"B")
+
+      entries = s1 * this%n_cross(i)
+      mem = entries * rmem
+      memt = memt + mem
+      call print("Descriptor "//i//" :: xPrime "//s1//" "//this%n_cross(i)//" memory "//i2si(mem)//"B")
+    end do
+    call print("Subtotal "//i2si(memt)//"B")
+    call print("")
+    memp1 = memt
+
+
+    call print("Covariances")
+    memt = 0
+    s1 = sum(this%config_type_n_sparseX)
+    s2 = (this%n_ener + this%n_local_property) + (this%n_force + this%n_virial + this%n_hessian)
+
+    entries = s1 * s2
+    mem = entries * rmem
+    memt = memt + mem * 2
+    call print("yY "//s1//" "//s2//" memory "//i2si(mem)//"B * 2")
+    memp1 = memp1 + mem
+
+    entries = s1 * s1
+    mem = entries * rmem
+    memt = memt + mem
+    call print("yy "//s1//" "//s1//" memory "//i2si(mem)//"B")
+
+    entries = s1 * (s1 + s2)
+    mem = entries * rmem
+    memt = memt + mem * 2
+    call print("A "//s1//" "//(s1+s2)//" memory "//i2si(mem)//"B * 2")
+    call print("Subtotal "//i2si(memt)//"B")
+    call print("")
+
+
+    mem = max(memp1, memt)
+    call print("Peak1 "//i2si(memp1)//"B")
+    call print("Peak2 "//i2si(memt)//"B")
+    call print("PEAK  "//i2si(mem)//"B")
+    call print("")
+
+    call mem_info(sys_total_mem, sys_free_mem)
+    call print("Free system memory  "//i2si(sys_free_mem)//"B")
+    call print("Total system memory "//i2si(sys_total_mem)//"B")
+
+    mem = sys_free_mem - mem
+    if (mem < 0) then
+      call print_warning("Memory estimate exceeds free system memory by "//i2si(-mem)//"B.")
+    end if
+
+    call print_title("")
+  end subroutine gap_fit_estimate_memory
 
 end module gap_fit_module

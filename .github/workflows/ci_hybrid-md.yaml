@@ -1,0 +1,41 @@
+name: HybridMD Python Package
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  root-directory: "${{github.workspace}}/hybrid_md_package"
+
+jobs:
+  install-and-run-pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.7", "3.8", "3.9", "3.10"]
+      max-parallel: 5
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Dependencies
+        run: pip install pytest pytest-cov numpy ase quippy-ase click pyyaml
+
+      - name: Install package
+        working-directory: ${{env.root-directory}}
+        run: pip install .
+
+      - name: Pytest + Coverage
+        working-directory: ${{env.root-directory}}
+        run: |
+          pytest -v --cov=hybrid_md --cov-report term --cov-report term-missing --cov-report xml
+
+      - uses: codecov/codecov-action@v3
+        with:
+          name: hybrid-md unittests
+          fail_ci_if_error: true
+          files: coverage.xml

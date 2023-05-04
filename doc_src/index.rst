@@ -17,6 +17,21 @@ tools. QUIP itself can be used as a plugin to LAMMPS or called from ASE.
 The purpose of the GAP code is to fit interatomic potentials and then
 use them for molecular simulation.
 
+**If you use the GAP code, please cite the original GAP paper:**
+
+`"The Accuracy of Quantum Mechanics, without the Electrons",  Albert P. Bartók, Mike C. Payne, Risi Kondor, and Gábor Csányi. Phys. Rev. Lett. 104, 136403 (2010)
+<https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.104.136403>`_
+
+**If you use the SOAP descriptor or kernel, please cite:**
+
+`"On representing chemical environments",  Albert P. Bartók, Risi Kondor, and Gábor Csányi, Physical Review B 87, 184115 (2013)
+<https://journals.aps.org/prb/abstract/10.1103/PhysRevB.87.184115>`_
+
+**For a general review of using SOAP and GAP for materials modelling, start here:**
+
+`"Gaussian Process Regression for Materials and Molecules", Volker L. Deringer, Albert P. Bartók, Noam Bernstein, David M. Wilkins, Michele Ceriotti, and Gábor Csányi, Chem. Rev. 2021, 121, 16, 10073–10141 (2021)
+<https://pubs.acs.org/doi/full/10.1021/acs.chemrev.1c00022>`_ 
+
 Contents
 ========
 
@@ -28,6 +43,7 @@ Contents
    tutorials.rst
    reference.rst
    data.rst
+   accelerated-aimd.rst
    
 Indices and tables
 ==================

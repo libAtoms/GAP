@@ -1,9 +1,9 @@
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ! HND X
 ! HND X   GAP (Gaussian Approximation Potental)
-! HND X   
 ! HND X
-! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi, 
+! HND X
+! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi,
 ! HND X   Copyright 2006-2021.
 ! HND X
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
@@ -14,7 +14,7 @@
 ! HND X      Academic Software License v1.0 (ASL)
 ! HND X
 ! HND X   GAP is distributed in the hope that it will be useful for non-commercial
-! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied 
+! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied
 ! HND X   warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 ! HND X   ASL for more details.
 ! HND X
@@ -37,26 +37,27 @@
 
 module descriptors_module
 
-   use error_module 
-   use system_module, only : dp, print, optional_default, system_timer, operator(//), split_string, string_to_int, split_string_simple, inoutput, OUTPUT, PRINT_VERBOSE, PRINT_NERD 
+   use error_module
+   use system_module, only : dp, print, optional_default, system_timer, operator(//), split_string, string_to_int, split_string_simple, inoutput, OUTPUT, PRINT_VERBOSE, PRINT_NERD
    use linkedlist_module
-   use units_module 
+   use units_module
    use periodictable_module
-   use linearalgebra_module 
-   use dictionary_module 
-   use paramreader_module 
-   use atoms_module 
-   use atoms_types_module  
-   use topology_module 
+   use linearalgebra_module
+   use dictionary_module
+   use paramreader_module
+   use atoms_module
+   use atoms_types_module
+   use topology_module
    use mpi_context_module
-   use table_module 
+   use table_module
 #ifdef DESCRIPTORS_NONCOMMERCIAL
-   use permutation_maker_module  
+   use permutation_maker_module
 #endif
-   use CInOutput_module 
-   use clusters_module 
-   use connection_module 
-   use angular_functions_module  
+   use CInOutput_module
+   use clusters_module
+   use connection_module
+   use angular_functions_module
+   use gamma_module
 
    implicit none
 
@@ -89,14 +90,14 @@ module descriptors_module
    integer, parameter, public :: DT_POWER_SO4       = 18
    integer, parameter, public :: DT_SOAP            = 19
    integer, parameter, public :: DT_AN_MONOMER      = 20
-   integer, parameter, public :: DT_GENERAL_MONOMER = 21  
-   integer, parameter, public :: DT_GENERAL_DIMER   = 22  
+   integer, parameter, public :: DT_GENERAL_MONOMER = 21
+   integer, parameter, public :: DT_GENERAL_DIMER   = 22
    integer, parameter, public :: DT_GENERAL_TRIMER  = 23
    integer, parameter, public :: DT_RDF             = 24
    integer, parameter, public :: DT_AS_DISTANCE_2B  = 25
-   integer, parameter, public :: DT_MOLECULE_LO_D   = 26 
+   integer, parameter, public :: DT_MOLECULE_LO_D   = 26
    integer, parameter, public :: DT_alex            = 27
-   integer, parameter, public :: DT_COM_DIMER       = 28 
+   integer, parameter, public :: DT_COM_DIMER       = 28
    integer, parameter, public :: DT_DISTANCE_NB     = 29
    integer, parameter, public :: DT_SOAP_EXPRESS    = 30
    integer, parameter, public :: DT_SOAP_TURBO      = 31
@@ -105,16 +106,16 @@ module descriptors_module
    integer, parameter :: NP_A2_DIMER       = 8
    integer, parameter :: NP_AB_DIMER       = 2
 
-   type transfer_parameters_type 
-      logical :: do_transfer 
-      real(dp) :: factor, r0, width 
-   endtype transfer_parameters_type 
-  
+   type transfer_parameters_type
+      logical :: do_transfer
+      real(dp) :: factor, r0, width
+   endtype transfer_parameters_type
+
    type descriptor_data_mono
       real(dp), dimension(:), allocatable :: data
       real(dp), dimension(:,:,:), allocatable :: grad_data
-      ! ci : atom indices amongst which to distribute energy of descriptor 
-      ! ii : all atoms involved in descriptor (for partial derivatives) 
+      ! ci : atom indices amongst which to distribute energy of descriptor
+      ! ii : all atoms involved in descriptor (for partial derivatives)
       integer, dimension(:), allocatable :: ci, ii
       real(dp), dimension(:,:), allocatable :: pos
       logical :: has_data
@@ -128,6 +129,10 @@ module descriptors_module
       complex(dp), dimension(:,:), allocatable :: mm
    endtype cplx_2d
 
+   type int_2d
+      integer , dimension(:,:), allocatable :: mm
+   endtype int_2d
+
    type real_2d
       real(dp), dimension(:,:), allocatable :: mm
    endtype real_2d
@@ -140,7 +145,7 @@ module descriptors_module
    !==                begin descriptors
    !=======================================================================
 
-   
+
    type RadialFunction_type
       integer :: n_max
       real(dp) :: cutoff, min_cutoff
@@ -169,7 +174,7 @@ module descriptors_module
 
       integer, dimension(:), pointer :: species_Z
       real(dp), dimension(:), pointer :: w
-      
+
       type(fourier_SO4_type) :: fourier_SO4
 
       logical :: initialised = .false.
@@ -219,10 +224,10 @@ module descriptors_module
 
    type distance_2b
       real(dp) :: cutoff
-      real(dp) :: cutoff_transition_width 
+      real(dp) :: cutoff_transition_width
       integer :: Z1, Z2
-      character(STRING_LENGTH) :: resid_name 
-      logical :: only_intra, only_inter 
+      character(STRING_LENGTH) :: resid_name
+      logical :: only_intra, only_inter
 
       integer :: n_exponents, tail_exponent
       real(dp) :: tail_range
@@ -308,7 +313,7 @@ module descriptors_module
       real(dp) :: cutoff, cutoff_transition_width
       real(dp) :: monomer_cutoff
       logical :: OHH_ordercheck
-      real(dp) :: power,dist_shift  
+      real(dp) :: power,dist_shift
 
       logical :: initialised = .false.
 
@@ -363,7 +368,7 @@ module descriptors_module
 
       integer, dimension(:), pointer :: species_Z
       real(dp), dimension(:), pointer :: w
-      
+
       type(fourier_SO4_type) :: fourier_SO4
 
       logical :: initialised = .false.
@@ -379,18 +384,25 @@ module descriptors_module
       real(dp) :: cutoff_scale
       real(dp) :: cutoff_rate
       integer :: l_max, n_max, n_Z, n_species
+
+      integer ::  nu_R, nu_S
       integer, dimension(:), allocatable :: species_Z, Z
       real(dp), dimension(:), allocatable :: r_basis
-      real(dp), dimension(:,:), allocatable :: transform_basis,cholesky_overlap_basis
+      real(dp), dimension(:,:,:), allocatable :: cholesky_overlap_basis
+      real(dp), dimension(:, :), allocatable :: transform_basis
 
       logical :: global = .false.
       logical :: central_reference_all_species = .false.
       logical :: diagonal_radial = .false.
       logical :: normalise = .true.
       logical :: initialised = .false.
+
+      character(len=STRING_LENGTH) :: radial_basis
+      real(dp), dimension(:,:,:), allocatable :: QR_factor
+      real(dp), dimension(:,:), allocatable :: QR_tau
    endtype soap
-   
-  
+
+
    type rdf
       real(dp) :: cutoff
       real(dp) :: transition_width, w_gauss
@@ -414,7 +426,7 @@ module descriptors_module
 
    type alex
 
-      integer :: Z, power_min, power_max 
+      integer :: Z, power_min, power_max
       real(dp) :: cutoff
 
       integer :: n_species
@@ -436,11 +448,24 @@ module descriptors_module
       logical :: initialised = .false.
    endtype distance_Nb
 
+   type soap_turbo
+      ! User controllable parameters
+      real(dp) :: rcut_hard, rcut_soft, nf
+      integer  :: n_species, radial_enhancement, central_index, l_max, compress_P_nonzero
+      character(len=STRING_LENGTH) :: basis, scaling_mode, compress_file, compress_mode
+
+      real(dp), dimension(:), allocatable :: atom_sigma_r, atom_sigma_r_scaling, &
+         atom_sigma_t, atom_sigma_t_scaling, amplitude_scaling, central_weight, compress_P_el
+      integer, dimension(:), allocatable :: species_Z, alpha_max, compress_P_i, compress_P_j
+
+      logical :: initialised = .false., compress = .false.
+   endtype soap_turbo
+
 #ifdef DESCRIPTORS_NONCOMMERCIAL
 #include "descriptors_noncommercial_types.inc"
 #endif
 
-   ! 
+   !
    ! All the descriptors need to be public so that they are visible to the python wrapper
 #ifdef DESCRIPTORS_NONCOMMERCIAL
    public :: soap, general_monomer, bispectrum_so4, bispectrum_so3, behler, distance_2b, &
@@ -448,21 +473,21 @@ module descriptors_module
         water_dimer, a2_dimer, bond_real_space, power_so3, power_so4, an_monomer, general_dimer, &
         general_trimer, rdf, as_distance_2b, molecule_lo_d, alex,  com_dimer,  distance_nb, &
         descriptor_data_mono, fourier_so4_type, radialfunction_type, transfer_parameters_type, &
-        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3, soap_express, &
-        soap_turbo
+        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3, soap_turbo, soap_express
 #else
    public :: soap, bispectrum_so4, bispectrum_so3, behler, distance_2b, &
         coordination, angle_3b, co_angle_3b, co_distance_2b, cosnx, trihis, water_monomer, &
         water_dimer, a2_dimer, power_so3, power_so4, &
         rdf, as_distance_2b,  alex,  distance_nb, &
         descriptor_data_mono, fourier_so4_type, radialfunction_type, transfer_parameters_type, &
-        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3
+        ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3, &
+        soap_turbo
 #endif
-   
+
    !=======================================================================
    !==                end descriptors
    !=======================================================================
-   
+
    type descriptor
       integer :: descriptor_type = DT_NONE
 
@@ -488,64 +513,64 @@ module descriptors_module
       type(as_distance_2b)  :: descriptor_as_distance_2b
       type(alex)            :: descriptor_alex
       type(distance_Nb)     :: descriptor_distance_Nb
+      type(soap_turbo)      :: descriptor_soap_turbo
 #ifdef DESCRIPTORS_NONCOMMERCIAL
       type(AN_monomer)      :: descriptor_AN_monomer
-      type(general_monomer) :: descriptor_general_monomer  
-      type(general_dimer)   :: descriptor_general_dimer  
+      type(general_monomer) :: descriptor_general_monomer
+      type(general_dimer)   :: descriptor_general_dimer
       type(general_trimer)  :: descriptor_general_trimer
-      type(molecule_lo_d)   :: descriptor_molecule_lo_d 
-      type(com_dimer)       :: descriptor_com_dimer 
+      type(molecule_lo_d)   :: descriptor_molecule_lo_d
+      type(com_dimer)       :: descriptor_com_dimer
       type(soap_express)    :: descriptor_soap_express
       type(bond_real_space) :: descriptor_bond_real_space
-      type(soap_turbo)      :: descriptor_soap_turbo
 #endif
    endtype
-     
+
    type descriptor_data
       type(descriptor_data_mono), dimension(:), allocatable :: x
    endtype descriptor_data
-     
+
    type cplx_1d
       complex(dp), dimension(:), allocatable :: m
    endtype cplx_1d
-     
+
    type real_1d
       real(dp), dimension(:), allocatable :: m
    endtype real_1d
-     
+
    type spherical_harmonics_type
       type(cplx_1d), dimension(:), allocatable :: spherical_harmonics
       type(cplx_2d), dimension(:), allocatable :: grad_spherical_harmonics
       real(dp) :: r
       real(dp), dimension(3) :: u
    endtype spherical_harmonics_type
-     
+
    type neighbour_type
       type(spherical_harmonics_type), dimension(:), allocatable :: neighbour
    endtype neighbour_type
-     
+
    type grad_spherical_harmonics_overlap_type
       type(cplx_3d), dimension(:), allocatable :: grad_integral
    endtype grad_spherical_harmonics_overlap_type
-     
+
    public :: neighbour_type, real_space_fourier_coefficients, real_space_covariance_coefficient
    public :: SphericalYCartesian
-     
+
    interface initialise
 #ifdef DESCRIPTORS_NONCOMMERCIAL
       module procedure descriptor_initialise, RadialFunction_initialise, fourier_so4_initialise, &
       bispectrum_SO4_initialise, bispectrum_SO3_initialise, behler_initialise, distance_2b_initialise, &
       coordination_initialise, angle_3b_initialise, co_angle_3b_initialise, co_distance_2b_initialise, cosnx_initialise, trihis_initialise, &
       water_monomer_initialise, water_dimer_initialise, A2_dimer_initialise, AB_dimer_initialise, distance_Nb_initialise,  rdf_initialise, as_distance_2b_initialise, alex_initialise, &
-      atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise, &
+      atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise, soap_turbo_initialise, &
       general_monomer_initialise, general_dimer_initialise, general_trimer_initialise,  molecule_lo_d_initialise,  AN_monomer_initialise, &
-      bond_real_space_initialise, transfer_initialise, com_dimer_initialise,  soap_express_initialise, soap_turbo_initialise
+      bond_real_space_initialise, transfer_initialise, com_dimer_initialise,  soap_express_initialise
 #else
       module procedure descriptor_initialise, RadialFunction_initialise, fourier_so4_initialise, &
       bispectrum_SO4_initialise, bispectrum_SO3_initialise, behler_initialise, distance_2b_initialise, &
       coordination_initialise, angle_3b_initialise, co_angle_3b_initialise, co_distance_2b_initialise, cosnx_initialise, trihis_initialise, &
       water_monomer_initialise, water_dimer_initialise, A2_dimer_initialise, AB_dimer_initialise, distance_Nb_initialise,  rdf_initialise, as_distance_2b_initialise, alex_initialise, &
-      atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise 
+      atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise, soap_turbo_initialise
 #endif
    endinterface initialise
    public :: initialise
@@ -555,14 +580,14 @@ module descriptors_module
       module procedure descriptor_finalise, descriptor_data_finalise, RadialFunction_finalise, fourier_so4_finalise, cplx_2d_array1_finalise, cplx_3d_array2_finalise, &
       bispectrum_SO4_finalise, bispectrum_SO3_finalise, behler_finalise, distance_2b_finalise, coordination_finalise, angle_3b_finalise, co_angle_3b_finalise, &
       co_distance_2b_finalise, cosnx_finalise, trihis_finalise, water_monomer_finalise, water_dimer_finalise, rdf_finalise, as_distance_2b_finalise,  alex_finalise, &
-      A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise,  &
+      A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise,  soap_turbo_finalise, &
       AN_monomer_finalise, general_monomer_finalise, general_dimer_finalise, general_trimer_finalise,  molecule_lo_d_finalise, com_dimer_finalise, &
-      bond_real_space_finalise, soap_express_finalise, soap_turbo_finalise
+      bond_real_space_finalise, soap_express_finalise
 #else
       module procedure descriptor_finalise, descriptor_data_finalise, RadialFunction_finalise, fourier_so4_finalise, cplx_2d_array1_finalise, cplx_3d_array2_finalise, &
       bispectrum_SO4_finalise, bispectrum_SO3_finalise, behler_finalise, distance_2b_finalise, coordination_finalise, angle_3b_finalise, co_angle_3b_finalise, &
       co_distance_2b_finalise, cosnx_finalise, trihis_finalise, water_monomer_finalise, water_dimer_finalise, rdf_finalise, as_distance_2b_finalise,  alex_finalise, &
-      A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise  
+      A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise, soap_turbo_finalise
 #endif
    endinterface finalise
    public :: finalise
@@ -572,14 +597,14 @@ module descriptors_module
       module procedure descriptor_calc, descriptor_calc_array, bispectrum_SO4_calc, bispectrum_SO3_calc, behler_calc, distance_2b_calc, coordination_calc, angle_3b_calc, co_angle_3b_calc, &
       co_distance_2b_calc, cosnx_calc, trihis_calc, water_monomer_calc, water_dimer_calc, A2_dimer_calc, AB_dimer_calc,  atom_real_space_calc, &
       power_so3_calc, power_SO4_calc, soap_calc, rdf_calc, as_distance_2b_calc, &
-      distance_Nb_calc, alex_calc, &
-      AN_monomer_calc,  soap_express_calc, general_monomer_calc, general_dimer_calc, general_trimer_calc,  molecule_lo_d_calc, com_dimer_calc, bond_real_space_calc, &
-      soap_turbo_calc
+      distance_Nb_calc, alex_calc, soap_turbo_calc, &
+      AN_monomer_calc,  soap_express_calc, general_monomer_calc, general_dimer_calc, general_trimer_calc,  molecule_lo_d_calc, com_dimer_calc, bond_real_space_calc
 #else
       module procedure descriptor_calc, descriptor_calc_array, bispectrum_SO4_calc, bispectrum_SO3_calc, behler_calc, distance_2b_calc, coordination_calc, angle_3b_calc, co_angle_3b_calc, &
       co_distance_2b_calc, cosnx_calc, trihis_calc, water_monomer_calc, water_dimer_calc, A2_dimer_calc, AB_dimer_calc,  atom_real_space_calc, &
       power_so3_calc, power_SO4_calc, soap_calc, rdf_calc, as_distance_2b_calc, &
-      distance_Nb_calc, alex_calc 
+      distance_Nb_calc, alex_calc, soap_turbo_calc
+
 #endif
    endinterface calc
    public :: calc
@@ -588,13 +613,12 @@ module descriptors_module
 #ifdef DESCRIPTORS_NONCOMMERCIAL
       module procedure descriptor_cutoff, bispectrum_SO4_cutoff, bispectrum_SO3_cutoff, behler_cutoff, distance_2b_cutoff, coordination_cutoff, angle_3b_cutoff, co_angle_3b_cutoff, &
       co_distance_2b_cutoff, cosnx_cutoff, trihis_cutoff, water_monomer_cutoff, water_dimer_cutoff, A2_dimer_cutoff, AB_dimer_cutoff, atom_real_space_cutoff, &
-      power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff, &
-      molecule_lo_d_cutoff, com_dimer_cutoff, soap_express_cutoff, AN_monomer_cutoff, general_monomer_cutoff, general_dimer_cutoff, general_trimer_cutoff,  bond_real_space_cutoff, &
-      soap_turbo_cutoff
+      power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff, soap_turbo_cutoff, &
+      molecule_lo_d_cutoff, com_dimer_cutoff, soap_express_cutoff, AN_monomer_cutoff, general_monomer_cutoff, general_dimer_cutoff, general_trimer_cutoff,  bond_real_space_cutoff
 #else
       module procedure descriptor_cutoff, bispectrum_SO4_cutoff, bispectrum_SO3_cutoff, behler_cutoff, distance_2b_cutoff, coordination_cutoff, angle_3b_cutoff, co_angle_3b_cutoff, &
       co_distance_2b_cutoff, cosnx_cutoff, trihis_cutoff, water_monomer_cutoff, water_dimer_cutoff, A2_dimer_cutoff, AB_dimer_cutoff, atom_real_space_cutoff, &
-      power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff 
+      power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff, soap_turbo_cutoff
 #endif
    endinterface cutoff
    public :: cutoff
@@ -604,14 +628,13 @@ module descriptors_module
       module procedure descriptor_sizes, bispectrum_SO4_sizes, bispectrum_SO3_sizes, behler_sizes, distance_2b_sizes, coordination_sizes, angle_3b_sizes, co_angle_3b_sizes, &
       co_distance_2b_sizes, cosnx_sizes, trihis_sizes, water_monomer_sizes, water_dimer_sizes, A2_dimer_sizes, AB_dimer_sizes, atom_real_space_sizes, &
       power_so3_sizes, power_SO4_sizes, soap_sizes,  rdf_sizes, as_distance_2b_sizes, &
-      alex_sizes, distance_Nb_sizes, &
-      molecule_lo_d_sizes, com_dimer_sizes,  soap_express_sizes, AN_monomer_sizes, general_monomer_sizes, general_dimer_sizes, general_trimer_sizes,  bond_real_space_sizes, &
-      soap_turbo_sizes
+      alex_sizes, distance_Nb_sizes, soap_turbo_sizes, &
+      molecule_lo_d_sizes, com_dimer_sizes,  soap_express_sizes, AN_monomer_sizes, general_monomer_sizes, general_dimer_sizes, general_trimer_sizes,  bond_real_space_sizes
 #else
       module procedure descriptor_sizes, bispectrum_SO4_sizes, bispectrum_SO3_sizes, behler_sizes, distance_2b_sizes, coordination_sizes, angle_3b_sizes, co_angle_3b_sizes, &
       co_distance_2b_sizes, cosnx_sizes, trihis_sizes, water_monomer_sizes, water_dimer_sizes, A2_dimer_sizes, AB_dimer_sizes, atom_real_space_sizes, &
       power_so3_sizes, power_SO4_sizes, soap_sizes,  rdf_sizes, as_distance_2b_sizes, &
-      alex_sizes, distance_Nb_sizes 
+      alex_sizes, distance_Nb_sizes, soap_turbo_sizes
 #endif
    endinterface descriptor_sizes
    public :: descriptor_sizes
@@ -619,7 +642,7 @@ module descriptors_module
    public :: descriptor_MPI_setup
 
    public :: descriptor, descriptor_data, descriptor_dimensions, descriptor_n_permutations, descriptor_permutations, descriptor_str_add_species
-   public :: real_space_covariance  
+   public :: real_space_covariance
    public :: cplx_1d, cplx_2d
 
    contains
@@ -628,7 +651,7 @@ module descriptors_module
 #ifdef DESCRIPTORS_NONCOMMERCIAL
 #include "descriptors_noncommercial.inc"
 #endif
-     
+
    function get_descriptor_type(args_str,error)
       character(len=*), intent(in) :: args_str
       integer, optional, intent(out) :: error
@@ -638,7 +661,7 @@ module descriptors_module
       type(Dictionary) :: params
       logical :: is_bispectrum_so4, is_bispectrum_so3, is_behler, is_distance_2b, is_coordination, is_angle_3b, &
          is_co_angle_3b, is_co_distance_2b, is_cosnx, is_trihis, is_water_monomer, is_water_dimer, is_A2_dimer, &
-         is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, is_soap, &  
+         is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, is_soap, &
          is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_rdf, is_as_distance_2b, &
          is_molecule_lo_d, is_alex, is_com_dimer, is_distance_Nb, is_soap_express, is_soap_turbo
 
@@ -665,14 +688,14 @@ module descriptors_module
       call param_register(params, 'power_so4', 'false', is_power_so4, help_string="Type of descriptor is power_so4.")
       call param_register(params, 'soap', 'false', is_soap, help_string="Type of descriptor is soap.")
       call param_register(params, 'AN_monomer', 'false', is_AN_monomer, help_string="Type of descriptor is AN_monomer.")
-      call param_register(params, 'general_monomer', 'false', is_general_monomer, help_string="Type of descriptor is general_monomer.")  
-      call param_register(params, 'general_dimer', 'false', is_general_dimer, help_string="Type of descriptor is general_dimer.")  
-      call param_register(params, 'general_trimer', 'false', is_general_trimer, help_string="Type of descriptor is general_trimer.")  
+      call param_register(params, 'general_monomer', 'false', is_general_monomer, help_string="Type of descriptor is general_monomer.")
+      call param_register(params, 'general_dimer', 'false', is_general_dimer, help_string="Type of descriptor is general_dimer.")
+      call param_register(params, 'general_trimer', 'false', is_general_trimer, help_string="Type of descriptor is general_trimer.")
       call param_register(params, 'rdf', 'false', is_rdf, help_string="Type of descriptor is rdf.")
       call param_register(params, 'as_distance_2b', 'false', is_as_distance_2b, help_string="Type of descriptor is as_distance_2b.")
-      call param_register(params, 'molecule_lo_d', 'false', is_molecule_lo_d, help_string="Type of descriptor is molecule_lo_d.") 
+      call param_register(params, 'molecule_lo_d', 'false', is_molecule_lo_d, help_string="Type of descriptor is molecule_lo_d.")
       call param_register(params, 'alex', 'false', is_alex, help_string="Type of descriptor is alex.")
-      call param_register(params, 'com_dimer', 'false', is_com_dimer, help_string="Type of descriptor is com_dimer.") 
+      call param_register(params, 'com_dimer', 'false', is_com_dimer, help_string="Type of descriptor is com_dimer.")
       call param_register(params, 'distance_Nb', 'false', is_distance_Nb, help_string="Type of descriptor is distance_Nb.")
       call param_register(params, 'soap_express', 'false', is_soap_express, help_string="Type of descriptor is soap_express.")
       call param_register(params, 'soap_turbo', 'false', is_soap_turbo, help_string="Type of descriptor is soap_turbo.")
@@ -683,7 +706,7 @@ module descriptors_module
       call finalise(params)
 
       if (count( (/is_bispectrum_so4, is_bispectrum_so3, is_behler, is_distance_2b, is_coordination, is_angle_3b, is_co_angle_3b, is_co_distance_2b, &
-      is_cosnx, is_trihis, is_water_monomer, is_water_dimer, is_A2_dimer, is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, &  
+      is_cosnx, is_trihis, is_water_monomer, is_water_dimer, is_A2_dimer, is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, &
       is_soap, is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_rdf, is_as_distance_2b, is_molecule_lo_d, is_alex, is_com_dimer, &
       is_distance_Nb, is_soap_express, is_soap_turbo /) ) /= 1) then
          RAISE_ERROR("descriptor_initialise found too few or too many IP Model types args_str='"//trim(args_str)//"'", error)
@@ -731,22 +754,22 @@ module descriptors_module
          get_descriptor_type = DT_SOAP
       elseif( is_AN_monomer ) then
          get_descriptor_type = DT_AN_MONOMER
-      elseif( is_general_monomer ) then  
-         get_descriptor_type = DT_GENERAL_MONOMER  
-      elseif( is_general_dimer ) then  
-         get_descriptor_type = DT_GENERAL_DIMER  
-      elseif( is_general_trimer ) then  
-         get_descriptor_type = DT_GENERAL_TRIMER  
+      elseif( is_general_monomer ) then
+         get_descriptor_type = DT_GENERAL_MONOMER
+      elseif( is_general_dimer ) then
+         get_descriptor_type = DT_GENERAL_DIMER
+      elseif( is_general_trimer ) then
+         get_descriptor_type = DT_GENERAL_TRIMER
       elseif( is_rdf ) then
          get_descriptor_type = DT_RDF
       elseif( is_as_distance_2b ) then
          get_descriptor_type = DT_AS_DISTANCE_2B
-      elseif( is_molecule_lo_d ) then 
-         get_descriptor_type = DT_MOLECULE_LO_D 
+      elseif( is_molecule_lo_d ) then
+         get_descriptor_type = DT_MOLECULE_LO_D
       elseif( is_alex ) then
          get_descriptor_type = DT_ALEX
-      elseif( is_com_dimer ) then 
-         get_descriptor_type = DT_COM_DIMER 
+      elseif( is_com_dimer ) then
+         get_descriptor_type = DT_COM_DIMER
       elseif( is_distance_Nb ) then
          get_descriptor_type = DT_DISTANCE_NB
       elseif( is_soap_express ) then
@@ -813,6 +836,8 @@ module descriptors_module
          call initialise(this%descriptor_alex,args_str,error)
       case(DT_DISTANCE_NB)
          call initialise(this%descriptor_distance_Nb,args_str,error)
+      case(DT_SOAP_TURBO)
+         call initialise(this%descriptor_soap_turbo,args_str,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
       case(DT_BOND_REAL_SPACE)
          call initialise(this%descriptor_bond_real_space,args_str,error)
@@ -830,8 +855,6 @@ module descriptors_module
          call initialise(this%descriptor_general_trimer,args_str,error)
       case(DT_SOAP_EXPRESS)
          call initialise(this%descriptor_soap_express,args_str,error)
-      case(DT_SOAP_TURBO)
-         call initialise(this%descriptor_soap_turbo,args_str,error)
 #endif
       endselect
 
@@ -911,7 +934,7 @@ module descriptors_module
       this%descriptor_type = DT_NONE
 
    endsubroutine descriptor_finalise
-   
+
    subroutine descriptor_MPI_setup(this,at,mpi,mpi_mask,error)
       type(descriptor), intent(in) :: this
       type(atoms), intent(in) :: at
@@ -930,7 +953,7 @@ module descriptors_module
          case(DT_BEHLER)
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
          case(DT_DISTANCE_2B)
-            call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error) 
+            call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
          case(DT_COORDINATION)
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
          case(DT_ANGLE_3B)
@@ -967,6 +990,8 @@ module descriptors_module
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
          case(DT_DISTANCE_NB)
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
+         case(DT_SOAP_TURBO)
+            call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_MOLECULE_LO_D)
             RAISE_ERROR("descriptor_MPI_setup: molecule_lo_d not MPI ready.", error)
@@ -975,16 +1000,14 @@ module descriptors_module
          case(DT_AN_MONOMER)
             RAISE_ERROR("descriptor_MPI_setup: AN_monomer not MPI ready.", error)
          case(DT_GENERAL_MONOMER)
-            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error) 
+            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error)
          case(DT_GENERAL_DIMER)
-            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error) 
+            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error)
          case(DT_GENERAL_TRIMER)
-            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error) 
-         case(DT_COM_DIMER) 
-            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error) 
+            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error)
+         case(DT_COM_DIMER)
+            call descriptor_general_monomer_nmer_MPI_setup(this,at,mpi,mpi_mask,error)
          case(DT_SOAP_EXPRESS)
-            call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
-         case(DT_SOAP_TURBO)
             call descriptor_atomic_MPI_setup(at,mpi,mpi_mask,error)
 #endif
          case default
@@ -1005,7 +1028,7 @@ module descriptors_module
       integer :: i
 
       INIT_ERROR(error)
-      
+
       mpi_mask = .false.
       do i = 1, at%N
          if( mod(i-1, mpi%n_procs) == mpi%my_proc ) mpi_mask(i) = .true.
@@ -1022,7 +1045,7 @@ module descriptors_module
       integer :: i
 
       INIT_ERROR(error)
-      
+
       mpi_mask = .false.
       do i = 1, at%N
          if( at%Z(i) == 8 .and. mod(i-1, mpi%n_procs) == mpi%my_proc ) mpi_mask(i) = .true.
@@ -1030,7 +1053,7 @@ module descriptors_module
 
    endsubroutine descriptor_water_monomer_dimer_MPI_setup
 
-  
+
    subroutine descriptor_data_finalise(this,error)
       type(descriptor_data), intent(inout) :: this
       integer, optional, intent(out) :: error
@@ -1145,7 +1168,7 @@ module descriptors_module
       type(cplx_2d), dimension(:), allocatable, intent(inout) :: U
       type(cplx_3d), dimension(:,:), allocatable, intent(inout), optional :: dU
       integer, optional, intent(out) :: error
-      character(len=*), intent(in), optional :: args_str   
+      character(len=*), intent(in), optional :: args_str
 
       complex(dp), dimension(:,:), allocatable :: Uc, Up
       complex(dp), dimension(:,:,:), allocatable :: dUc, dUp
@@ -1201,7 +1224,7 @@ module descriptors_module
          if(allocated(dU)) call finalise(dU)
 
          ! dU is not allocated, allocate and zero it
-         allocate( dU(0:this%j_max,0:n_neighbours(at,i,max_dist=this%cutoff)) ) 
+         allocate( dU(0:this%j_max,0:n_neighbours(at,i,max_dist=this%cutoff)) )
          do j = 0, this%j_max
             allocate( dU(j,0)%mm(3,-j:j,-j:j) )
             dU(j,0)%mm = CPLX_ZERO
@@ -1214,8 +1237,8 @@ module descriptors_module
       endif
 
       n_i = 0
-      do n = 1, n_neighbours(at,i) 
-         ji = neighbour(at, i, n, distance=r, diff=diff, cosines=u_ij) 
+      do n = 1, n_neighbours(at,i)
+         ji = neighbour(at, i, n, distance=r, diff=diff, cosines=u_ij)
          if( r >= this%cutoff ) cycle
 
          n_i = n_i + 1
@@ -1229,27 +1252,27 @@ module descriptors_module
          x_pls_Iy = ( diff(1) + CPLX_IMAG*diff(2) ) * r0
          x_min_Iy = ( diff(1) - CPLX_IMAG*diff(2) ) * r0
 
-         fcut = cos_cutoff_function(r,this%cutoff) * this%w(species_map(at%Z(ji)))  
+         fcut = cos_cutoff_function(r,this%cutoff) * this%w(species_map(at%Z(ji)))
 
          U(0)%mm(0,0) = U(0)%mm(0,0) + fcut
          Up(0:0,0:0) = CPLX_ONE
 
          if(present(dU)) then
 
-            dfcut = -dcos_cutoff_function(r,this%cutoff)*u_ij * this%w(species_map(at%Z(ji)))  
+            dfcut = -dcos_cutoff_function(r,this%cutoff)*u_ij * this%w(species_map(at%Z(ji)))
             dz0 = ( 1.0_dp / tan( theta0 ) - theta0 / sin(theta0)**2 ) * u_ij
             dr0 = ( cos( theta0 ) / (r*this%z0) - r0 / r ) * u_ij
 
             dz0_pls_Iz = ( z0 + CPLX_IMAG*diff(3) )*dr0 + dz0*r0
             dz0_pls_Iz(3) = dz0_pls_Iz(3) + CPLX_IMAG*r0
-               
+
             dz0_min_Iz = ( z0 - CPLX_IMAG*diff(3) )*dr0 + dz0*r0
             dz0_min_Iz(3) = dz0_min_Iz(3) - CPLX_IMAG*r0
-               
+
             dx_pls_Iy = ( diff(1) + CPLX_IMAG*diff(2) )*dr0
             dx_pls_Iy(1) = dx_pls_Iy(1) + r0
             dx_pls_Iy(2) = dx_pls_Iy(2) + CPLX_IMAG*r0
-               
+
             dx_min_Iy = ( diff(1) - CPLX_IMAG*diff(2) )*dr0
             dx_min_Iy(1) = dx_min_Iy(1) + r0
             dx_min_Iy(2) = dx_min_Iy(2) - CPLX_IMAG*r0
@@ -1383,7 +1406,7 @@ module descriptors_module
       call finalise(params)
 
       this%z0 = max(1.0_dp,this%z0_ratio) * this%cutoff/(PI-0.02_dp)
-      
+
       this%initialised = .true.
 
 
@@ -1429,7 +1452,7 @@ module descriptors_module
       this%cutoff => this%fourier_SO4%cutoff
       this%species_Z => this%fourier_SO4%species_Z
       this%w => this%fourier_SO4%w
-      
+
       this%initialised = .true.
 
    endsubroutine bispectrum_so4_initialise
@@ -1732,12 +1755,12 @@ module descriptors_module
 
       call initialise(params)
       call param_register(params, 'cutoff', '0.00', this%cutoff, help_string="Cutoff for distance_2b-type descriptors")
-      call param_register(params, 'cutoff_transition_width', '0.5', this%cutoff_transition_width, help_string="Transition width of cutoff for distance_2b-type descriptors")  
+      call param_register(params, 'cutoff_transition_width', '0.5', this%cutoff_transition_width, help_string="Transition width of cutoff for distance_2b-type descriptors")
       call param_register(params, 'Z1', '0', this%Z1, help_string="Atom type #1 in bond")
       call param_register(params, 'Z2', '0', this%Z2, help_string="Atom type #2 in bond")
-      call param_register(params, 'resid_name', '', this%resid_name, has_value_target=has_resid_name, help_string="Name of an integer property in the atoms object giving the residue id of the molecule to which the atom belongs.")  
-      call param_register(params, 'only_intra', 'F', this%only_intra, help_string="Only calculate INTRAmolecular pairs with equal residue ids (bonds)")  
-      call param_register(params, 'only_inter', 'F', this%only_inter, help_string="Only apply to INTERmolecular pairs with different residue ids (non-bonded)")  
+      call param_register(params, 'resid_name', '', this%resid_name, has_value_target=has_resid_name, help_string="Name of an integer property in the atoms object giving the residue id of the molecule to which the atom belongs.")
+      call param_register(params, 'only_intra', 'F', this%only_intra, help_string="Only calculate INTRAmolecular pairs with equal residue ids (bonds)")
+      call param_register(params, 'only_inter', 'F', this%only_inter, help_string="Only apply to INTERmolecular pairs with different residue ids (non-bonded)")
 
       call param_register(params, 'n_exponents', '1', this%n_exponents, help_string="Number of exponents")
       call param_register(params, 'tail_range', '1.0', this%tail_range, help_string="Tail order")
@@ -1749,13 +1772,13 @@ module descriptors_module
       endif
       call finalise(params)
 
-      if (this%only_intra .and. this%only_inter) then  
-         RAISE_ERROR("distance_2b_initialise: cannot specify both only_inter AND only_intra", error)  
-      end if  
-      if ((this%only_intra .or. this%only_inter) .and. (.not. has_resid_name)) then  
-         RAISE_ERROR("distance_2b_initialise: only_intra and only_inter require resid_name to be given as well", error)  
-      end if  
-  
+      if (this%only_intra .and. this%only_inter) then
+         RAISE_ERROR("distance_2b_initialise: cannot specify both only_inter AND only_intra", error)
+      end if
+      if ((this%only_intra .or. this%only_inter) .and. (.not. has_resid_name)) then
+         RAISE_ERROR("distance_2b_initialise: only_intra and only_inter require resid_name to be given as well", error)
+      end if
+
       allocate(this%exponents(this%n_exponents))
       call initialise(params)
       if( this%n_exponents == 1 ) then
@@ -1788,14 +1811,14 @@ module descriptors_module
 
       if(.not. this%initialised) return
       this%cutoff = 0.0_dp
-      this%cutoff_transition_width = 0.5_dp  
+      this%cutoff_transition_width = 0.5_dp
       this%Z1 = 0
       this%Z2 = 0
 
-      this%resid_name = ''   
-      this%only_intra = .false. 
-      this%only_inter = .false. 
-   
+      this%resid_name = ''
+      this%only_intra = .false.
+      this%only_inter = .false.
+
       this%tail_exponent = 0
       this%tail_range = 0.0_dp
       this%has_tail = .false.
@@ -2160,7 +2183,7 @@ module descriptors_module
       call param_register(params, 'monomer_cutoff', '1.50', this%monomer_cutoff, help_string="Monomer cutoff for water_dimer-type descriptors")
       call param_register(params, 'OHH_ordercheck', 'T', this%OHH_ordercheck, help_string="T: find water molecules. F: use default order OHH")
       call param_register(params, 'power', '1.0', this%power, help_string="Power of distances to be used in the kernel")
-      call param_register(params, 'dist_shift', '0.0', this%dist_shift, help_string="Distance shift for inverse distance descriptors.")  
+      call param_register(params, 'dist_shift', '0.0', this%dist_shift, help_string="Distance shift for inverse distance descriptors.")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='water_dimer_initialise args_str')) then
          RAISE_ERROR("water_dimer_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -2183,7 +2206,7 @@ module descriptors_module
       this%monomer_cutoff = 0.0_dp
       this%OHH_ordercheck = .true.
       this%power = 1.0_dp
-      this%dist_shift = 0.0_dp  
+      this%dist_shift = 0.0_dp
 
       this%initialised = .false.
 
@@ -2294,8 +2317,8 @@ module descriptors_module
       call param_register(params, 'alpha', '1.0', this%alpha, help_string="Width of atomic Gaussians")
       call param_register(params, 'zeta', '1.0', this%zeta, help_string="Exponent of covariance function")
 
-      if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='atom_real_space_initialise args_str')) then  
-         RAISE_ERROR("atom_real_space_initialise failed to parse args_str='"//trim(args_str)//"'", error)  
+      if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='atom_real_space_initialise args_str')) then
+         RAISE_ERROR("atom_real_space_initialise failed to parse args_str='"//trim(args_str)//"'", error)
       endif
       call finalise(params)
 
@@ -2408,7 +2431,7 @@ module descriptors_module
       this%cutoff => this%fourier_SO4%cutoff
       this%species_Z => this%fourier_SO4%species_Z
       this%w => this%fourier_SO4%w
-      
+
       this%initialised = .true.
 
    endsubroutine power_so4_initialise
@@ -2443,10 +2466,16 @@ module descriptors_module
 
       type(Dictionary) :: params
       real(dp) :: alpha_basis, spacing_basis, cutoff_basis, basis_error_exponent
-      real(dp), dimension(:,:), allocatable :: covariance_basis, overlap_basis, cholesky_overlap_basis
-      integer :: i, j, xml_version
+      real(dp) ::  N_alpha, S_alpha_beta, N_beta
+      real(dp), dimension(:,:,:), allocatable :: covariance_basis, overlap_basis
+      integer :: i, j, xml_version, info, n_radial_grid
+
+      real(dp), dimension(:, :), allocatable ::  alpha_ln, Q, R
+      real(dp) :: u, alpha_gto, t, Rg
+      integer :: l, n, l_ub
 
       type(LA_Matrix) :: LA_covariance_basis, LA_overlap_basis
+      type(LA_matrix), dimension(:), allocatable :: LA_BL_ti
       character(len=STRING_LENGTH) :: species_Z_str
       logical :: has_n_species, has_species_Z, has_central_reference_all_species
 
@@ -2462,7 +2491,7 @@ module descriptors_module
       call param_register(params, 'cutoff_dexp', '0', this%cutoff_dexp, help_string="Cutoff decay exponent")
       call param_register(params, 'cutoff_scale', '1.0', this%cutoff_scale, help_string="Cutoff decay scale")
       call param_register(params, 'cutoff_rate', '1.0', this%cutoff_rate, help_string="Inverse cutoff decay rate")
-      
+
       call param_register(params, 'l_max', PARAM_MANDATORY, this%l_max, help_string="L_max (spherical harmonics basis band limit) for soap-type descriptors")
       call param_register(params, 'n_max', PARAM_MANDATORY, this%n_max, help_string="N_max (number of radial basis functions) for soap-type descriptors")
       call param_register(params, 'atom_gaussian_width', PARAM_MANDATORY, this%atom_sigma, help_string="Width of atomic Gaussians for soap-type descriptors", altkey='atom_sigma')
@@ -2472,7 +2501,7 @@ module descriptors_module
            "By default (F) only consider when neighbour is the same species as centre")
       call param_register(params, 'average', 'F', this%global, help_string="Whether to calculate averaged SOAP - one descriptor per atoms object. If false (default) atomic SOAP is returned.")
       call param_register(params, 'diagonal_radial', 'F', this%diagonal_radial, help_string="Only return the n1=n2 elements of the power spectrum.")
- 
+
       call param_register(params, 'covariance_sigma0', '0.0', this%covariance_sigma0, help_string="sigma_0 parameter in polynomial covariance function")
       call param_register(params, 'normalise', 'T', this%normalise, help_string="Normalise descriptor so magnitude is 1. In this case the kernel of two equivalent environments is 1.", altkey="normalize")
       call param_register(params, 'basis_error_exponent', '10.0', basis_error_exponent, help_string="10^(-basis_error_exponent) is the max difference between the target and the expanded function")
@@ -2482,6 +2511,10 @@ module descriptors_module
       call param_register(params, 'species_Z', '', species_Z_str, has_value_target=has_species_Z, help_string="Atomic number of species")
       call param_register(params, 'xml_version', '1426512068', xml_version, help_string="Version of GAP the XML potential file was created")
 
+      call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
+      call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
+      call param_register(params, 'radial_basis', '', this%radial_basis, help_string="Radial basis functions to use. Options are EQUISPACED_GAUSS, POLY and GTO (default for xml_version > 1987654320")
+
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
       endif
@@ -2490,8 +2523,16 @@ module descriptors_module
       ! backwards compatibility: the default used to be different before this version number
       if( xml_version < 1426512068 ) this%central_reference_all_species = .true.
 
-      allocate(this%species_Z(this%n_species))
+      !backwards compatibility: only EQUISPACED_GAUSS allowed for old versions. default is GTO for new versions.
+      if( xml_version < 1987654321) then
+         this%radial_basis = "EQUISPACED_GAUSS"
+      elseif (this%radial_basis == "") then
+         this%radial_basis = "GTO"
+      endif
+
+      allocate(this%species_Z(0:this%n_species))
       allocate(this%Z(this%n_Z))
+      this%species_Z(0)=0
 
       if( has_species_Z .and. .not. has_n_species ) then
          RAISE_ERROR("soap_initialise: is species_Z is present, n_species must be present, too.",error)
@@ -2515,7 +2556,7 @@ module descriptors_module
          if(this%n_species == 1) then
             call param_register(params, 'species_Z', '0', this%species_Z(1), help_string="Atomic number of species")
          else
-            call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z, help_string="Atomic number of species")
+            call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z(1:this%n_species), help_string="Atomic number of species")
          endif
       else
          call param_register(params, 'species_Z', '0', this%species_Z(1), help_string="Atomic number of species")
@@ -2528,71 +2569,187 @@ module descriptors_module
       else
          call param_register(params, 'Z', '//MANDATORY//', this%Z, help_string="Atomic numbers to be considered for central atom, must be a list")
       endif
-      
+
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
          RAISE_ERROR("soap_initialise failed to parse args_str='"//trim(args_str)//"'", error)
       endif
       call finalise(params)
 
-      this%alpha = 0.5_dp / this%atom_sigma**2
 
+      this%alpha = 0.5_dp / this%atom_sigma**2
       alpha_basis = this%alpha
       cutoff_basis = this%cutoff + this%atom_sigma * sqrt(2.0_dp * basis_error_exponent * log(10.0_dp))
       spacing_basis = cutoff_basis / this%n_max
 
-      allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
-         covariance_basis(this%n_max,this%n_max), overlap_basis(this%n_max,this%n_max), this%cholesky_overlap_basis(this%n_max,this%n_max))
+      if (this%radial_basis == "EQUISPACED_GAUSS") then
+         allocate(this%r_basis(this%n_max), this%transform_basis(this%n_max,this%n_max), &
+            covariance_basis(this%n_max,this%n_max, 1), overlap_basis(this%n_max,this%n_max, 1), this%cholesky_overlap_basis(this%n_max,this%n_max, 1))
 
-      !this%r_basis(this%n_max) = cutoff_basis
-      !do i = this%n_max-1, 1, -1
-      !   this%r_basis(i)  = this%r_basis(i+1) - spacing_basis
-      !enddo
-
-      this%r_basis(1) = 0.0_dp
-      do i = 2, this%n_max
-         this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
-      enddo
-
-      do i = 1, this%n_max
-         do j = 1, this%n_max
-            covariance_basis(j,i) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
-            !overlap_basis(j,i) = exp(-0.5_dp * alpha_basis* (this%r_basis(i) - this%r_basis(j))**2) * ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) )
-            !print*, 'A', exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) )
-            !print*, 'B', sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j))
-            !print*, 'C', alpha_basis*exp(0.5_dp * alpha_basis * (this%r_basis(i) + this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 )
-            !print*, 'D', ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) )
-            !overlap_basis(j,i) = exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
-            !   ( sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
-            !   alpha_basis*exp(0.5_dp * alpha_basis * (this%r_basis(i) + this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
-            !   ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
-
-            overlap_basis(j,i) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
-               sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
-               alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
-               ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
+         this%r_basis(1) = 0.0_dp
+         do i = 2, this%n_max
+            this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
          enddo
-      enddo
 
-      !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
-      overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
-
-      call initialise(LA_covariance_basis,covariance_basis)
-      call initialise(LA_overlap_basis,overlap_basis)
-      call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis)
-      do i = 1, this%n_max
-         do j = 1, i-1 !i + 1, this%n_max
-            this%cholesky_overlap_basis(j,i) = 0.0_dp
+         do i = 1, this%n_max
+            do j = 1, this%n_max
+               covariance_basis(j,i, 1) = exp(-alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)
+               overlap_basis(j,i,1) = ( exp( -alpha_basis*(this%r_basis(i)**2+this%r_basis(j)**2) ) * &
+                  sqrt(2.0_dp) * alpha_basis**1.5_dp * (this%r_basis(i) + this%r_basis(j)) + &
+                  alpha_basis*exp(-0.5_dp * alpha_basis * (this%r_basis(i) - this%r_basis(j))**2)*sqrt(PI)*(1.0_dp + alpha_basis*(this%r_basis(i) + this%r_basis(j))**2 ) * &
+                  ( 1.0_dp + erf( sqrt(alpha_basis/2.0_dp) * (this%r_basis(i) + this%r_basis(j)) ) ) )
+            enddo
          enddo
-      enddo
 
-      call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis,this%transform_basis)
+         !overlap_basis = overlap_basis * sqrt(pi / ( 8.0_dp * alpha_basis ) )
+         overlap_basis = overlap_basis / sqrt(128.0_dp * alpha_basis**5)
 
-      call finalise(LA_covariance_basis)
-      call finalise(LA_overlap_basis)
+         call initialise(LA_covariance_basis, covariance_basis(:, :, 1))
+         call initialise(LA_overlap_basis,overlap_basis(:, :, 1))
+         call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(:, :, 1))
+         do i = 1, this%n_max
+            do j = 1, i-1 !i + 1, this%n_max
+               this%cholesky_overlap_basis(j,i,1) = 0.0_dp    ! lower triangular
+            enddo
+         enddo
 
-      if(allocated(covariance_basis)) deallocate(covariance_basis)
-      if(allocated(overlap_basis)) deallocate(overlap_basis)
-      if(allocated(cholesky_overlap_basis)) deallocate(cholesky_overlap_basis)
+         call Matrix_Solve(LA_covariance_basis,this%cholesky_overlap_basis(:, :, 1),this%transform_basis)
+
+         call finalise(LA_covariance_basis)
+         call finalise(LA_overlap_basis)
+
+         if(allocated(covariance_basis)) deallocate(covariance_basis)
+         if(allocated(overlap_basis)) deallocate(overlap_basis)
+
+      else
+         ! fine radial grid to fit radial coeficients
+         n_radial_grid = 3 * this%n_max
+         allocate(this%r_basis(n_radial_grid))
+         spacing_basis = cutoff_basis / n_radial_grid
+         this%r_basis(1) = 0.0_dp
+         do i = 2, n_radial_grid
+            this%r_basis(i)  = this%r_basis(i-1) + spacing_basis
+         enddo
+
+
+         ! allocations
+         allocate(covariance_basis(n_radial_grid, this%n_max, 0:this%l_max))
+         allocate(overlap_basis(this%n_max,this%n_max, 0:this%l_max))
+         allocate(this%cholesky_overlap_basis(this%n_max,this%n_max, 0:this%l_max))
+         allocate(LA_BL_ti(0:this%l_max))
+         allocate(Q(n_radial_grid, this%n_max), R(this%n_max, this%n_max))
+
+         if (this%radial_basis == "POLY") then
+            l_ub = 0
+         ! form the overlap matrix and do cholesky decomposition
+            do i = 1, this%n_max
+               N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
+               do j = 1, this%n_max
+                  N_beta = ((cutoff_basis**(2*j+7))/((j+3)*(2*j+5)*(2*j+7)))**0.5_dp
+                  S_alpha_beta = (2*cutoff_basis**(i+j+7))/((5+i+j)*(6+i+j)*(7+i+j))
+                  overlap_basis(j,i, 0) = S_alpha_beta/(N_alpha*N_beta)
+               enddo
+            enddo
+
+            ! form the "covariance matrix"
+            do i = 1, this%n_max
+               N_alpha = ((cutoff_basis**(2*i+7))/((i+3)*(2*i+5)*(2*i+7)))**0.5_dp
+               do j = 1, n_radial_grid
+                  covariance_basis(j, i, 0) = ((cutoff_basis-this%r_basis(j))**(i+2))/N_alpha
+               enddo
+            enddo
+
+         elseif (this%radial_basis == "GTO") then
+            l_ub = this%l_max
+            allocate(alpha_ln(0:this%l_max+1, this%n_max))
+
+            spacing_basis = cutoff_basis/this%n_max
+            do l = 0, this%l_max
+               do n = 1, this%n_max
+                  Rg = spacing_basis * n
+                  alpha_ln(l, n) = -Rg**(-2) * (log(0.001_dp) - l*log(Rg))
+               enddo
+            enddo
+
+            !form the overlap matrices
+            do l = 0, this%l_max
+               do i = 1, this%n_max
+                  do j = 1, this%n_max
+                     alpha_gto = alpha_ln(l, i) + alpha_ln(l, j)
+                     u = alpha_gto*cutoff_basis**2
+                     t = l + 1.5_dp
+                     overlap_basis(i, j, l) = 0.5*cutoff_basis**(2*t)*u**(-t)* ( gamma(t) - gamma_incomplete_upper(t, u) )
+                  enddo
+               enddo
+            enddo
+
+            !form the covariance matrices
+            do l = 0, this%l_max
+               do i = 1, this%n_max
+                  do j = 1, n_radial_grid
+                     covariance_basis(j, i, l) = this%r_basis(j)**l * exp(-alpha_ln(l, i)*this%r_basis(j)**2)
+                  enddo
+               enddo
+            enddo
+
+         else
+            RAISE_ERROR("soap_initialise: radial_basis not recognised: EQUISPACED_GAUSS, POLY or GTO" ,error)
+         endif
+
+         !allocate(this%BL_ti(0:this%l_max, n_radial_grid, this%n_max))
+         ! extract factor and tau as these are only bits needed for QR_solve
+         allocate(this%QR_factor( size(this%r_basis), this%n_max, 0:this%l_max))
+         allocate(this%QR_tau(this%n_max, 0:this%l_max))
+
+         ! per l
+         do l = 0, l_ub
+            ! cholesky factorisation
+            call initialise(LA_covariance_basis, covariance_basis(:, :, l))
+            call initialise(LA_overlap_basis,overlap_basis(:, :, l))
+            call LA_Matrix_Factorise(LA_overlap_basis, this%cholesky_overlap_basis(:, :, l))
+            do i = 1, this%n_max
+               do j = 1, i-1 !i + 1, this%n_max
+                  this%cholesky_overlap_basis(j,i, l) = 0.0_dp    ! lower triangular
+               enddo
+            enddo
+
+            !find inverse of L^T, NOTE: reusing overlap basis in a confusing way here
+            overlap_basis(:, :, l) = transpose(this%cholesky_overlap_basis(:, :, l))
+            call dtrtri("U", "N", this%n_max, overlap_basis(:, :, l), this%n_max, i)
+            ! form B(L^T)^-1 and do QR factorisation in prep for solving equations.
+            !this%BL_ti(l, :, :) =  matmul(covariance_basis(l, :, :), overlap_basis(l, :, :))
+
+            call initialise(LA_BL_ti(l), matmul(covariance_basis(:, :, l), overlap_basis(:, :, l)))
+            call LA_Matrix_QR_Factorise(LA_BL_ti(l), Q, R, error)
+
+            this%QR_factor(:, :, l) = LA_BL_ti(l)%factor
+            this%QR_tau(:, l) = LA_BL_ti(l)%tau
+
+            call finalise(LA_covariance_basis)
+            call finalise(LA_overlap_basis)
+         enddo
+
+         if (l_ub == 0 .and. this%l_max > 0) then
+            do l = 1, this%l_max
+               this%QR_factor(:, :, l) = this%QR_factor(:, :, 0)
+               this%QR_tau(:, l) = this%QR_tau(:, 0)
+            enddo
+         endif
+
+
+         if (allocated(covariance_basis)) deallocate(covariance_basis)
+         if (allocated(overlap_basis)) deallocate(overlap_basis)
+         if (allocated(Q)) deallocate(Q)
+         if (allocated(R)) deallocate(R)
+
+         if (allocated(LA_BL_ti)) then
+            do l = 0, this%l_max
+               call finalise(LA_BL_ti(l))
+            enddo
+            deallocate(LA_BL_ti)
+         endif
+      endif
+
+
 
       this%initialised = .true.
 
@@ -2601,13 +2758,14 @@ module descriptors_module
    subroutine soap_finalise(this,error)
       type(soap), intent(inout) :: this
       integer, optional, intent(out) :: error
+      integer :: l
 
       INIT_ERROR(error)
 
       if(.not. this%initialised) return
       this%cutoff_dexp = 0
-      this%cutoff_scale = 1.0_dp 
-      this%cutoff_rate = 1.0_dp 
+      this%cutoff_scale = 1.0_dp
+      this%cutoff_rate = 1.0_dp
       this%cutoff = 0.0_dp
       this%cutoff_transition_width = 0.0_dp
       this%l_max = 0
@@ -2622,12 +2780,17 @@ module descriptors_module
       this%n_max = 0
       this%n_Z = 0
       this%n_species = 0
+      this%nu_R = 2
+      this%nu_S = 2
 
       if(allocated(this%r_basis)) deallocate(this%r_basis)
       if(allocated(this%transform_basis)) deallocate(this%transform_basis)
       if(allocated(this%cholesky_overlap_basis)) deallocate(this%cholesky_overlap_basis)
       if(allocated(this%species_Z)) deallocate(this%species_Z)
       if(allocated(this%Z)) deallocate(this%Z)
+
+      if (allocated(this%QR_factor)) deallocate(this%QR_factor)
+      if (allocated(this%QR_tau)) deallocate(this%QR_tau)
 
       this%initialised = .false.
 
@@ -2689,16 +2852,16 @@ module descriptors_module
 
    subroutine as_distance_2b_initialise(this,args_str,error)
       type(as_distance_2b), intent(inout) :: this
-      character(len=*), intent(in) :: args_str  
-      integer, optional, intent(out) :: error  
-  
-      type(Dictionary) :: params  
-  
-      INIT_ERROR(error)  
-  
-      call finalise(this)  
-  
-      call initialise(params)  
+      character(len=*), intent(in) :: args_str
+      integer, optional, intent(out) :: error
+
+      type(Dictionary) :: params
+
+      INIT_ERROR(error)
+
+      call finalise(this)
+
+      call initialise(params)
       call param_register(params, 'min_cutoff', '0.00', this%min_cutoff, help_string="Lower cutoff for as_distance_2b-type descriptors")
       call param_register(params, 'max_cutoff', PARAM_MANDATORY, this%max_cutoff, help_string="Higher cutoff for as_distance_2b-type descriptors")
       call param_register(params, 'as_cutoff', PARAM_MANDATORY, this%as_cutoff, help_string="Cutoff of asymmetricity")
@@ -2710,16 +2873,16 @@ module descriptors_module
       call param_register(params, 'coordination_transition_width', '0.50', this%coordination_transition_width, help_string="Transition width for as_distance_2b-type descriptors")
       call param_register(params, 'Z1', '0', this%Z1, help_string="Atom type #1 in bond")
       call param_register(params, 'Z2', '0', this%Z2, help_string="Atom type #2 in bond")
-  
+
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='as_distance_2b_initialise args_str')) then
          RAISE_ERROR("as_distance_2b_initialise failed to parse args_str='"//trim(args_str)//"'", error)
-      endif  
-      call finalise(params)  
-  
-      this%initialised = .true.  
-  
+      endif
+      call finalise(params)
+
+      this%initialised = .true.
+
    endsubroutine as_distance_2b_initialise
-  
+
    subroutine as_distance_2b_finalise(this,error)
       type(as_distance_2b), intent(inout) :: this
       integer, optional, intent(out) :: error
@@ -2743,7 +2906,7 @@ module descriptors_module
 
    endsubroutine as_distance_2b_finalise
 
-  
+
    subroutine alex_initialise(this,args_str,error)
       type(alex), intent(inout) :: this
       character(len=*), intent(in) :: args_str
@@ -2799,7 +2962,7 @@ module descriptors_module
       this%initialised = .false.
 
    endsubroutine alex_finalise
-  
+
    subroutine distance_Nb_initialise(this,args_str,error)
       type(distance_Nb), intent(inout) :: this
       character(len=*), intent(in) :: args_str
@@ -2979,11 +3142,11 @@ module descriptors_module
 
       call uniq(Z,uniq_Z)
       call reallocate(n_permutations,size(uniq_Z))
-     
+
       do i = 1, size(uniq_Z)
          n_permutations(i) = count( uniq_Z(i) == Z )
       enddo
-      
+
       if(allocated(uniq_Z)) deallocate(uniq_Z)
 
    endsubroutine distance_Nb_n_permutations
@@ -2991,20 +3154,20 @@ module descriptors_module
    recursive subroutine distance_Nb_permutations(n_permutations,permutations)
       integer, dimension(:), intent(in) :: n_permutations
       integer, dimension(sum(n_permutations),product(factorial_int(n_permutations))), intent(inout) :: permutations
- 
+
       integer, dimension(:), allocatable, save :: current_permutation
       integer :: i, j, n_lo, n_hi
       integer, save :: recursion_level = 0, i_current_permutation = 0
- 
+
       recursion_level = recursion_level + 1
- 
+
 
       if( recursion_level == 1 ) then
          i_current_permutation = 0
          allocate(current_permutation(sum(n_permutations)))
          current_permutation = 0
       endif
- 
+
 
       do i = 1, size(n_permutations)
          if( i == 1 ) then
@@ -3016,7 +3179,7 @@ module descriptors_module
          do j = n_lo, n_hi
             if( i_current_permutation < size(permutations,2) ) then
                if( .not. any(j==current_permutation) .and. recursion_level >= n_lo .and. recursion_level <= n_hi ) then
- 
+
                   current_permutation(recursion_level) = j
                   if( recursion_level == sum(n_permutations) ) then
                      i_current_permutation = i_current_permutation + 1
@@ -3028,16 +3191,225 @@ module descriptors_module
             endif
          enddo
       enddo
- 
+
       current_permutation(recursion_level) = 0
- 
+
       recursion_level = recursion_level - 1
- 
+
       if( recursion_level == 0 ) then
          deallocate(current_permutation)
       endif
- 
+
    endsubroutine distance_Nb_permutations
+
+   subroutine soap_turbo_initialise(this,args_str,error)
+      use soap_turbo_compress_module
+
+      type(soap_turbo), intent(inout) :: this
+      character(len=*), intent(in) :: args_str
+      integer, optional, intent(out) :: error
+
+      type(Dictionary) :: params
+
+      logical :: has_atom_sigma_angular
+
+      integer :: l, k, i, j, m, n, n_nonzero
+      real(dp) :: fact, fact1, fact2, ppi, atom_sigma_radial_normalised, cutoff_hard,&
+         s2, I_n, N_n, N_np1, N_np2, I_np1, I_np2, C2
+      character(len=64) :: compress_string
+
+      type(LA_Matrix) :: LA_overlap
+      real(dp), dimension(:), allocatable :: s
+      real(dp), dimension(:,:), allocatable :: sqrt_overlap, u, v
+      real(dp), parameter :: sqrt_two = sqrt(2.0_dp)
+
+      INIT_ERROR(error)
+
+      call finalise(this)
+
+      call initialise(params)
+      call param_register(params, 'l_max', PARAM_MANDATORY, this%l_max, help_string="Angular basis resolution")
+      call param_register(params, 'n_species', '1', this%n_species, help_string="Number of species for the descriptor")
+      call param_register(params, 'rcut_hard', PARAM_MANDATORY, this%rcut_hard, help_string="Hard cutoff")
+      call param_register(params, 'rcut_soft', PARAM_MANDATORY, this%rcut_soft, help_string="Soft cutoff")
+      call param_register(params, 'nf', "4.0", this%nf, help_string="TODO")
+      call param_register(params, 'radial_enhancement', "0", this%radial_enhancement, help_string="TODO")
+      call param_register(params, 'basis', "poly3", this%basis, help_string="poly3 or poly3gauss")
+      call param_register(params, 'scaling_mode', "polynomial", this%scaling_mode, help_string="TODO")
+      call param_register(params, 'compress_file', "None", this%compress_file, help_string="TODO")
+      call param_register(params, 'compress_mode', "None", this%compress_mode, help_string="TODO")
+      call param_register(params, 'central_index', "1", this%central_index, help_string="Index of central atom species_Z in the >species< array")
+
+      if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
+         RAISE_ERROR("soap_turbo_initialise failed to parse args_str='"//trim(args_str)//"'", error)
+      endif
+
+      call finalise(params)
+
+      allocate(this%atom_sigma_r(this%n_species))
+      allocate(this%atom_sigma_r_scaling(this%n_species))
+      allocate(this%atom_sigma_t(this%n_species))
+      allocate(this%atom_sigma_t_scaling(this%n_species))
+      allocate(this%amplitude_scaling(this%n_species))
+      allocate(this%central_weight(this%n_species))
+      allocate(this%alpha_max(this%n_species))
+      allocate(this%species_Z(this%n_species))
+
+      call initialise(params)
+      if(this%n_species == 1) then
+         call param_register(params, 'alpha_max', PARAM_MANDATORY, this%alpha_max(1), &
+            help_string="Radial basis resolution for each species")
+         call param_register(params, 'atom_sigma_r', PARAM_MANDATORY, this%atom_sigma_r(1), &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the radial direction")
+         call param_register(params, 'atom_sigma_r_scaling', PARAM_MANDATORY, this%atom_sigma_r_scaling(1), &
+            help_string="Scaling rate of radial sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'atom_sigma_t', PARAM_MANDATORY, this%atom_sigma_t(1), &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the angular direction")
+         call param_register(params, 'atom_sigma_t_scaling', PARAM_MANDATORY, this%atom_sigma_t_scaling(1), &
+            help_string="Scaling rate of angular sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'amplitude_scaling', PARAM_MANDATORY, this%amplitude_scaling(1), &
+            help_string="Scaling rate of amplitude: scaled as an inverse function of neighbour distance")
+         call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
+            help_string="Weight of central atom in environment")
+         call param_register(params, 'species_Z', PARAM_MANDATORY, this%species_Z(1), &
+            help_string="Atomic number of species, including the central atom")
+      else
+         call param_register(params, 'alpha_max', '//MANDATORY//', this%alpha_max, &
+            help_string="Radial basis resultion for each species")
+         call param_register(params, 'atom_sigma_r', '//MANDATORY//', this%atom_sigma_r, &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the radial direction")
+         call param_register(params, 'atom_sigma_r_scaling', '//MANDATORY//', this%atom_sigma_r_scaling, &
+            help_string="Scaling rate of radial sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'atom_sigma_t', '//MANDATORY//', this%atom_sigma_t, &
+            help_string="Width of atomic Gaussians for soap-type descriptors in the angular direction")
+         call param_register(params, 'atom_sigma_t_scaling', '//MANDATORY//', this%atom_sigma_t_scaling, &
+            help_string="Scaling rate of angular sigma: scaled as a function of neighbour distance")
+         call param_register(params, 'amplitude_scaling', '//MANDATORY//', this%amplitude_scaling, &
+                     help_string="Scaling rate of amplitude: scaled as an inverse function of neighbour distance")
+         call param_register(params, 'central_weight', '//MANDATORY//', this%central_weight, &
+            help_string="Weight of central atom in environment")
+         call param_register(params, 'species_Z', '//MANDATORY//', this%species_Z, &
+            help_string="Atomic number of species, including the central atom")
+      endif
+
+      if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
+         RAISE_ERROR("soap_turbo_initialise failed to parse args_str='"//trim(args_str)//"'", error)
+      endif
+      call finalise(params)
+
+!     Here we read in the compression information from a file (compress_file) or rely on a keyword provided
+!     by the user (compress_mode) which leads to a predefined recipe to compress the soap_turbo descriptor
+!     The file always takes precedence over the keyword.
+      if( this%compress_file /= "None" )then
+        this%compress = .true.
+        open(unit=10, file=this%compress_file, status="old")
+        read(10, *) (i, j=1,this%n_species), i, n
+        read(10, '(A)') compress_string
+        if( compress_string == "P_transformation" )then
+          n_nonzero = -1
+          do while( compress_string /= "end_transformation" )
+            read(10, '(A)') compress_string
+            n_nonzero = n_nonzero + 1
+          end do
+          this%compress_P_nonzero = n_nonzero
+          allocate( this%compress_P_el(1:n_nonzero) )
+          allocate( this%compress_P_i(1:n_nonzero) )
+          allocate( this%compress_P_j(1:n_nonzero) )
+          do i = 1, n_nonzero+1
+            backspace(10)
+          end do
+          do i = 1, n_nonzero
+            read(10,*) this%compress_P_i(i), this%compress_P_j(i), this%compress_P_el(i)
+          end do
+        else
+!         Old way to handle compression for backcompatibility
+          backspace(10)
+          this%compress_P_nonzero = n
+          allocate( this%compress_P_el(1:n) )
+          allocate( this%compress_P_i(1:n) )
+          allocate( this%compress_P_j(1:n) )
+          do i = 1, n
+            read(10, *) this%compress_P_j(i)
+            this%compress_P_i(i) = i
+            this%compress_P_el(i) = 1.0_dp
+          end do
+        end if
+        close(10)
+      else if( this%compress_mode /= "None" )then
+        this%compress = .true.
+        call get_compress_indices( this%compress_mode, this%alpha_max, this%l_max, n, this%compress_P_nonzero, &
+                                   this%compress_P_i, this%compress_P_j, this%compress_P_el, "get_dim" )
+        allocate( this%compress_P_i(1:this%compress_P_nonzero) )
+        allocate( this%compress_P_j(1:this%compress_P_nonzero) )
+        allocate( this%compress_P_el(1:this%compress_P_nonzero) )
+        call get_compress_indices( this%compress_mode, this%alpha_max, this%l_max, n, this%compress_P_nonzero, &
+                                   this%compress_P_i, this%compress_P_j, this%compress_P_el, "set_indices" )
+      end if
+
+
+      this%initialised = .true.
+
+   endsubroutine soap_turbo_initialise
+
+   subroutine soap_turbo_finalise(this,error)
+      type(soap_turbo), intent(inout) :: this
+      integer, optional, intent(out) :: error
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) return
+      this%rcut_hard = 0.0_dp
+      this%rcut_soft = 0.0_dp
+      this%nf = 0.0_dp
+      this%n_species = 0
+      this%radial_enhancement = 0
+      this%central_index = 0
+      this%l_max = 0
+
+      if(allocated(this%alpha_max)) deallocate(this%alpha_max)
+      if(allocated(this%atom_sigma_r)) deallocate(this%atom_sigma_r)
+      if(allocated(this%atom_sigma_r_scaling)) deallocate(this%atom_sigma_r_scaling)
+      if(allocated(this%atom_sigma_t)) deallocate(this%atom_sigma_t)
+      if(allocated(this%atom_sigma_t_scaling)) deallocate(this%atom_sigma_t_scaling)
+      if(allocated(this%amplitude_scaling)) deallocate(this%amplitude_scaling)
+      if(allocated(this%central_weight)) deallocate(this%central_weight)
+      if(allocated(this%species_Z)) deallocate(this%species_Z)
+
+      this%initialised = .false.
+
+   endsubroutine soap_turbo_finalise
+
+   subroutine soap_turbo_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
+      type(soap_turbo), intent(in) :: this
+      type(atoms), intent(in) :: at
+      integer, intent(out) :: n_descriptors, n_cross
+      logical, dimension(:), intent(in), optional :: mask
+      integer, intent(out), optional :: n_index
+      integer, optional, intent(out) :: error
+
+      integer :: i
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("soap_turbo_sizes: descriptor object not initialised", error)
+      endif
+
+      n_descriptors = 0
+      n_cross = 0
+
+      do i = 1, at%N
+         if( at%Z(i) /= this%species_Z(this%central_index) ) cycle
+         if(present(mask)) then
+            if(.not. mask(i)) cycle
+         endif
+         n_descriptors = n_descriptors + 1
+         n_cross = n_cross + n_neighbours(at,i,max_dist=this%rcut_hard) + 1
+      enddo
+
+      if( present(n_index) ) n_index = 1
+
+   endsubroutine soap_turbo_sizes
 
    subroutine descriptor_str_add_species(this,species,descriptor_str,error)
       character(len=*), intent(in) :: this
@@ -3105,7 +3477,7 @@ module descriptors_module
                enddo
             enddo
          enddo
-      case(DT_GENERAL_MONOMER,DT_GENERAL_DIMER,DT_WATER_MONOMER,DT_WATER_DIMER,DT_A2_DIMER,DT_AB_DIMER,DT_TRIHIS,DT_BOND_REAL_SPACE,DT_ATOM_REAL_SPACE,DT_AN_MONOMER)  
+      case(DT_GENERAL_MONOMER,DT_GENERAL_DIMER,DT_WATER_MONOMER,DT_WATER_DIMER,DT_A2_DIMER,DT_AB_DIMER,DT_TRIHIS,DT_BOND_REAL_SPACE,DT_ATOM_REAL_SPACE,DT_AN_MONOMER)
          allocate(descriptor_str(1))
          descriptor_str(1) = trim(this)
       case(DT_DISTANCE_NB)
@@ -3144,24 +3516,24 @@ module descriptors_module
       integer, dimension(:,:), intent(inout) :: ZN
       integer, dimension(:), intent(in) :: species
       integer, intent(in) :: order
- 
+
       integer :: i_species, n_species
       integer, save :: current_descriptor, current_order = 0
       integer, dimension(:), allocatable, save :: ZN_current
- 
+
       n_species = size(species)
- 
+
       if( current_order == 0 ) then                           ! first run, outermost order.
          current_descriptor = 0                               ! keeps track of descriptor
          current_order = 1                                    ! keeps track of order
          allocate(ZN_current(order))                          ! builds/updates atomic numbers gradually for each descriptor
       endif
- 
+
       do i_species = 1, n_species
          if( current_order > 1 ) then                             ! no special atom, all atoms equivalent
             if( species(i_species) < ZN_current(current_order-1) ) cycle   ! avoids double-counting of neighbours
          endif
- 
+
          ZN_current(current_order) = species(i_species)
          if( current_order < order ) then                                 ! calls recursively until we reach the last order
             current_order = current_order + 1
@@ -3171,11 +3543,11 @@ module descriptors_module
             ZN(:,current_descriptor) = ZN_current
          endif
       enddo
- 
+
       current_order = current_order - 1                                   ! when the loop finished, step one level down
- 
+
       if( current_order == 0 ) deallocate(ZN_current)                     ! when we reach zero, we finished.
- 
+
    endsubroutine descriptor_str_add_species_distance_Nb
 
    subroutine descriptor_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
@@ -3183,7 +3555,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       INIT_ERROR(error)
@@ -3237,6 +3609,8 @@ module descriptors_module
             call calc(this%descriptor_alex,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_DISTANCE_Nb)
             call calc(this%descriptor_distance_Nb,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+         case(DT_SOAP_TURBO)
+            call calc(this%descriptor_soap_turbo,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             call calc(this%descriptor_bond_real_space,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
@@ -3244,18 +3618,16 @@ module descriptors_module
             call calc(this%descriptor_AN_monomer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_COM_DIMER)
             call calc(this%descriptor_com_dimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
-         case(DT_GENERAL_MONOMER)  
-            call calc(this%descriptor_general_monomer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)  
-         case(DT_GENERAL_DIMER)  
-            call calc(this%descriptor_general_dimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)  
-         case(DT_GENERAL_TRIMER)  
-            call calc(this%descriptor_general_trimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)  
-         case(DT_MOLECULE_LO_D)  
-            call calc(this%descriptor_molecule_lo_d,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)  
+         case(DT_GENERAL_MONOMER)
+            call calc(this%descriptor_general_monomer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+         case(DT_GENERAL_DIMER)
+            call calc(this%descriptor_general_dimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+         case(DT_GENERAL_TRIMER)
+            call calc(this%descriptor_general_trimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+         case(DT_MOLECULE_LO_D)
+            call calc(this%descriptor_molecule_lo_d,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_SOAP_EXPRESS)
             call calc(this%descriptor_soap_express,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
-         case(DT_SOAP_TURBO)
-            call calc(this%descriptor_soap_turbo,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 #endif
          case default
             RAISE_ERROR("descriptor_calc: unknown descriptor type "//this%descriptor_type,error)
@@ -3275,11 +3647,15 @@ module descriptors_module
       integer, dimension(:,:), intent(out), optional :: grad_descriptor_index
       real(dp), dimension(:,:), intent(out), optional :: grad_descriptor_pos
       real(dp), dimension(:,:), intent(out), optional :: grad_covariance_cutoff
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(descriptor_data) :: my_descriptor_data
+      type(Dictionary) :: params
       integer :: i, n, i_d, n_descriptors, n_cross, n_index
+      character(STRING_LENGTH) :: atom_mask_name
+      logical :: has_atom_mask_name
+      logical, dimension(:), pointer :: atom_mask_pointer
       logical :: do_grad_descriptor, do_descriptor
 
       INIT_ERROR(error)
@@ -3287,7 +3663,35 @@ module descriptors_module
       do_descriptor = present(descriptor_out)
       do_grad_descriptor = present(grad_descriptor_out) .or. present(grad_descriptor_index) .or. present(grad_descriptor_pos)
 
-      call descriptor_sizes(this,at,n_descriptors,n_cross,n_index=n_index,error=error)
+      atom_mask_pointer => null()
+      if(present(args_str)) then
+         call initialise(params)
+
+         call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
+         help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
+         "calculated.")
+
+         if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='descriptor_calc_array args_str')) then
+            RAISE_ERROR("descriptor_calc_array failed to parse args_str='"//trim(args_str)//"'", error)
+         endif
+
+         call finalise(params)
+
+         if( has_atom_mask_name ) then
+            if (.not. assign_pointer(at, trim(atom_mask_name), atom_mask_pointer)) then
+               RAISE_ERROR("descriptor_calc_array did not find "//trim(atom_mask_name)//" property in the atoms object.", error)
+            endif
+         else
+            atom_mask_pointer => null()
+         endif
+
+      endif
+
+      if (associated(atom_mask_pointer)) then
+         call descriptor_sizes(this,at,n_descriptors,n_cross,mask=atom_mask_pointer,n_index=n_index,error=error)
+      else
+         call descriptor_sizes(this,at,n_descriptors,n_cross,n_index=n_index,error=error)
+      endif
 
       call calc(this,at,my_descriptor_data,do_descriptor=do_descriptor,do_grad_descriptor=do_grad_descriptor,args_str=args_str,error=error)
 
@@ -3342,7 +3746,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -3379,7 +3783,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -3387,7 +3791,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='bispectrum_SO4_calc args_str')) then
             RAISE_ERROR("bispectrum_SO4_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -3409,7 +3813,7 @@ module descriptors_module
          endif
       enddo
 
-      call cg_initialise(this%j_max, 2)  
+      call cg_initialise(this%j_max, 2)
 
       call finalise(descriptor_out)
 
@@ -3442,18 +3846,18 @@ module descriptors_module
          endif
 
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
+            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
 
-            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_data = 0.0_dp
             descriptor_out%x(i_desc)%ii = 0
             descriptor_out%x(i_desc)%pos = 0.0_dp
             descriptor_out%x(i_desc)%has_grad_data = .false.
 
-            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
          endif
 
@@ -3475,7 +3879,7 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
             ! dU is not allocated, allocate and zero it
-            allocate( dU(0:this%j_max,0:n_neighbours(at,i,max_dist=this%cutoff)) ) 
+            allocate( dU(0:this%j_max,0:n_neighbours(at,i,max_dist=this%cutoff)) )
             do j = 0, this%j_max
                allocate( dU(j,0)%mm(3,-j:j,-j:j) )
                dU(j,0)%mm = CPLX_ZERO
@@ -3487,8 +3891,8 @@ module descriptors_module
          endif
 
          n_i = 0
-         do n = 1, n_neighbours(at,i) 
-            ji = neighbour(at, i, n, jn=jn, distance=r, diff=diff, cosines=u_ij,shift=shift) 
+         do n = 1, n_neighbours(at,i)
+            ji = neighbour(at, i, n, jn=jn, distance=r, diff=diff, cosines=u_ij,shift=shift)
             if( r >= this%cutoff ) cycle
 
             n_i = n_i + 1
@@ -3514,7 +3918,7 @@ module descriptors_module
                !do j2 = 0, this%j_max
                   do j = abs(j1-j2), min(this%j_max,j1+j2)
                      if( mod(j1+j2+j,2) == 1 ) cycle
-                     
+
                      i_bisp = i_bisp + 1
 
                      !do m1 = -j, j, 2
@@ -3552,9 +3956,9 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
             n_i = 0
-            do n = 0, n_neighbours(at,i) 
+            do n = 0, n_neighbours(at,i)
                if( n>0 ) then
-                  ji = neighbour(at, i, n, distance=r) 
+                  ji = neighbour(at, i, n, distance=r)
                   if( r >= this%cutoff ) cycle
                   n_i = n_i + 1
                endif
@@ -3595,7 +3999,7 @@ module descriptors_module
                               dsub = CPLX_ZERO
                               do m11 = max(-j1,m1-j2), min(j1,m1+j2), 2
                                  do m12 = max(-j1,m2-j2), min(j1,m2+j2), 2
-                                    
+
                                     tmp_cg =  cg_array(j1,m11,j2,m1-m11,j,m1) &
                                     * cg_array(j1,m12,j2,m2-m12,j,m2)
 
@@ -3614,7 +4018,7 @@ module descriptors_module
 
                      enddo
                   !enddo
-               enddo 
+               enddo
             enddo
          endif
 
@@ -3633,7 +4037,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(cplx_1d), dimension(:), allocatable :: SphericalY_ij
@@ -3682,14 +4086,14 @@ module descriptors_module
          endif
       enddo
 
-      call cg_initialise(this%l_max)  
+      call cg_initialise(this%l_max)
 
       call finalise(descriptor_out)
 
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -3697,7 +4101,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='bispectrum_SO3_calc args_str')) then
             RAISE_ERROR("bispectrum_SO3_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -3712,7 +4116,7 @@ module descriptors_module
       endif
 
       d = bispectrum_so3_dimensions(this,error)
-         
+
       if(associated(atom_mask_pointer)) then
          call descriptor_sizes(this,at,n_descriptors,n_cross, &
             mask=atom_mask_pointer,n_index=n_index,error=error)
@@ -3737,18 +4141,18 @@ module descriptors_module
             descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
+            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
 
-            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_data = 0.0_dp
             descriptor_out%x(i_desc)%ii = 0
             descriptor_out%x(i_desc)%pos = 0.0_dp
             descriptor_out%x(i_desc)%has_grad_data = .false.
 
-            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
          endif
       enddo
@@ -3788,8 +4192,8 @@ module descriptors_module
          endif
 
          if(my_do_grad_descriptor) then
-            allocate( dfourier_so3(0:this%l_max,this%n_max,0:n_neighbours(at,i,max_dist=this%cutoff)) ) 
-            do n = 0, n_neighbours(at,i,max_dist=this%cutoff) 
+            allocate( dfourier_so3(0:this%l_max,this%n_max,0:n_neighbours(at,i,max_dist=this%cutoff)) )
+            do n = 0, n_neighbours(at,i,max_dist=this%cutoff)
                do a = 1, this%n_max
                   do l = 0, this%l_max
                      allocate(dfourier_so3(l,a,n)%mm(3,-l:l))
@@ -3803,8 +4207,8 @@ module descriptors_module
          endif
 
          n_i = 0
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij)
             if( r_ij >= this%cutoff ) cycle
 
             n_i = n_i + 1
@@ -3866,7 +4270,7 @@ module descriptors_module
          endif
 
          if(my_do_grad_descriptor) then
-            do n = 1, n_neighbours(at,i,max_dist=this%cutoff) 
+            do n = 1, n_neighbours(at,i,max_dist=this%cutoff)
                i_pow = 0
                do a = 1, this%n_max
                   do l1 = 0, this%l_max
@@ -3945,7 +4349,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -3981,7 +4385,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -3989,7 +4393,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='behler_calc args_str')) then
             RAISE_ERROR("behler_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -4034,7 +4438,7 @@ module descriptors_module
             descriptor_out%x(i_desc_i)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
+            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
 
             allocate(descriptor_out%x(i_desc_i)%grad_data(d,3,0:l_n_neighbours))
             allocate(descriptor_out%x(i_desc_i)%ii(0:l_n_neighbours))
@@ -4068,13 +4472,13 @@ module descriptors_module
          endif
          if(my_do_grad_descriptor) then
             descriptor_out%x(i_desc_i)%ii(0) = i
-            descriptor_out%x(i_desc_i)%pos(:,0) = at%pos(:,i) 
+            descriptor_out%x(i_desc_i)%pos(:,0) = at%pos(:,i)
             descriptor_out%x(i_desc_i)%has_grad_data(0) = .true.
          endif
 
          n_i = 0
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij)
             if( r_ij >= this%cutoff ) cycle
 
             n_i = n_i + 1
@@ -4102,8 +4506,8 @@ module descriptors_module
 
 
             m_i = 0
-            do m = 1, n_neighbours(at,i) 
-               k = neighbour(at, i, m, distance = r_ik, cosines=u_ik, diff=d_ik) 
+            do m = 1, n_neighbours(at,i)
+               k = neighbour(at, i, m, distance = r_ik, cosines=u_ik, diff=d_ik)
                if( r_ik >= this%cutoff ) cycle
 
                m_i = m_i + 1
@@ -4124,11 +4528,11 @@ module descriptors_module
                do b = 1, this%n_g3
                   if( r_ik >= this%g3(b)%rc .or. r_jk >= this%g3(b)%rc) cycle
                   if( this%g3(b)%Z_n(1) /= 0 .and. this%g3(b)%Z_n(2) /= 0 ) then
-                     if( .not. ( & 
+                     if( .not. ( &
                         ( this%g3(b)%Z_n(1) == at%Z(j) .and. this%g3(b)%Z_n(2) == at%Z(k) ) .or. &
                         ( this%g3(b)%Z_n(1) == at%Z(k) .and. this%g3(b)%Z_n(2) == at%Z(j) ) ) ) cycle
                   endif
-                     
+
                   f_cut_ij = cos_cutoff_function(r_ij,this%g3(b)%rc)
                   f_cut_ik = cos_cutoff_function(r_ik,this%g3(b)%rc)
                   f_cut_jk = cos_cutoff_function(r_jk,this%g3(b)%rc)
@@ -4155,7 +4559,7 @@ module descriptors_module
 
                      descriptor_out%x(i_desc_i)%grad_data(a,:,m_i) = descriptor_out%x(i_desc_i)%grad_data(a,:,m_i) + 0.5_dp * &
                      ( ( dAng * dcosijk_ik * Rad + Ang * ( dRad_ik * u_ik + dRad_jk * u_jk ) ) * f_cut_ij * f_cut_ik * f_cut_jk + &
-                     Ang * Rad * f_cut_ij * ( df_cut_ik * u_ik * f_cut_jk + f_cut_ik * df_cut_jk * u_jk ) ) 
+                     Ang * Rad * f_cut_ij * ( df_cut_ik * u_ik * f_cut_jk + f_cut_ik * df_cut_jk * u_jk ) )
 
                      descriptor_out%x(i_desc_i)%grad_data(a,:,0) = descriptor_out%x(i_desc_i)%grad_data(a,:,0) - 0.5_dp * &
                      ( ( dAng * (dcosijk_ij+dcosijk_ik) * Rad + Ang * (dRad_ij * u_ij + dRad_ik * u_ik) ) * f_cut_ij * f_cut_ik * f_cut_jk + &
@@ -4171,7 +4575,7 @@ module descriptors_module
          do b = 1, this%n_g3
             a = b + this%n_g2
 
-            if(my_do_descriptor) descriptor_out%x(i_desc_i)%data(a) = descriptor_out%x(i_desc_i)%data(a) * 2.0_dp**(1.0_dp-this%g3(b)%zeta) 
+            if(my_do_descriptor) descriptor_out%x(i_desc_i)%data(a) = descriptor_out%x(i_desc_i)%data(a) * 2.0_dp**(1.0_dp-this%g3(b)%zeta)
             if(my_do_grad_descriptor) descriptor_out%x(i_desc_i)%grad_data(a,:,:) = descriptor_out%x(i_desc_i)%grad_data(a,:,:) * 2.0_dp**(1.0_dp-this%g3(b)%zeta)
          enddo
       enddo
@@ -4188,15 +4592,15 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
       character(STRING_LENGTH) :: atom_mask_name
       logical :: has_atom_mask_name
-      logical :: needs_resid 
+      logical :: needs_resid
       logical, dimension(:), pointer :: atom_mask_pointer
-      integer, dimension(:), pointer :: resid_pointer 
+      integer, dimension(:), pointer :: resid_pointer
 
       logical :: my_do_descriptor, my_do_grad_descriptor, Zi1, Zi2, Zj1, Zj2
       integer :: d, n_descriptors, n_cross, i_desc, i, j, n, n_index
@@ -4222,7 +4626,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -4230,7 +4634,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='distance_2b_calc args_str')) then
             RAISE_ERROR("distance_2b_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -4243,15 +4647,15 @@ module descriptors_module
 
       endif
 
-      needs_resid = this%only_intra .or. this%only_inter 
-      if (needs_resid) then 
-         if (.not. assign_pointer(at, trim(this%resid_name), resid_pointer)) then 
-            RAISE_ERROR("distance_2b_calc did not find "//trim(this%resid_name)//" property (residue id) in the atoms object.", error) 
-         end if 
-      else    
-         resid_pointer => null() 
-      end if   
-   
+      needs_resid = this%only_intra .or. this%only_inter
+      if (needs_resid) then
+         if (.not. assign_pointer(at, trim(this%resid_name), resid_pointer)) then
+            RAISE_ERROR("distance_2b_calc did not find "//trim(this%resid_name)//" property (residue id) in the atoms object.", error)
+         end if
+      else
+         resid_pointer => null()
+      end if
+
       d = distance_2b_dimensions(this,error)
 
       if(associated(atom_mask_pointer)) then
@@ -4267,9 +4671,9 @@ module descriptors_module
             allocate(descriptor_out%x(i)%data(d))
             descriptor_out%x(i)%data = 0.0_dp
             allocate(descriptor_out%x(i)%ci(n_index))
-            descriptor_out%x(i)%ci = 0 
+            descriptor_out%x(i)%ci = 0
             descriptor_out%x(i)%has_data = .false.
-            descriptor_out%x(i)%covariance_cutoff = 1.0_dp 
+            descriptor_out%x(i)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
             allocate(descriptor_out%x(i)%grad_data(d,3,0:1))
@@ -4292,21 +4696,21 @@ module descriptors_module
          if(associated(atom_mask_pointer)) then  ! skip if masked
             if(.not. atom_mask_pointer(i)) cycle ! skip if masked
          endif                                   ! skip if masked
-         
+
          Zi1 = (this%Z1 == 0) .or. (at%Z(i) == this%Z1)
          Zi2 = (this%Z2 == 0) .or. (at%Z(i) == this%Z2)
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, shift=shift) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, shift=shift)
             if( r_ij >= this%cutoff ) cycle
 
             Zj1 = (this%Z1 == 0) .or. (at%Z(j) == this%Z1)
             Zj2 = (this%Z2 == 0) .or. (at%Z(j) == this%Z2)
             if( .not. ( ( Zi1 .and. Zj2 ) .or. ( Zi2 .and. Zj1 ) ) ) cycle ! this pair doesn't belong to the descriptor type
 
-            if (needs_resid) then 
-               if (this%only_intra .and. resid_pointer(i) /= resid_pointer(j)) cycle 
-               if (this%only_inter .and. resid_pointer(i) == resid_pointer(j)) cycle 
-            end if 
+            if (needs_resid) then
+               if (this%only_intra .and. resid_pointer(i) /= resid_pointer(j)) cycle
+               if (this%only_inter .and. resid_pointer(i) == resid_pointer(j)) cycle
+            end if
 
             i_desc = i_desc + 1
 
@@ -4334,7 +4738,7 @@ module descriptors_module
                endif
 
                descriptor_out%x(i_desc)%ii(0) = i
-               descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+               descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
                descriptor_out%x(i_desc)%has_grad_data(0) = .true.
                descriptor_out%x(i_desc)%grad_data(:,:,0) = -( this%exponents*r_ij**(this%exponents-1) ) .outer. u_ij
                descriptor_out%x(i_desc)%grad_covariance_cutoff(:,0) = -(dcovariance_cutoff*tail + covariance_cutoff*dtail)*u_ij
@@ -4358,7 +4762,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -4388,7 +4792,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -4396,7 +4800,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='coordination_calc args_str')) then
             RAISE_ERROR("coordination_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -4438,18 +4842,18 @@ module descriptors_module
             descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
+            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
 
-            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_data = 0.0_dp
             descriptor_out%x(i_desc)%ii = 0
             descriptor_out%x(i_desc)%pos = 0.0_dp
             descriptor_out%x(i_desc)%has_grad_data = .false.
 
-            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
          endif
       enddo
@@ -4469,13 +4873,13 @@ module descriptors_module
          endif
          if(my_do_grad_descriptor) then
             descriptor_out%x(i_desc)%ii(0) = i
-            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
             descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
          i_n = 0
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, shift=shift) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, shift=shift)
 
             if( r_ij >= this%cutoff ) cycle
             i_n = i_n + 1
@@ -4505,7 +4909,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -4537,7 +4941,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -4545,7 +4949,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='angle_3b_calc args_str')) then
             RAISE_ERROR("angle_3b_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -4596,11 +5000,11 @@ module descriptors_module
          if(associated(atom_mask_pointer)) then   ! skip if masked
             if(.not. atom_mask_pointer(i)) cycle  ! skip if masked
          endif                                    ! skip if masked
-         
+
          if( (this%Z /=0) .and. (at%Z(i) /= this%Z) ) cycle
-         
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, diff = d_ij, shift=shift_ij) 
+
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, diff = d_ij, shift=shift_ij)
 
             if( r_ij >= this%cutoff ) cycle
 
@@ -4610,11 +5014,11 @@ module descriptors_module
             fc_j = coordination_function(r_ij,this%cutoff,this%cutoff_transition_width)
             dfc_j = dcoordination_function(r_ij,this%cutoff,this%cutoff_transition_width)
 
-            do m = 1, n_neighbours(at,i) 
+            do m = 1, n_neighbours(at,i)
 
                if( n == m ) cycle
 
-               k = neighbour(at, i, m, distance = r_ik, cosines = u_ik, diff = d_ik, shift=shift_ik) 
+               k = neighbour(at, i, m, distance = r_ik, cosines = u_ik, diff = d_ik, shift=shift_ik)
                if( r_ik >= this%cutoff ) cycle
 
                Zk1 = (this%Z1 == 0) .or. (at%Z(k) == this%Z1)
@@ -4648,7 +5052,7 @@ module descriptors_module
                   dcosijk_ik = ( u_ij - cos_ijk * u_ik ) / r_ik
 
                   descriptor_out%x(i_desc)%ii(0) = i
-                  descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+                  descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
                   descriptor_out%x(i_desc)%has_grad_data(0) = .true.
                   descriptor_out%x(i_desc)%grad_data(1,:,0) = - u_ij - u_ik
                   descriptor_out%x(i_desc)%grad_data(2,:,0) = 2.0_dp * (r_ij - r_ik)*(-u_ij + u_ik)
@@ -4687,7 +5091,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(descriptor) :: my_coordination
@@ -4723,7 +5127,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -4731,7 +5135,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='co_angle_3b_calc args_str')) then
             RAISE_ERROR("co_angle_3b_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -4758,20 +5162,20 @@ module descriptors_module
       i_desc = 0
       do i = 1, at%N
          if( (this%Z /=0) .and. (at%Z(i) /= this%Z) ) cycle
-         l_n_neighbours_coordination = n_neighbours(at,i,max_dist=this%coordination_cutoff) 
+         l_n_neighbours_coordination = n_neighbours(at,i,max_dist=this%coordination_cutoff)
 
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij)
             if( r_ij >= this%cutoff ) cycle
 
             Zj1 = (this%Z1 == 0) .or. (at%Z(j) == this%Z1)
             Zj2 = (this%Z2 == 0) .or. (at%Z(j) == this%Z2)
 
-            do m = 1, n_neighbours(at,i) 
+            do m = 1, n_neighbours(at,i)
 
                if( n == m ) cycle
 
-               k = neighbour(at, i, m, distance = r_ik) 
+               k = neighbour(at, i, m, distance = r_ik)
                if( r_ik >= this%cutoff ) cycle
 
                Zk1 = (this%Z1 == 0) .or. (at%Z(k) == this%Z1)
@@ -4789,16 +5193,16 @@ module descriptors_module
 
                if(my_do_grad_descriptor) then
 
-                  allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:2+l_n_neighbours_coordination)) 
-                  allocate(descriptor_out%x(i_desc)%ii(0:2+l_n_neighbours_coordination)) 
-                  allocate(descriptor_out%x(i_desc)%pos(3,0:2+l_n_neighbours_coordination)) 
-                  allocate(descriptor_out%x(i_desc)%has_grad_data(0:2+l_n_neighbours_coordination)) 
+                  allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:2+l_n_neighbours_coordination))
+                  allocate(descriptor_out%x(i_desc)%ii(0:2+l_n_neighbours_coordination))
+                  allocate(descriptor_out%x(i_desc)%pos(3,0:2+l_n_neighbours_coordination))
+                  allocate(descriptor_out%x(i_desc)%has_grad_data(0:2+l_n_neighbours_coordination))
                   descriptor_out%x(i_desc)%grad_data = 0.0_dp
                   descriptor_out%x(i_desc)%ii = 0
                   descriptor_out%x(i_desc)%pos = 0.0_dp
                   descriptor_out%x(i_desc)%has_grad_data = .false.
 
-                  allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:2+l_n_neighbours_coordination)) 
+                  allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:2+l_n_neighbours_coordination))
                   descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
                endif
             enddo
@@ -4807,13 +5211,13 @@ module descriptors_module
 
       call initialise(my_coordination,'coordination cutoff='//this%coordination_cutoff//' coordination_transition_width='//this%coordination_transition_width,error)
       call calc(my_coordination,at,descriptor_coordination,do_descriptor,do_grad_descriptor,args_str,error)
-      
+
       i_desc = 0
       do i = 1, at%N
          if( (this%Z /=0) .and. (at%Z(i) /= this%Z) ) cycle
 
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, diff = d_ij, shift=shift_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, diff = d_ij, shift=shift_ij)
 
             if( r_ij >= this%cutoff ) cycle
 
@@ -4823,10 +5227,10 @@ module descriptors_module
             fc_j = coordination_function(r_ij,this%cutoff,0.5_dp)
             dfc_j = dcoordination_function(r_ij,this%cutoff,0.5_dp)
 
-            do m = 1, n_neighbours(at,i) 
+            do m = 1, n_neighbours(at,i)
                if( n == m ) cycle
 
-               k = neighbour(at, i, m, distance = r_ik, cosines = u_ik, diff = d_ik, shift=shift_ik) 
+               k = neighbour(at, i, m, distance = r_ik, cosines = u_ik, diff = d_ik, shift=shift_ik)
                if( r_ik >= this%cutoff ) cycle
 
                Zk1 = (this%Z1 == 0) .or. (at%Z(k) == this%Z1)
@@ -4861,7 +5265,7 @@ module descriptors_module
                   dcosijk_ik = ( u_ij - cos_ijk * u_ik ) / r_ik
 
                   descriptor_out%x(i_desc)%ii(0) = i
-                  descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+                  descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
                   descriptor_out%x(i_desc)%has_grad_data(0) = .true.
                   descriptor_out%x(i_desc)%grad_data(1,:,0) = - u_ij - u_ik
                   descriptor_out%x(i_desc)%grad_data(2,:,0) = 2.0_dp * (r_ij - r_ik)*(-u_ij + u_ik)
@@ -4909,7 +5313,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(descriptor) :: my_coordination
@@ -4944,7 +5348,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -4952,7 +5356,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='co_distance_2b_calc args_str')) then
             RAISE_ERROR("co_distance_2b_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -4978,15 +5382,15 @@ module descriptors_module
       allocate(descriptor_out%x(n_descriptors))
       i_desc = 0
       do i = 1, at%N
-         
+
          if( associated(atom_mask_pointer) ) then
             if( .not. atom_mask_pointer(i) ) cycle
          endif
 
          Zi1 = (this%Z1 == 0) .or. (at%Z(i) == this%Z1)
          Zi2 = (this%Z2 == 0) .or. (at%Z(i) == this%Z2)
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance=r_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance=r_ij)
 
             if(r_ij >= this%cutoff) cycle
 !if(r_ij <3.5_dp) cycle
@@ -5004,8 +5408,8 @@ module descriptors_module
             endif
 
             if(my_do_grad_descriptor) then
-               n_neighbours_coordination_ij = n_neighbours(at,i,max_dist=this%coordination_cutoff) + & 
-               n_neighbours(at,j,max_dist=this%coordination_cutoff) + 2 
+               n_neighbours_coordination_ij = n_neighbours(at,i,max_dist=this%coordination_cutoff) + &
+               n_neighbours(at,j,max_dist=this%coordination_cutoff) + 2
 
                allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:1+n_neighbours_coordination_ij))
                allocate(descriptor_out%x(i_desc)%ii(0:1+n_neighbours_coordination_ij))
@@ -5024,7 +5428,7 @@ module descriptors_module
 
       call initialise(my_coordination,'coordination cutoff='//this%coordination_cutoff//' transition_width='//this%coordination_transition_width,error)
       call calc(my_coordination,at,descriptor_coordination,.true.,do_grad_descriptor,args_str,error)
-      
+
       i_desc = 0
       do i = 1, at%N
 
@@ -5034,8 +5438,8 @@ module descriptors_module
 
          Zi1 = (this%Z1 == 0) .or. (at%Z(i) == this%Z1)
          Zi2 = (this%Z2 == 0) .or. (at%Z(i) == this%Z2)
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, shift=shift) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines = u_ij, shift=shift)
             if( r_ij >= this%cutoff ) cycle
 !if(r_ij <3.5_dp) cycle
 
@@ -5046,7 +5450,7 @@ module descriptors_module
             i_desc = i_desc + 1
             if(my_do_descriptor) then
                descriptor_out%x(i_desc)%ci(1:2) = (/i,j/)
-               
+
                descriptor_out%x(i_desc)%has_data = .true.
 
                descriptor_out%x(i_desc)%data(1) = r_ij
@@ -5056,10 +5460,10 @@ module descriptors_module
                descriptor_out%x(i_desc)%covariance_cutoff = coordination_function(r_ij, this%cutoff,this%transition_width) !coordination_function(r_ij,3.5_dp, 0.5_dp, this%cutoff,this%transition_width)
             endif
             if(my_do_grad_descriptor) then
-               n_neighbours_coordination_i = n_neighbours(at,i,max_dist=this%coordination_cutoff) 
+               n_neighbours_coordination_i = n_neighbours(at,i,max_dist=this%coordination_cutoff)
 
                descriptor_out%x(i_desc)%ii(0) = i
-               descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+               descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
                descriptor_out%x(i_desc)%has_grad_data(0) = .true.
                descriptor_out%x(i_desc)%grad_data(1,:,0) = -u_ij(:)
                descriptor_out%x(i_desc)%grad_covariance_cutoff(:,0) = -dcoordination_function(r_ij,this%cutoff,this%transition_width)*u_ij !-dcoordination_function(r_ij,3.5_dp, 0.5_dp, this%cutoff,this%transition_width)*u_ij
@@ -5100,7 +5504,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -5134,7 +5538,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -5142,7 +5546,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='cosnx_calc args_str')) then
             RAISE_ERROR("cosnx_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -5193,18 +5597,18 @@ module descriptors_module
             descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
+            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
 
-            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_data = 0.0_dp
             descriptor_out%x(i_desc)%ii = 0
             descriptor_out%x(i_desc)%pos = 0.0_dp
             descriptor_out%x(i_desc)%has_grad_data = .false.
 
-            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
          endif
       enddo
@@ -5230,13 +5634,13 @@ module descriptors_module
          endif
          if(my_do_grad_descriptor) then
             descriptor_out%x(i_desc)%ii(0) = i
-            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
             descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
          n_i = 0
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij)
             if( r_ij >= this%cutoff ) cycle
 
             n_i = n_i + 1
@@ -5252,8 +5656,8 @@ module descriptors_module
                descriptor_out%x(i_desc)%has_grad_data(n_i) = .true.
             endif
 
-            do m = 1, n_neighbours(at,i) 
-               k = neighbour(at, i, m, distance = r_ik, cosines=u_ik, diff=d_ik) 
+            do m = 1, n_neighbours(at,i)
+               k = neighbour(at, i, m, distance = r_ik, cosines=u_ik, diff=d_ik)
                if( r_ik >= this%cutoff ) cycle
 
                d_jk = d_ik - d_ij
@@ -5305,7 +5709,7 @@ module descriptors_module
                      U_cos_ijk(b) = U_n_cos_ijk
                   endif
                enddo
-     
+
                i_cosnx = 0
                do a = 1, this%n_max
                   do b = 0, this%l_max
@@ -5349,7 +5753,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -5383,7 +5787,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -5391,7 +5795,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='trihis_calc args_str')) then
             RAISE_ERROR("trihis_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -5416,10 +5820,10 @@ module descriptors_module
             descriptor_out%x(i)%has_data = .false.
          endif
          if(my_do_grad_descriptor) then
-            allocate(descriptor_out%x(i)%grad_data(d,3,0:n_neighbours(at,i))) 
-            allocate(descriptor_out%x(i)%ii(0:n_neighbours(at,i))) 
-            allocate(descriptor_out%x(i)%pos(3,0:n_neighbours(at,i))) 
-            allocate(descriptor_out%x(i)%has_grad_data(0:n_neighbours(at,i))) 
+            allocate(descriptor_out%x(i)%grad_data(d,3,0:n_neighbours(at,i)))
+            allocate(descriptor_out%x(i)%ii(0:n_neighbours(at,i)))
+            allocate(descriptor_out%x(i)%pos(3,0:n_neighbours(at,i)))
+            allocate(descriptor_out%x(i)%has_grad_data(0:n_neighbours(at,i)))
             descriptor_out%x(i)%grad_data = 0.0_dp
             descriptor_out%x(i)%ii = 0
             descriptor_out%x(i)%pos = 0.0_dp
@@ -5435,12 +5839,12 @@ module descriptors_module
          endif
          if(my_do_grad_descriptor) then
             descriptor_out%x(i)%ii(0) = i
-            descriptor_out%x(i)%pos(:,0) = at%pos(:,i) 
+            descriptor_out%x(i)%pos(:,0) = at%pos(:,i)
             descriptor_out%x(i)%has_grad_data(0) = .true.
          endif
 
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij)
             if( r_ij >= this%cutoff ) cycle
 
             if(my_do_grad_descriptor) then
@@ -5449,8 +5853,8 @@ module descriptors_module
                descriptor_out%x(i)%has_grad_data(n) = .true.
             endif
 
-            do m = 1, n_neighbours(at,i) 
-               k = neighbour(at, i, m, distance = r_ik, cosines=u_ik, diff=d_ik) 
+            do m = 1, n_neighbours(at,i)
+               k = neighbour(at, i, m, distance = r_ik, cosines=u_ik, diff=d_ik)
                if( r_ik >= this%cutoff ) cycle
 
                d_jk = d_ik - d_ij
@@ -5506,7 +5910,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -5540,7 +5944,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -5548,7 +5952,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='water_monomer_calc args_str')) then
             RAISE_ERROR("water_monomer_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -5618,7 +6022,7 @@ module descriptors_module
          if(my_do_descriptor) then
             descriptor_out%x(i_desc)%ci(:) = water_monomer_index(:,i)
             descriptor_out%x(i_desc)%has_data = .true.
-            descriptor_out%x(i_desc)%data(1) = r1+r2 
+            descriptor_out%x(i_desc)%data(1) = r1+r2
             descriptor_out%x(i_desc)%data(2) = (r1-r2)**2
             descriptor_out%x(i_desc)%data(3) = dot_product(v1,v2)
          endif
@@ -5653,7 +6057,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -5691,11 +6095,11 @@ module descriptors_module
       if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
 
       call finalise(descriptor_out)
-  
+
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -5703,9 +6107,9 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='water_dimer_calc args_str')) then
             RAISE_ERROR("water_dimer_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
-  
+
          if( has_atom_mask_name ) then
             if (.not. assign_pointer(at, trim(atom_mask_name), atom_mask_pointer)) then
                RAISE_ERROR("water_dimer_calc did not find "//trim(atom_mask_name)//" property in the atoms object.", error)
@@ -5762,7 +6166,7 @@ module descriptors_module
          iAO = water_monomer_index(1,i)
          iAH1 = water_monomer_index(2,i)
          iAH2 = water_monomer_index(3,i)
-  
+
          if(associated(atom_mask_pointer)) then
             if(.not. atom_mask_pointer(iAO)) cycle
          endif
@@ -5775,8 +6179,8 @@ module descriptors_module
          r_AO_AH2 = norm(diff_AO_AH2)
          r_AH1_AH2 = norm(diff_AH1_AH2)
 
-         do n = 1, n_neighbours(at,iAO) 
-            iBO = neighbour(at,iAO,n,distance=r_AO_BO, diff=diff_AO_BO, shift=shift_AO_BO ) 
+         do n = 1, n_neighbours(at,iAO)
+            iBO = neighbour(at,iAO,n,distance=r_AO_BO, diff=diff_AO_BO, shift=shift_AO_BO )
             if(at%Z(iBO) /= 8) cycle
             if( r_AO_BO >= this%cutoff ) cycle
             i_desc = i_desc + 1
@@ -5826,20 +6230,20 @@ module descriptors_module
             r_AH2_BH1 = norm(diff_AH2_BH1)
             r_AH2_BH2 = norm(diff_AH2_BH2)
 
-  
+
             distances = (/r_AO_BO, &
                   r_AO_AH1, r_AO_AH2, r_AO_BH1, r_AO_BH2, r_BO_AH1, r_BO_AH2, r_BO_BH1, r_BO_BH2, &
                   r_AH1_AH2, r_AH1_BH1, r_AH1_BH2, r_AH2_BH1, r_AH2_BH2, r_BH1_BH2/)
- 
+
             if(my_do_descriptor) then
                descriptor_out%x(i_desc)%ci(:) = (/ water_monomer_index(:,i),water_monomer_index(:,j) /)
                descriptor_out%x(i_desc)%has_data = .true.
-               descriptor_out%x(i_desc)%data(:) = (distances+this%dist_shift)**this%power  
+               descriptor_out%x(i_desc)%data(:) = (distances+this%dist_shift)**this%power
 
                descriptor_out%x(i_desc)%covariance_cutoff = coordination_function(r_AO_BO, &
                this%cutoff,this%cutoff_transition_width)
             endif
-  
+
             if(my_do_grad_descriptor) then
                descriptor_out%x(i_desc)%ii(:) = (/ water_monomer_index(:,i),water_monomer_index(:,j) /)
                descriptor_out%x(i_desc)%pos(:,1) = at%pos(:,iAO) ! TODO: Have to figure out how to do this.
@@ -5889,7 +6293,7 @@ module descriptors_module
 
                do i_distance = 1, 15
                   descriptor_out%x(i_desc)%grad_data(i_distance,:,:) = descriptor_out%x(i_desc)%grad_data(i_distance,:,:) * &
-                     (distances(i_distance)+this%dist_shift)**(this%power-1.0_dp) * this%power  
+                     (distances(i_distance)+this%dist_shift)**(this%power-1.0_dp) * this%power
                enddo
 
                descriptor_out%x(i_desc)%grad_covariance_cutoff(:,1) = -dcoordination_function(r_AO_BO,&
@@ -5909,7 +6313,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -5942,7 +6346,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -5950,7 +6354,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='A2_dimer_calc args_str')) then
             RAISE_ERROR("A2_dimer_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -5997,12 +6401,12 @@ module descriptors_module
       i_desc = 0
       do i = 1, at%N
          iA1 = i
-         iA2 = neighbour(at,i,A2_monomer_index(i),distance=r_A1_A2,shift=shift_A1_A2) 
+         iA2 = neighbour(at,i,A2_monomer_index(i),distance=r_A1_A2,shift=shift_A1_A2)
          if( iA1 > iA2 ) cycle
 
          do j = i + 1, at%N
             iB1 = j
-            iB2 = neighbour(at,j,A2_monomer_index(j),distance=r_B1_B2,shift=shift_B1_B2) 
+            iB2 = neighbour(at,j,A2_monomer_index(j),distance=r_B1_B2,shift=shift_B1_B2)
             if( iB1 > iB2 ) cycle
 
             r_A1_B1 = distance_min_image(at,iA1,iB1,shift=shift_A1_B1)
@@ -6010,7 +6414,7 @@ module descriptors_module
 
             r_A2_B1 = distance_min_image(at,iA2,iB1,shift=shift_A2_B1)
             r_A2_B2 = distance_min_image(at,iA2,iB2,shift=shift_A2_B2)
-            
+
             if( any( (/r_A1_A2,r_B1_B2,r_A1_B1,r_A1_B2,r_A2_B1,r_A2_B2/) >= this%cutoff) ) cycle
             i_desc = i_desc + 1
 
@@ -6053,7 +6457,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -6086,7 +6490,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -6094,7 +6498,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='AB_dimer_calc args_str')) then
             RAISE_ERROR("AB_dimer_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -6160,7 +6564,7 @@ module descriptors_module
 
             r_A1_B2 = distance_min_image(at,iA1,iB2,shift=shift_A1_B2)
             r_A2_B1 = distance_min_image(at,iA2,iB1,shift=shift_A2_B1)
-            
+
             if( any( (/r_A1_A2,r_B1_B2,r_A1_B1,r_A1_B2,r_A2_B1,r_A2_B2/) >= this%cutoff) ) cycle
             i_desc = i_desc + 1
 
@@ -6205,7 +6609,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -6243,7 +6647,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -6251,7 +6655,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='atom_real_space_calc args_str')) then
             RAISE_ERROR("atom_real_space_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -6273,8 +6677,8 @@ module descriptors_module
       do i = 1, at%N
          i_desc = i_desc + 1
 
-         l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
-         d = ( 2 * (this%l_max+1)**2 + 2 ) * l_n_neighbours 
+         l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
+         d = ( 2 * (this%l_max+1)**2 + 2 ) * l_n_neighbours
 
          if(my_do_descriptor) then
             allocate(descriptor_out%x(i_desc)%data(d))
@@ -6286,16 +6690,16 @@ module descriptors_module
          if(my_do_grad_descriptor) then
             grad_d = 2 * (this%l_max+1)**2 + 2
 
-            allocate(descriptor_out%x(i_desc)%grad_data(d,3,1:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%ii(1:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%pos(3,1:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%has_grad_data(1:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,1:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(1:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,1:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(1:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_data = 0.0_dp
             descriptor_out%x(i_desc)%ii = 0
             descriptor_out%x(i_desc)%pos = 0.0_dp
             descriptor_out%x(i_desc)%has_grad_data = .false.
 
-            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,1:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,1:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
          endif
       enddo
@@ -6320,9 +6724,9 @@ module descriptors_module
             !descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
-         do n = 1, n_neighbours(at,i) 
+         do n = 1, n_neighbours(at,i)
 
-            j = neighbour(at,i,n,distance = r, diff = diff, shift=shift) 
+            j = neighbour(at,i,n,distance = r, diff = diff, shift=shift)
             if(r >= this%cutoff) cycle
             i_n = i_n + 1
 
@@ -6343,7 +6747,7 @@ module descriptors_module
 
             do l = 0, this%l_max
                descriptor_mould_size = size(transfer(spherical_harmonics(-l:l),descriptor_mould))
-               
+
                do m = -l, l
                   if(my_do_descriptor) spherical_harmonics(m) = SphericalYCartesian(l,m,diff)
                   if(my_do_grad_descriptor) grad_spherical_harmonics(:,m) = GradSphericalYCartesian(l,m,diff)
@@ -6378,7 +6782,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -6418,7 +6822,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -6426,7 +6830,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='power_so3_calc args_str')) then
             RAISE_ERROR("power_so3_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -6477,18 +6881,18 @@ module descriptors_module
             descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
          endif
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
+            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
 
-            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_data = 0.0_dp
             descriptor_out%x(i_desc)%ii = 0
             descriptor_out%x(i_desc)%pos = 0.0_dp
             descriptor_out%x(i_desc)%has_grad_data = .false.
 
-            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
          endif
       enddo
@@ -6531,8 +6935,8 @@ module descriptors_module
          enddo
 
          if(my_do_grad_descriptor) then
-            allocate( dfourier_so3(0:this%l_max,this%n_max,0:n_neighbours(at,i,max_dist=this%cutoff)) ) 
-            do n = 0, n_neighbours(at,i,max_dist=this%cutoff) 
+            allocate( dfourier_so3(0:this%l_max,this%n_max,0:n_neighbours(at,i,max_dist=this%cutoff)) )
+            do n = 0, n_neighbours(at,i,max_dist=this%cutoff)
                do a = 1, this%n_max
                   do l = 0, this%l_max
                      allocate(dfourier_so3(l,a,n)%mm(3,-l:l))
@@ -6546,8 +6950,8 @@ module descriptors_module
          endif
 
          n_i = 0
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij)
             if( r_ij >= this%cutoff ) cycle
 
             n_i = n_i + 1
@@ -6595,7 +6999,7 @@ module descriptors_module
          endif
 
          if(my_do_grad_descriptor) then
-            do n = 1, n_neighbours(at,i,max_dist=this%cutoff) 
+            do n = 1, n_neighbours(at,i,max_dist=this%cutoff)
                i_pow = 0
                do a = 1, this%n_max
                   do l = 0, this%l_max
@@ -6656,7 +7060,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(cplx_2d), dimension(:), allocatable :: U
@@ -6702,7 +7106,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -6710,7 +7114,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='power_SO4_calc args_str')) then
             RAISE_ERROR("power_SO4_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -6750,18 +7154,18 @@ module descriptors_module
          endif
 
          if(my_do_grad_descriptor) then
-            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff) 
+            l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
 
-            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours)) 
-            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_data = 0.0_dp
             descriptor_out%x(i_desc)%ii = 0
             descriptor_out%x(i_desc)%pos = 0.0_dp
             descriptor_out%x(i_desc)%has_grad_data = .false.
 
-            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours)) 
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours))
             descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
          endif
 
@@ -6788,8 +7192,8 @@ module descriptors_module
          endif
 
          n_i = 0
-         do n = 1, n_neighbours(at,i) 
-            ji = neighbour(at, i, n, jn=jn, distance=r, diff=diff, cosines=u_ij,shift=shift) 
+         do n = 1, n_neighbours(at,i)
+            ji = neighbour(at, i, n, jn=jn, distance=r, diff=diff, cosines=u_ij,shift=shift)
             if( r >= this%cutoff ) cycle
 
             n_i = n_i + 1
@@ -6818,8 +7222,8 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
             n_i = 0
-            do n = 1, n_neighbours(at,i) 
-               ji = neighbour(at, i, n, distance=r) 
+            do n = 1, n_neighbours(at,i)
+               ji = neighbour(at, i, n, distance=r)
                if( r >= this%cutoff ) cycle
                n_i = n_i + 1
                i_bisp = 0
@@ -6828,7 +7232,7 @@ module descriptors_module
                   do k = 1, 3
                      descriptor_out%x(i_desc)%grad_data(i_bisp,k,n_i) = 2.0_dp * sum( conjg(U(j)%mm)*dU(j,n_i)%mm(k,:,:) )
                   enddo
-               enddo 
+               enddo
             enddo
             descriptor_out%x(i_desc)%grad_data(:,:,0) = -sum(descriptor_out%x(i_desc)%grad_data(:,:,:), dim=3)
          endif
@@ -6843,7 +7247,65 @@ module descriptors_module
 
    endsubroutine power_SO4_calc
 
+   subroutine form_gs_index(this, gs_index, error)
+      !replacement for the old rs_index
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      integer :: a, i, j, smin, smax, sdif, nmin, nmax, ndif, j_species, nu_R, nu_S
+      type(int_2d), dimension(:), allocatable :: gs_index
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("form_gs_index: descriptor object not initialised", error)
+      endif
+
+      if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
+         RAISE_ERROR("nu_R outside allowed range of 0-2", error)
+      endif
+
+      if (( this%nu_S > 2) .OR. (this%nu_S < 0)) then
+         RAISE_ERROR("nu_S outside allowed range of 0-2", error)
+      endif
+
+
+      allocate(gs_index(2))
+      nu_R = this%nu_R
+      nu_S = this%nu_S
+
+      !new loop
+      do i = 1,2
+         if (nu_R > 0) then
+            nmin = 1
+            nu_R  = nu_R - 1
+         else
+            nmin = 0
+         endif
+         nmax =this%n_max * nmin
+         ndif = nmax-nmin
+
+         if (nu_S > 0) then
+            smin = 1
+            nu_S  = nu_S - 1
+         else
+            smin = 0
+         endif
+         smax = this%n_species* smin
+         sdif = smax-smin
+         allocate(gs_index(i)%mm((ndif+1)*(sdif+1), 2))
+
+         j = 0
+         do j_species = smin, smax
+            do a = nmin, nmax
+               j = j +1
+               gs_index(i)%mm(j,:) = (/ j_species, a /)
+            enddo
+         enddo
+      enddo
+   endsubroutine form_gs_index
+
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+
       type real_2d_array
          type(real_2d), dimension(:,:,:), allocatable :: x
       endtype real_2d_array
@@ -6852,7 +7314,7 @@ module descriptors_module
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -6870,10 +7332,10 @@ module descriptors_module
       real(dp), allocatable :: t_g_r(:,:), t_g_i(:,:), t_f_r(:,:), t_f_i(:,:), t_g_f_rr(:,:), t_g_f_ii(:,:)
       integer :: alpha
 
-      logical :: my_do_descriptor, my_do_grad_descriptor, do_two_l_plus_one
+      logical :: my_do_descriptor, my_do_grad_descriptor, do_two_l_plus_one, sym_desc
       integer :: d, i, j, n, a, b, k, l, m, i_pow, i_coeff, l_n_neighbours, n_i, &
          n_descriptors, n_cross, i_species, j_species, ia, jb, i_desc_i, &
-         xml_version, sum_l_n_neighbours, i_pair, i_pair_i, n_index
+         xml_version, sum_l_n_neighbours, i_pair, i_pair_i, n_index, ub, ia_rs, jb_rs
       integer, dimension(3) :: shift_ij
       integer, dimension(:), allocatable :: i_desc
       integer, dimension(:,:), allocatable :: rs_index
@@ -6885,15 +7347,22 @@ module descriptors_module
       real(dp), dimension(:), allocatable :: global_fourier_so3_r_array, global_fourier_so3_i_array
       type(real_2d_array), dimension(:), allocatable :: global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array
       integer, dimension(total_elements) :: species_map
+      type(int_2d), dimension(:), allocatable :: gs_index
       complex(dp), allocatable, save :: sphericalycartesian_all_t(:,:), gradsphericalycartesian_all_t(:,:,:)
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
+
+      ! Create a thread private QR_factor here as dormqr modifies it and restores it during solve
+      ! and this doesn't work with OMP threading, hence the thread private copy.
+      real(dp), dimension(:,:,:), allocatable, save :: QR_factor
+
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
 !$omp threadprivate(fourier_so3_r, fourier_so3_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
-!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i)
+!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, QR_factor)
+
 
       INIT_ERROR(error)
 
@@ -6903,7 +7372,21 @@ module descriptors_module
          RAISE_ERROR("soap_calc: descriptor object not initialised", error)
       endif
 
-      species_map = 0
+      if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
+         RAISE_ERROR("nu_R outside allowed range of 0-2", error)
+      endif
+
+      if (( this%nu_S > 2) .OR. (this%nu_S < 0)) then
+         RAISE_ERROR("nu_S outside allowed range of 0-2", error)
+      endif
+
+      call form_gs_index(this, gs_index, error)
+      if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
+         sym_desc = .false.
+      else
+         sym_desc = .true.
+      endif
+
       do i_species = 1, this%n_species
          if(this%species_Z(i_species) == 0) then
             species_map = 1
@@ -6922,7 +7405,7 @@ module descriptors_module
       xml_version = 1423143769     ! This is the version number where the 2l+1 normalisation of soap vectors was introduced
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
             help_string="Name of a logical property in the atoms object. For atoms where this property is " // &
             "true, descriptors are calculated.")
@@ -6933,7 +7416,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='soap_calc args_str')) then
             RAISE_ERROR("soap_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -6958,10 +7441,10 @@ module descriptors_module
 
       do_two_l_plus_one = (xml_version >= 1423143769)
 
-      allocate(rs_index(2,this%n_max*this%n_species))
+      allocate(rs_index(2,(this%n_max+1)*(this%n_species+1)))
       i = 0
-      do i_species = 1, this%n_species
-         do a = 1, this%n_max
+      do i_species = 0, this%n_species
+         do a = 0, this%n_max
             i = i + 1
             rs_index(:,i) = (/a,i_species/)
          enddo
@@ -6986,16 +7469,16 @@ module descriptors_module
          max_n_neigh = max(max_n_neigh, n_neighbours(at, n_i))
       end do
 
-!$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh) private(i_species, a, l, n_i)
+!$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh) private(i_species, a, l, n_i, ub)
       allocate(descriptor_i(d))
       if(my_do_grad_descriptor) allocate(grad_descriptor_i(d,3))
 
-      allocate(radial_fun(0:this%l_max, this%n_max), radial_coefficient(0:this%l_max, this%n_max)) 
+      allocate(radial_fun(0:this%l_max, size(this%r_basis)), radial_coefficient(0:this%l_max, this%n_max))
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
-      allocate(fourier_so3_r(0:this%l_max,this%n_max,this%n_species), fourier_so3_i(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
+      allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
 
       if(my_do_grad_descriptor) then
-         allocate(grad_radial_fun(0:this%l_max, this%n_max), grad_radial_coefficient(0:this%l_max, this%n_max))
+         allocate(grad_radial_fun(0:this%l_max, size(this%r_basis)), grad_radial_coefficient(0:this%l_max, this%n_max))
          allocate(grad_SphericalY_ij(0:this%l_max))
       endif
 
@@ -7004,8 +7487,8 @@ module descriptors_module
           allocate(gradsphericalycartesian_all_t(0:this%l_max, -this%l_max:this%l_max, 3))
       end if
 
-      do i_species = 1, this%n_species
-         do a = 1, this%n_max
+      do i_species = 0, this%n_species
+         do a = 0, this%n_max
             do l = 0, this%l_max
                !SPEED allocate(fourier_so3(l,a,i_species)%m(-l:l))
                !SPEED fourier_so3(l,a,i_species)%m(:) = CPLX_ZERO
@@ -7017,6 +7500,13 @@ module descriptors_module
          enddo
       enddo
 
+      if (this%radial_basis /= "EQUISPACED_GAUSS") then
+         allocate(QR_factor(size(this%r_basis), this%n_max, 0:this%l_max))
+         do l = 0, this%l_max
+            QR_factor(:, :, l) = this%QR_factor(:, :, l)
+         enddo
+      endif
+
       do l = 0, this%l_max
          allocate(SphericalY_ij(l)%m(-l:l))
          if(my_do_grad_descriptor) allocate(grad_SphericalY_ij(l)%mm(3,-l:l))
@@ -7024,10 +7514,10 @@ module descriptors_module
 
       if (my_do_grad_descriptor) then
           !SPEED allocate( grad_fourier_so3(0:this%l_max,this%n_max,n_neighbours(at,i,max_dist=this%cutoff)) )
-          allocate( grad_fourier_so3_r(0:this%l_max,this%n_max,max_n_neigh) )
-          allocate( grad_fourier_so3_i(0:this%l_max,this%n_max,max_n_neigh) )
+          allocate( grad_fourier_so3_r(0:this%l_max,0:this%n_max,max_n_neigh) )
+          allocate( grad_fourier_so3_i(0:this%l_max,0:this%n_max,max_n_neigh) )
           do n_i=1, max_n_neigh
-              do a = 1, this%n_max
+              do a = 0, this%n_max
                   do l = 0, this%l_max
                      !SPEED allocate(grad_fourier_so3(l,a,n_i)%mm(3,-l:l))
                      !SPEED grad_fourier_so3(l,a,n_i)%mm(:,:) = CPLX_ZERO
@@ -7082,8 +7572,8 @@ module descriptors_module
       enddo
 
       allocate( &
-         global_fourier_so3_r_array((this%l_max+1)**2 * this%n_max * this%n_species), &
-         global_fourier_so3_i_array((this%l_max+1)**2 * this%n_max * this%n_species), &
+         global_fourier_so3_r_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
+         global_fourier_so3_i_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
          global_grad_fourier_so3_r_array( count(i_desc/=0) ), &
          global_grad_fourier_so3_i_array( count(i_desc/=0) ) )
 
@@ -7114,12 +7604,15 @@ module descriptors_module
                l_n_neighbours = n_neighbours(at,i,max_dist=this%cutoff)
                sum_l_n_neighbours = sum_l_n_neighbours + l_n_neighbours + 1 ! include central atom as well!
 
+               ! allocate( &
+               ! global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,0:this%n_max,l_n_neighbours), &
+               !global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,0:this%n_max,l_n_neighbours) )
                allocate( &
-               global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,this%n_max,l_n_neighbours), &
-               global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,this%n_max,l_n_neighbours) )
+               global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh), &
+               global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh) )
 
                do n_i = 1, l_n_neighbours
-                  do a = 1, this%n_max
+                  do a = 0, this%n_max
                      do l = 0, this%l_max
                         allocate( &
                            global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(3,-l:l), &
@@ -7142,18 +7635,22 @@ module descriptors_module
 
          global_fourier_so3_r_array = 0.0_dp
          global_fourier_so3_i_array = 0.0_dp
-      endif ! this%global 
+      endif ! this%global
 
-!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one) &
+
+!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
 !$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
-!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i) &
+!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
 !$omp private(c_tmp) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
 !$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
 !$omp private(radial_decay, dradial_decay) &
 !$omp reduction(+:global_fourier_so3_r_array,global_fourier_so3_i_array)
-      do i = 1, at%N
 
+
+
+
+      do i = 1, at%N
          if(i_desc(i) == 0) then
             cycle
          else
@@ -7172,20 +7669,35 @@ module descriptors_module
             endif
          endif
 
-         !do a = 1, this%n_max
-         !   radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
-         !enddo
-         !radial_coefficient(0,:) = matmul( radial_fun(0,:), this%transform_basis )
-         radial_fun(0,:) = 0.0_dp
-         radial_fun(0,1) = 1.0_dp
-         radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis)
+         if (this%radial_basis == "EQUISPACED_GAUSS") then
+            ! original version
+            radial_fun(0,:) = 0.0_dp
+            radial_fun(0,1) = 1.0_dp
+            radial_coefficient(0,:) = matmul( radial_fun(0,:), this%cholesky_overlap_basis(:, :, 1))
+         else
+            ! uncommented old version that I think should work...
+            do a = 1, size(this%r_basis)
+               radial_fun(0,a) = exp( -this%alpha * this%r_basis(a)**2 ) !* this%r_basis(a)
+            enddo
+            !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(0), radial_fun(0, :), radial_coefficient(0, :))
+            call Matrix_QR_Solve(QR_factor(:, :, 0), this%QR_tau(:, 0), radial_fun(0, :), radial_coefficient(0, :))
+            ! alternative approach: don't invert L^T and multiply at the end. Doesn't work as well for POLY basis
+            !radial_coefficient = matmul(radial_coefficient, this%cholesky_overlap_basis(0, :, :))
+         endif
 
-         do i_species = 1, this%n_species
-            do a = 1, this%n_max
+
+         do i_species = 0, this%n_species
+            do a = 0, this%n_max
                !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
-               if( this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0 ) then
-                  fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
-                  fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
+
+               if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
+                  if (a == 0) then
+                     fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
+                     fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
+                  else
+                     fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
+                     fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
+                  endif
                else
                   fourier_so3_i(0,a,i_species)%m(0) = 0.0_dp
                   fourier_so3_r(0,a,i_species)%m(0) = 0.0_dp
@@ -7199,10 +7711,12 @@ module descriptors_module
             enddo
          enddo
 
+
+
 ! soap_calc 20 takes 0.0052 s
          n_i = 0
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, cosines=u_ij, diff=d_ij, shift=shift_ij)
             if( r_ij >= this%cutoff ) cycle
 
             n_i = n_i + 1
@@ -7210,13 +7724,14 @@ module descriptors_module
             i_species = species_map(at%Z(j))
             if( i_species == 0 ) cycle
 
+
             if(.not. this%global .and. my_do_grad_descriptor) then
                descriptor_out%x(i_desc_i)%ii(n_i) = j
                descriptor_out%x(i_desc_i)%pos(:,n_i) = at%pos(:,j) + matmul(at%lattice,shift_ij)
                descriptor_out%x(i_desc_i)%has_grad_data(n_i) = .true.
             endif
 
-            f_cut = coordination_function(r_ij,this%cutoff, this%cutoff_transition_width)
+            f_cut = coordination_function(r_ij, this%cutoff, this%cutoff_transition_width)
             radial_decay = ( 1.0_dp + this%cutoff_rate ) / ( this%cutoff_rate + ( r_ij / this%cutoff_scale )**this%cutoff_dexp )
             radial_decay = norm_radial_decay * radial_decay
 
@@ -7230,7 +7745,7 @@ module descriptors_module
             endif
             f_cut = f_cut * radial_decay
 
-            do a = 1, this%n_max
+            do a = 1, size(this%r_basis)
                arg_bess = 2.0_dp * this%alpha * r_ij * this%r_basis(a)
                exp_p = exp( -this%alpha*( r_ij + this%r_basis(a) )**2 )
                exp_m = exp( -this%alpha*( r_ij - this%r_basis(a) )**2 )
@@ -7272,9 +7787,26 @@ module descriptors_module
                enddo
             enddo
 
-            radial_coefficient = matmul( radial_fun, this%transform_basis )
-            if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
-            radial_coefficient = radial_coefficient * f_cut
+            if (this%radial_basis == "EQUISPACED_GAUSS") then
+               radial_coefficient = matmul( radial_fun, this%transform_basis )
+               if(my_do_grad_descriptor) grad_radial_coefficient = matmul( grad_radial_fun, this%transform_basis ) * f_cut + radial_coefficient * df_cut
+               radial_coefficient = radial_coefficient * f_cut
+            else
+               do l = 0, this%l_max
+                  !call LA_Matrix_QR_Solve_Vector(LA_BL_ti(l), radial_fun(l, :), radial_coefficient(l, :))
+                  call Matrix_QR_Solve(QR_factor(:, :, l), this%QR_tau(:, l), radial_fun(l, :), radial_coefficient(l, :))
+                  !radial_coefficient(l, :) = matmul(radial_coefficient(l, :), this%cholesky_overlap_basis(l, :, :))
+               enddo
+               if(my_do_grad_descriptor) then
+                  !grad_radial_coefficient = matmul( grad_radial_fun, transpose(this%transform_basis )) * f_cut + radial_coefficient * df_cut
+                  do l = 0, this%l_max
+                     call Matrix_QR_Solve(QR_factor(:, :, l), this%QR_tau(:, l), grad_radial_fun(l, :), grad_radial_coefficient(l, :))
+                  enddo
+                  grad_radial_coefficient = grad_radial_coefficient * f_cut + radial_coefficient * df_cut
+               endif
+               radial_coefficient = radial_coefficient * f_cut
+            endif
+
 
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
             if(my_do_grad_descriptor) gradsphericalycartesian_all_t = GradSphericalYCartesian_all(this%l_max, d_ij)
@@ -7285,19 +7817,38 @@ module descriptors_module
                enddo
             enddo
 
-            do a = 1, this%n_max
+            do a = 0, this%n_max
                do l = 0, this%l_max
                   do m = -l, l
                      !SPEED fourier_so3(l,a,i_species)%m(m) = fourier_so3(l,a,i_species)%m(m) + radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
                      !SPEED if(my_do_grad_descriptor) grad_fourier_so3(l,a,n_i)%mm(:,m) = grad_fourier_so3(l,a,n_i)%mm(:,m) + &
                      !SPEED    grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
-                     c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
+
+                     if (a==0) then
+                        c_tmp(1) = f_cut * SphericalY_ij(l)%m(m)
+                     else
+                        c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
+
+                     endif
+
                      fourier_so3_r(l,a,i_species)%m(m) = fourier_so3_r(l,a,i_species)%m(m) + real(c_tmp(1))
                      fourier_so3_i(l,a,i_species)%m(m) = fourier_so3_i(l,a,i_species)%m(m) + aimag(c_tmp(1))
+                     fourier_so3_r(l,a,0)%m(m) = fourier_so3_r(l,a,0)%m(m) + real(c_tmp(1))
+                     fourier_so3_i(l,a,0)%m(m) = fourier_so3_i(l,a,0)%m(m) + aimag(c_tmp(1))
+
+
                      if(my_do_grad_descriptor) then
-                        c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
+                        if (a==0) then
+                           c_tmp(:) = df_cut * SphericalY_ij(l)%m(m) * u_ij(:) + &
+                                       f_cut * grad_SphericalY_ij(l)%mm(:,m)
+
+                        else
+                           c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + &
+                                   radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
+                        endif
                         ! grad_fourier_so3_r(l,a,n_i)%mm(:,m) = grad_fourier_so3_r(l,a,n_i)%mm(:,m) + real(c_tmp)
                         ! grad_fourier_so3_i(l,a,n_i)%mm(:,m) = grad_fourier_so3_i(l,a,n_i)%mm(:,m) + imag(c_tmp)
+
                         grad_fourier_so3_r(l,a,n_i)%mm(:,m) = real(c_tmp)
                         grad_fourier_so3_i(l,a,n_i)%mm(:,m) = aimag(c_tmp)
                      endif ! my_do_grad_descriptor
@@ -7307,9 +7858,10 @@ module descriptors_module
 
          enddo ! n
 
+
          if(this%global .and. my_do_grad_descriptor) then
-            global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r
-            global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i
+            global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
+            global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
             !do n_i = lbound(grad_fourier_so3_r,3), ubound(grad_fourier_so3_r,3)
             !   do a = lbound(grad_fourier_so3_r,2), ubound(grad_fourier_so3_r,2)
             !      do l = lbound(grad_fourier_so3_r,1), ubound(grad_fourier_so3_r,1)
@@ -7320,9 +7872,10 @@ module descriptors_module
             !enddo ! n_i
          endif
 
+
          if(this%global) then
             i_coeff = 0
-            do ia = 1, this%n_species*this%n_max
+            do ia = 1, (this%n_species+1)*(this%n_max+1)
                a = rs_index(1,ia)
                i_species = rs_index(2,ia)
                do l = 0, this%l_max
@@ -7334,12 +7887,18 @@ module descriptors_module
          endif
 
          i_pow = 0
-         do ia = 1, this%n_species*this%n_max
-            a = rs_index(1,ia)
-            i_species = rs_index(2,ia)
-            do jb = 1, ia
-               b = rs_index(1,jb)
-               j_species = rs_index(2,jb)
+         do ia = 1, size(gs_index(1)%mm(:,0))
+            a = gs_index(1)%mm(ia,2)
+            i_species = gs_index(1)%mm(ia,1)
+
+            !set upper bound for the second loop
+            ub = size(gs_index(2)%mm(:,0))
+            if (sym_desc) then
+               ub = ia
+            endif
+            do jb = 1, ub
+               b = gs_index(2)%mm(jb, 2)
+               j_species = gs_index(2)%mm(jb, 1)
 
                if(this%diagonal_radial .and. a /= b) cycle
 
@@ -7348,7 +7907,9 @@ module descriptors_module
                   !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
                   descriptor_i(i_pow) = dot_product(fourier_so3_r(l,a,i_species)%m, fourier_so3_r(l,b,j_species)%m) + dot_product(fourier_so3_i(l,a,i_species)%m, fourier_so3_i(l,b,j_species)%m)
                   if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
-                  if( ia /= jb ) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  if( ia /= jb .and. sym_desc) then
+                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  endif
                enddo !l
             enddo !jb
          enddo !ia
@@ -7368,14 +7929,14 @@ module descriptors_module
 
          if(my_do_grad_descriptor) then
 ! soap_calc 33 takes 0.047 s
-	    allocate(t_g_r(this%n_max*3, 2*this%l_max+1), t_g_i(this%n_max*3, 2*this%l_max+1))
-	    allocate(t_f_r(this%n_max*this%n_species, 2*this%l_max+1), t_f_i(this%n_max*this%n_species, 2*this%l_max+1))
-	    allocate(t_g_f_rr(this%n_max*3, this%n_max*this%n_species), t_g_f_ii(this%n_max*3, this%n_max*this%n_species))
-            !do n_i = 1, n_neighbours(at,i,max_dist=this%cutoff) 
+	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
+	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
+	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
+            !do n_i = 1, n_neighbours(at,i,max_dist=this%cutoff)
 
             n_i = 0
-            do n = 1, n_neighbours(at,i) 
-               j = neighbour(at, i, n, distance = r_ij) 
+            do n = 1, n_neighbours(at,i)
+               j = neighbour(at, i, n, distance = r_ij)
                if( r_ij >= this%cutoff ) cycle
 
                n_i = n_i + 1
@@ -7385,8 +7946,9 @@ module descriptors_module
                i_pow = 0
                grad_descriptor_i = 0.0_dp
 
+               !V1 ***********************
                !SPEED do ia = 1, this%n_species*this%n_max
-               !SPEED    a = rs_index(1,ia) 
+               !SPEED    a = rs_index(1,ia)
                !SPEED    i_species = rs_index(2,ia)
                !SPEED    do jb = 1, ia
                !SPEED       b = rs_index(1,jb)
@@ -7401,74 +7963,65 @@ module descriptors_module
                !SPEED    enddo !jb
                !SPEED enddo !ia
 
-               !SPEED do ia = 1, this%n_species*this%n_max
-               !SPEED    a = rs_index(1,ia) 
-               !SPEED    i_species = rs_index(2,ia)
-               !SPEED    do jb = 1, ia
-               !SPEED       b = rs_index(1,jb)
-               !SPEED       j_species = rs_index(2,jb)
-               !SPEED       do l = 0, this%l_max
-               !SPEED          i_pow = i_pow + 1
-               !SPEED          if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
-               !SPEED             matmul(grad_fourier_so3_r(l,a,n_i)%mm,fourier_so3_r(l,b,j_species)%m) + matmul(grad_fourier_so3_i(l,a,n_i)%mm,fourier_so3_i(l,b,j_species)%m)
-               !SPEED          if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + &
-               !SPEED             matmul(grad_fourier_so3_r(l,b,n_i)%mm,fourier_so3_r(l,a,i_species)%m) + matmul(grad_fourier_so3_i(l,b,n_i)%mm,fourier_so3_i(l,a,i_species)%m)
-               !SPEED          if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-               !SPEED       enddo !l
-               !SPEED    enddo !jb
-               !SPEED enddo !ia
+               !V3 ****************** save
 
+               !do each l_block separately to use matrix multiplication
                do l=0, this%l_max
-                  do a = 1, this%n_max
+                  !put density gradients for neighbour atom n_i into t_g_r matrix
+                  do a = 0, this%n_max
                      do alpha=1, 3
-                	t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                	t_g_i(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
-                     enddo
-                  enddo
-                  do ia = 1, this%n_species*this%n_max
-                     a = rs_index(1,ia)
-                     i_species = rs_index(2,ia)
-                     
-                     t_f_r(ia, 1:2*l+1) = fourier_so3_r(l,a,i_species)%m(-l:l)
-                     t_f_i(ia, 1:2*l+1) = fourier_so3_i(l,a,i_species)%m(-l:l)
-                  enddo
-                  call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
-                     t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
-                  call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
-                     t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
-                  !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
-                  !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
-               
-                  i_pow = l+1
-                  do ia = 1, this%n_species*this%n_max
-                     a = rs_index(1,ia)
-                     i_species = rs_index(2,ia)
-                     do jb = 1, ia !this%n_species*this%n_max !ia
-                        b = rs_index(1,jb)
-                        j_species = rs_index(2,jb)
-
-                        if(this%diagonal_radial .and. a /= b) cycle
-               
-                        if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(a-1)+1:3*a,jb) + t_g_f_ii(3*(a-1)+1:3*a,jb)
-                        if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(b-1)+1:3*b,ia) + t_g_f_ii(3*(b-1)+1:3*b,ia)
-               
-
-                        if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
-                        if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-                        i_pow = i_pow + this%l_max+1
+                        !t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
+                        t_g_r(3*a+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
+                        t_g_i(3*a+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
                      enddo
                   enddo
 
-                  !do a = 1, this%n_max
-                  !   do b = 1, a
-                  !      grad_descriptor_i(i_pow, 1:3) = t_g_f_rr(3*(a-1)+1:3*a,b) + t_g_f_ii(3*(a-1)+1:3*a,b) + &
-                  !                                      t_g_f_rr(3*(b-1)+1:3*b,a) + t_g_f_ii(3*(b-1)+1:3*b,a)
-                  !      if( a /= b ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-                  !      i_pow = i_pow + this%l_max+1
-                  !   end do
-                  !end do
+               !put expansion coefficients into temporary array
+               do ia = 1, (this%n_species+1)*(this%n_max+1)
+                  a = rs_index(1,ia)
+                  i_species = rs_index(2,ia)
 
-               end do !l
+                  t_f_r(ia, 1:2*l+1) = fourier_so3_r(l,a,i_species)%m(-l:l)
+                  t_f_i(ia, 1:2*l+1) = fourier_so3_i(l,a,i_species)%m(-l:l)
+               enddo
+
+               !matrix multiplication
+               call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
+                  t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
+               call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
+                  t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
+               !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
+               !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
+
+               !loop over all terms in power spec with same l, add to the gradient if the neighbour atom matches i_species or j_species
+               i_pow = l+1
+
+               do ia = 1, size(gs_index(1)%mm(:,0))
+                  a = gs_index(1)%mm(ia,2)
+                  i_species = gs_index(1)%mm(ia,1)
+                  ia_rs = i_species*(this%n_max+1)+a+1
+
+                  !set upper bound for the second loop
+                  ub = size(gs_index(2)%mm(:,0))
+                  if (sym_desc) then
+                     ub = ia
+                  endif
+                  do jb = 1, ub
+                     b = gs_index(2)%mm(jb, 2)
+                     j_species = gs_index(2)%mm(jb, 1)
+                     jb_rs = j_species*(this%n_max+1)+b+1
+
+                     if(this%diagonal_radial .and. a /= b) cycle
+
+                     if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*a+1:3*(a+1),jb_rs) + t_g_f_ii(3*a+1:3*(a+1),jb_rs)
+                     if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*b+1:3*(b+1),ia_rs) + t_g_f_ii(3*b+1:3*(b+1),ia_rs)
+
+                     if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
+                     if(ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
+                     i_pow = i_pow + this%l_max+1
+                  enddo
+               enddo
+               enddo !l
 
                grad_descriptor_i(d, 1:3) = 0.0_dp
 
@@ -7489,6 +8042,7 @@ module descriptors_module
 	    deallocate(t_g_r, t_g_i)
 	    deallocate(t_g_f_rr, t_g_f_ii)
 
+
          endif
 
       enddo ! i
@@ -7505,7 +8059,8 @@ module descriptors_module
       !SPEED    deallocate(fourier_so3)
       !SPEED endif
 
-!$omp parallel default(none) shared(this, max_n_neigh) private(i_species, a, l, n_i)
+
+!$omp parallel default(none) shared(this, max_n_neigh) private(i_species, a, l, n_i, ub)
       if(allocated(fourier_so3_r)) then
          do i_species = lbound(fourier_so3_r,3), ubound(fourier_so3_r,3)
             do a = lbound(fourier_so3_r,2), ubound(fourier_so3_r,2)
@@ -7549,11 +8104,13 @@ module descriptors_module
       if(allocated(grad_radial_fun)) deallocate(grad_radial_fun)
       if(allocated(grad_radial_coefficient)) deallocate(grad_radial_coefficient)
       if(allocated(descriptor_i)) deallocate(descriptor_i)
+
+      !print *, "about to deallocate grad_descriptor_i"
       if(allocated(grad_descriptor_i)) deallocate(grad_descriptor_i)
 
         if (allocated(grad_fourier_so3_r)) then ! should really check for grad_fourier_so3_i also
             do n_i = 1, max_n_neigh
-               do a = 1, this%n_max
+               do a = 0, this%n_max
                   do l = 0, this%l_max
                      !SPEED deallocate(grad_fourier_so3(l,a,n_i)%mm)
                      if(allocated(grad_fourier_so3_r(l,a,n_i)%mm)) deallocate(grad_fourier_so3_r(l,a,n_i)%mm)
@@ -7565,14 +8122,15 @@ module descriptors_module
         !SPEED deallocate(grad_fourier_so3)
         if (allocated(grad_fourier_so3_r)) deallocate(grad_fourier_so3_r)
         if (allocated(grad_fourier_so3_i)) deallocate(grad_fourier_so3_i)
+        if (allocated(QR_factor)) deallocate(QR_factor)
 !$omp end parallel
 
       if(this%global) then
-         allocate(global_fourier_so3_r(0:this%l_max,this%n_max,this%n_species), global_fourier_so3_i(0:this%l_max,this%n_max,this%n_species), &
+         allocate(global_fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), global_fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), &
             descriptor_i(d) )
 
          i_coeff = 0
-         do ia = 1, this%n_species*this%n_max
+         do ia = 1, (this%n_species+1)*(this%n_max+1)
             a = rs_index(1,ia)
             i_species = rs_index(2,ia)
             do l = 0, this%l_max
@@ -7585,28 +8143,34 @@ module descriptors_module
          enddo
 
          i_pow = 0
-         do ia = 1, this%n_species*this%n_max
-            a = rs_index(1,ia)
-            i_species = rs_index(2,ia)
-            do jb = 1, ia
-               b = rs_index(1,jb)
-               j_species = rs_index(2,jb)
+         do ia = 1, size(gs_index(1)%mm(:,0))
+            a = gs_index(1)%mm(ia,2)
+            i_species = gs_index(1)%mm(ia,1)
+
+            !set upper bound for the second loop
+            ub = size(gs_index(2)%mm(:,0))
+            if (sym_desc) then
+               ub = ia
+            endif
+            do jb = 1, ub
+               b = gs_index(2)%mm(jb, 2)
+               j_species = gs_index(2)%mm(jb, 1)
 
                if(this%diagonal_radial .and. a /= b) cycle
 
                do l = 0, this%l_max
                   i_pow = i_pow + 1
-                  descriptor_i(i_pow) = &
-                     dot_product(global_fourier_so3_r(l,a,i_species)%m, global_fourier_so3_r(l,b,j_species)%m) + &
-                     dot_product(global_fourier_so3_i(l,a,i_species)%m, global_fourier_so3_i(l,b,j_species)%m)
-
-                  !if( ia /= jb ) descriptor_out%global_data(i_pow) = descriptor_out%global_data(i_pow) * SQRT_TWO
+                  !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
+                  descriptor_i(i_pow) = dot_product(global_fourier_so3_r(l,a,i_species)%m, global_fourier_so3_r(l,b,j_species)%m) + dot_product(global_fourier_so3_i(l,a,i_species)%m, global_fourier_so3_i(l,b,j_species)%m)
                   if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
-                  if( ia /= jb ) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  if( ia /= jb .and. sym_desc) then
+                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  endif
                enddo !l
-
             enddo !jb
          enddo !ia
+
+
          descriptor_i(d) = 0.0_dp
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
          if( norm_descriptor_i .feq. 0.0_dp ) norm_descriptor_i = tiny(1.0_dp)
@@ -7620,9 +8184,9 @@ module descriptors_module
          endif
 
          if(my_do_grad_descriptor) then
-	    allocate(t_g_r(this%n_max*3, 2*this%l_max+1), t_g_i(this%n_max*3, 2*this%l_max+1))
-	    allocate(t_f_r(this%n_max*this%n_species, 2*this%l_max+1), t_f_i(this%n_max*this%n_species, 2*this%l_max+1))
-	    allocate(t_g_f_rr(this%n_max*3, this%n_max*this%n_species), t_g_f_ii(this%n_max*3, this%n_max*this%n_species))
+       allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
+	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
+	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
             allocate(grad_descriptor_i(d,3))
 
             i_pair = 0
@@ -7657,49 +8221,61 @@ module descriptors_module
                   i_pow = 0
                   grad_descriptor_i = 0.0_dp
 
+                  !global gradient loop
                   do l=0, this%l_max
-                     do a = 1, this%n_max
+                     do a = 0, this%n_max
                         do alpha=1, 3
-                           t_g_r(3*(a-1)+alpha, 1:2*l+1) = global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
-                           t_g_i(3*(a-1)+alpha, 1:2*l+1) = global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
+                           t_g_r(3*a+alpha, 1:2*l+1) = global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
+                           t_g_i(3*a+alpha, 1:2*l+1) = global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
                         enddo
                      enddo
-                     do ia = 1, this%n_species*this%n_max
+
+                     do ia = 1, (this%n_species+1)*(this%n_max+1)
                         a = rs_index(1,ia)
                         i_species = rs_index(2,ia)
-                        
+
                         t_f_r(ia, 1:2*l+1) = global_fourier_so3_r(l,a,i_species)%m(-l:l)
                         t_f_i(ia, 1:2*l+1) = global_fourier_so3_i(l,a,i_species)%m(-l:l)
                      enddo
-                     call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
-                        t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
-                     call dgemm('N','T',this%n_max*3, this%n_max*this%n_species, 2*l+1, 1.0_dp, &
-                        t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
+
+                     call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
+                     t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
+                     call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
+                     t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
                      !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
                      !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
-                  
+
                      i_pow = l+1
-                     do ia = 1, this%n_species*this%n_max
-                        a = rs_index(1,ia)
-                        i_species = rs_index(2,ia)
-                        do jb = 1, ia !this%n_species*this%n_max !ia
-                           b = rs_index(1,jb)
-                           j_species = rs_index(2,jb)
-                  
+                     do ia = 1, size(gs_index(1)%mm(:,0))
+                        a = gs_index(1)%mm(ia,2)
+                        i_species = gs_index(1)%mm(ia,1)
+                        ia_rs = i_species*(this%n_max+1)+a+1
+
+                        !set upper bound for the second loop
+                        ub = size(gs_index(2)%mm(:,0))
+                        if (sym_desc) then
+                           ub = ia
+                        endif
+                        do jb = 1, ub
+                           b = gs_index(2)%mm(jb, 2)
+                           j_species = gs_index(2)%mm(jb, 1)
+                           jb_rs = j_species*(this%n_max+1)+b+1
+
                            if(this%diagonal_radial .and. a /= b) cycle
 
-                           if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(a-1)+1:3*a,jb) + t_g_f_ii(3*(a-1)+1:3*a,jb)
-                           if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*(b-1)+1:3*b,ia) + t_g_f_ii(3*(b-1)+1:3*b,ia)
-                  
-  
+                           if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*a+1:3*(a+1),jb_rs) + t_g_f_ii(3*a+1:3*(a+1),jb_rs)
+                           if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*b+1:3*(b+1),ia_rs) + t_g_f_ii(3*b+1:3*(b+1),ia_rs)
+
                            if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
-                           if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
+                           if(ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
                            i_pow = i_pow + this%l_max+1
                         enddo
                      enddo
-  
+
                   end do !l
-  
+
+
+
                   grad_descriptor_i(d, 1:3) = 0.0_dp
                   if( this%normalise ) then
                      descriptor_out%x(1)%grad_data(:,:,i_pair) = grad_descriptor_i / norm_descriptor_i
@@ -7709,18 +8285,18 @@ module descriptors_module
                   else
                      descriptor_out%x(1)%grad_data(:,:,i_pair) = grad_descriptor_i
                   endif
-  
+
                   descriptor_out%x(1)%grad_data(:,:,i_pair_i) = descriptor_out%x(1)%grad_data(:,:,i_pair_i) - descriptor_out%x(1)%grad_data(:,:,i_pair)
                enddo ! n/n_i
-  
+
             enddo ! i
-  
+
             deallocate(grad_descriptor_i)
             deallocate(t_f_r, t_f_i)
             deallocate(t_g_r, t_g_i)
             deallocate(t_g_f_rr, t_g_f_ii)
          endif ! my_do_grad_descriptor
-  
+
          do i_species = lbound(global_fourier_so3_r,3), ubound(global_fourier_so3_r,3)
             do a = lbound(global_fourier_so3_r,2), ubound(global_fourier_so3_r,2)
                do l = lbound(global_fourier_so3_r,1), ubound(global_fourier_so3_r,1)
@@ -7737,13 +8313,13 @@ module descriptors_module
             enddo
          enddo
          deallocate(global_fourier_so3_i)
-  
+
          if(allocated(descriptor_i)) deallocate(descriptor_i)
       endif ! this%global
-  
+
       if(allocated(global_fourier_so3_r_array)) deallocate(global_fourier_so3_r_array)
       if(allocated(global_fourier_so3_i_array)) deallocate(global_fourier_so3_i_array)
-   
+
       if(allocated(global_grad_fourier_so3_r_array)) then
          do i_desc_i = lbound(global_grad_fourier_so3_r_array,1), ubound(global_grad_fourier_so3_r_array,1)
             if(allocated(global_grad_fourier_so3_r_array(i_desc_i)%x)) then
@@ -7774,24 +8350,25 @@ module descriptors_module
          enddo ! i_desc_i
          deallocate(global_grad_fourier_so3_i_array)
       endif
-  
+
       if(allocated(rs_index)) deallocate(rs_index)
       if(allocated(i_desc)) deallocate(i_desc)
-  
+      if (allocated(gs_index)) deallocate(gs_index)
+
       call system_timer('soap_calc')
 
    endsubroutine soap_calc
-   
-   
-   
-   
-  
+
+
+
+
+
    subroutine rdf_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
       type(rdf), intent(in) :: this
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -7822,7 +8399,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -7830,7 +8407,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='rdf_calc args_str')) then
             RAISE_ERROR("rdf_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -7904,7 +8481,7 @@ module descriptors_module
          endif
          if(my_do_grad_descriptor) then
             descriptor_out%x(i_desc)%ii(0) = i
-            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
             descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
@@ -7939,13 +8516,13 @@ module descriptors_module
       call system_timer('rdf_calc')
 
    endsubroutine rdf_calc
-  
+
    subroutine as_distance_2b_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
       type(as_distance_2b), intent(in) :: this
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(descriptor) :: my_coordination
@@ -7980,7 +8557,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -7988,7 +8565,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='as_distance_2b_calc args_str')) then
             RAISE_ERROR("as_distance_2b_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -8115,47 +8692,47 @@ module descriptors_module
             rho_i = rho_i / f_cut_i
 
             if(rho_i > this%as_cutoff) cycle
-  
+
             rho_j = 0.0_dp
             f_cut_j = 0.0_dp
-  
+
             do m = 1, n_neighbours(at,j)
                k = neighbour(at, j, m, distance=r_jk, cosines=u_jk)
-  
+
                if(r_jk > this%coordination_cutoff) cycle
-  
+
                cos_jik = dot_product(-u_ij,u_jk)
                f_cut_jk = coordination_function(r_jk,this%coordination_cutoff,this%coordination_transition_width)
-  
+
                f_cut_j = f_cut_j + f_cut_jk
                rho_j = rho_j + 0.5_dp * ( erf(cos_jik/this%overlap_alpha) + 1.0_dp ) * f_cut_jk**2
             enddo
-  
+
             if(rho_j > this%as_cutoff) cycle
             ! all three conditions fulfilled: pair within lower and upper cutoff, asymmetricity lower than threshold
-  
+
             i_desc = i_desc + 1
-  
+
             f_cut_ij = coordination_function(r_ij,this%max_cutoff,this%max_transition_width,this%min_cutoff,this%min_transition_width)
             f_cut_as_i = coordination_function(rho_i,this%as_cutoff, this%as_transition_width)
             f_cut_as_j = coordination_function(rho_j,this%as_cutoff, this%as_transition_width)
 
             if(my_do_descriptor) then
                descriptor_out%x(i_desc)%ci(1:2) = (/i,j/)
-               
+
                descriptor_out%x(i_desc)%has_data = .true.
-  
+
                descriptor_out%x(i_desc)%data(1) = r_ij
                descriptor_out%x(i_desc)%data(2) = f_cut_i + f_cut_j
                descriptor_out%x(i_desc)%data(3) = (f_cut_i - f_cut_j)**2
-  
+
                descriptor_out%x(i_desc)%covariance_cutoff = f_cut_ij * f_cut_as_i * f_cut_as_j
             endif
             if(my_do_grad_descriptor) then
                n_neighbours_coordination_i = n_neighbours(at,i,max_dist=this%coordination_cutoff)
-  
+
                descriptor_out%x(i_desc)%ii(0) = i
-               descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+               descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
                descriptor_out%x(i_desc)%has_grad_data(0) = .true.
                descriptor_out%x(i_desc)%grad_data(1,:,0) = -u_ij(:)
                descriptor_out%x(i_desc)%grad_covariance_cutoff(:,0) = -dcoordination_function(r_ij,this%coordination_cutoff,this%coordination_transition_width)*u_ij
@@ -8165,39 +8742,39 @@ module descriptors_module
                !descriptor_out%x(i_desc)%has_grad_data(1) = .true.
                !descriptor_out%x(i_desc)%grad_data(1,:,1) = u_ij(:)
                !descriptor_out%x(i_desc)%grad_covariance_cutoff(:,1) = -descriptor_out%x(i_desc)%grad_covariance_cutoff(:,0)
-  
+
                !descriptor_out%x(i_desc)%ii(2:n_neighbours_coordination_i+2) = descriptor_coordination%x(i)%ii(:)
                !descriptor_out%x(i_desc)%pos(:,2:n_neighbours_coordination_i+2) = descriptor_coordination%x(i)%pos(:,:)
                !descriptor_out%x(i_desc)%has_grad_data(2:n_neighbours_coordination_i+2) = descriptor_coordination%x(i)%has_grad_data(:)
                !descriptor_out%x(i_desc)%grad_data(2,:,2:n_neighbours_coordination_i+2) = descriptor_coordination%x(i)%grad_data(1,:,:)
                !descriptor_out%x(i_desc)%grad_data(3,:,2:n_neighbours_coordination_i+2) = 2.0_dp*(descriptor_coordination%x(i)%data(1) - descriptor_coordination%x(j)%data(1))*&
                !   descriptor_coordination%x(i)%grad_data(1,:,:)
-  
+
                !descriptor_out%x(i_desc)%ii(n_neighbours_coordination_i+3:) = descriptor_coordination%x(j)%ii(:)
                !descriptor_out%x(i_desc)%pos(:,n_neighbours_coordination_i+3:) = descriptor_coordination%x(j)%pos(:,:)
                !descriptor_out%x(i_desc)%has_grad_data(n_neighbours_coordination_i+3:) = descriptor_coordination%x(j)%has_grad_data(:)
                !descriptor_out%x(i_desc)%grad_data(2,:,n_neighbours_coordination_i+3:) = descriptor_coordination%x(j)%grad_data(1,:,:)
                !descriptor_out%x(i_desc)%grad_data(3,:,n_neighbours_coordination_i+3:) = -2.0_dp*(descriptor_coordination%x(i)%data(1) - descriptor_coordination%x(j)%data(1))*&
                !   descriptor_coordination%x(j)%grad_data(1,:,:)
-  
+
             endif
          enddo
-      enddo  
-  
+      enddo
+
       call finalise(my_coordination)
       call finalise(descriptor_coordination)
 
       call system_timer('as_distance_2b_calc')
 
    endsubroutine as_distance_2b_calc
-  
-  
+
+
    subroutine alex_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
       type(alex), intent(in) :: this
       type(atoms), intent(in) :: at
       type(descriptor_data), intent(out) :: descriptor_out
       logical, intent(in), optional :: do_descriptor, do_grad_descriptor
-      character(len=*), intent(in), optional :: args_str 
+      character(len=*), intent(in), optional :: args_str
       integer, optional, intent(out) :: error
 
       type(Dictionary) :: params
@@ -8233,7 +8810,7 @@ module descriptors_module
       atom_mask_pointer => null()
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -8241,7 +8818,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='alex_calc args_str')) then
             RAISE_ERROR("alex_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          if( has_atom_mask_name ) then
@@ -8325,7 +8902,7 @@ module descriptors_module
          endif
          if(my_do_grad_descriptor) then
             descriptor_out%x(i_desc)%ii(0) = i
-            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i) 
+            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
             descriptor_out%x(i_desc)%has_grad_data(0) = .true.
          endif
 
@@ -8405,7 +8982,7 @@ module descriptors_module
                desc_index = desc_index + 1
             end do
          end do
-         
+
          do p = 1,n_radial
             do q = 1,n_radial
                do r = 1,n_radial
@@ -8529,7 +9106,7 @@ module descriptors_module
 
       if(present(args_str)) then
          call initialise(params)
-         
+
          call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
          help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
          "calculated.")
@@ -8537,7 +9114,7 @@ module descriptors_module
          if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='distance_Nb_calc args_str')) then
             RAISE_ERROR("distance_Nb_calc failed to parse args_str='"//trim(args_str)//"'", error)
          endif
-         
+
          call finalise(params)
 
          atom_mask_pointer => null()
@@ -8735,6 +9312,246 @@ module descriptors_module
 
    endsubroutine distance_Nb_calc
 
+   subroutine soap_turbo_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+      use soap_turbo_desc
+
+      type(soap_turbo), intent(in) :: this
+      type(atoms), intent(in) :: at
+      type(descriptor_data), intent(out) :: descriptor_out
+      logical, intent(in), optional :: do_descriptor, do_grad_descriptor
+      character(len=*), intent(in), optional :: args_str
+      integer, optional, intent(out) :: error
+
+      type(Dictionary) :: params
+      character(STRING_LENGTH) :: atom_mask_name
+      logical :: has_atom_mask_name
+      logical, dimension(:), pointer :: atom_mask_pointer
+
+      logical :: my_do_descriptor, my_do_grad_descriptor, do_timing
+      integer :: d, i, j, k, n, i_n, l_n_neighbours, &
+         i_desc, n_descriptors, n_cross, n_index, n_atom_pairs
+      real(dp) :: r_ij
+      real(dp), dimension(3) :: d_ij, u_ij
+      real(dp), dimension(:), allocatable :: rjs, thetas, phis, rcut_hard, rcut_soft, nf, global_scaling
+      real(dp), dimension(:,:), allocatable :: descriptor_i
+      real(dp), dimension(:,:,:), allocatable :: grad_descriptor_i
+      integer, dimension(:), allocatable :: species_map
+      integer, dimension(3) :: shift_ij
+      logical, dimension(:,:), allocatable :: mask
+
+      INIT_ERROR(error)
+
+      call system_timer('soap_turbo_calc')
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("soap_turbo_calc: descriptor object not initialised", error)
+      endif
+
+!     This is to make the code compatible with the newest TurboGAP (which as multisoap support)
+      allocate( rcut_hard(this%n_species) )
+      allocate( rcut_soft(this%n_species) )
+      allocate( nf(this%n_species) )
+      allocate( global_scaling(this%n_species) )
+      rcut_hard = this%rcut_hard
+      rcut_soft = this%rcut_soft
+      nf = this%nf
+      global_scaling = 1.0_dp
+
+      my_do_descriptor = optional_default(.false., do_descriptor)
+      my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
+
+      if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
+
+!      allocate(species_map(maxval(this%species_Z)))
+      allocate(species_map(1:118))
+      species_map = 0
+      species_map(this%species_Z) = (/(i, i = 1, this%n_species)/)
+
+      atom_mask_pointer => null()
+      if(present(args_str)) then
+         call initialise(params)
+
+         call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
+         help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
+         "calculated.")
+
+         call param_register(params, 'do_timing', 'F', do_timing, help_string="Do timing or not")
+
+         if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='coordination_calc args_str')) then
+            RAISE_ERROR("soap_turbo_calc failed to parse args_str='"//trim(args_str)//"'", error)
+         endif
+
+         call finalise(params)
+
+         if( has_atom_mask_name ) then
+            if (.not. assign_pointer(at, trim(atom_mask_name), atom_mask_pointer)) then
+               RAISE_ERROR("soap_turbo_calc did not find "//trim(atom_mask_name)//" property in the atoms object.", error)
+            endif
+         else
+            atom_mask_pointer => null()
+         endif
+
+      endif
+
+      call finalise(descriptor_out)
+
+      d = soap_turbo_dimensions(this,error)
+
+      allocate(descriptor_i(d,1))
+
+      if(associated(atom_mask_pointer)) then
+         call descriptor_sizes(this,at,n_descriptors,n_cross, &
+            mask=atom_mask_pointer,n_index=n_index,error=error)
+      else
+         call descriptor_sizes(this,at,n_descriptors,n_cross,n_index=n_index,error=error)
+      endif
+
+      allocate(descriptor_out%x(n_descriptors))
+      i_desc = 0
+      do i = 1, at%N
+        if(associated(atom_mask_pointer)) then
+            if(.not. atom_mask_pointer(i)) cycle
+         endif
+         if( at%Z(i) /= this%species_Z(this%central_index) ) cycle
+
+         i_desc = i_desc + 1
+         if(my_do_descriptor) then
+            allocate(descriptor_out%x(i_desc)%data(d))
+            descriptor_out%x(i_desc)%data = 0.0_dp
+            allocate(descriptor_out%x(i_desc)%ci(n_index))
+            descriptor_out%x(i_desc)%has_data = .false.
+
+            descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
+         endif
+         if(my_do_grad_descriptor) then
+!           l_n_neighbours = n_neighbours(at,i,max_dist=this%rcut_hard)
+            l_n_neighbours = 0
+            do n = 1, n_neighbours(at, i)
+               j = neighbour(at, i, n, distance = r_ij)
+!              The neighbors list past to the soap_turbo library must only contained the "seen" species
+               if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
+                  l_n_neighbours = l_n_neighbours + 1
+               endif
+            enddo
+            allocate(descriptor_out%x(i_desc)%grad_data(d,3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%ii(0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%pos(3,0:l_n_neighbours))
+            allocate(descriptor_out%x(i_desc)%has_grad_data(0:l_n_neighbours))
+            descriptor_out%x(i_desc)%grad_data = 0.0_dp
+            descriptor_out%x(i_desc)%ii = 0
+            descriptor_out%x(i_desc)%pos = 0.0_dp
+            descriptor_out%x(i_desc)%has_grad_data = .false.
+
+            allocate(descriptor_out%x(i_desc)%grad_covariance_cutoff(3,0:l_n_neighbours))
+            descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
+         endif
+      enddo
+
+      i_desc = 0
+      do i = 1, at%N
+
+         if(associated(atom_mask_pointer)) then
+            if(.not. atom_mask_pointer(i)) cycle
+         endif
+         if( at%Z(i) /= this%species_Z(this%central_index) ) cycle
+
+         i_desc = i_desc + 1
+
+         if(my_do_descriptor) then
+            descriptor_out%x(i_desc)%ci(1) = i
+            descriptor_out%x(i_desc)%has_data = .true.
+         endif
+         if(my_do_grad_descriptor) then
+            descriptor_out%x(i_desc)%ii(0) = i
+            descriptor_out%x(i_desc)%pos(:,0) = at%pos(:,i)
+            descriptor_out%x(i_desc)%has_grad_data(0) = .true.
+         endif
+
+!         n_atom_pairs = n_neighbours(at,i, max_dist = this%rcut_hard) + 1 !Including the central atom
+         n_atom_pairs = 1 !Including the central atom
+         do n = 1, n_neighbours(at, i)
+            j = neighbour(at, i, n, distance = r_ij)
+!           The neighbors list past to the soap_turbo library must only contained the "seen" species
+            if( r_ij < this%rcut_hard .and. species_map(at%Z(j)) > 0)then
+               n_atom_pairs = n_atom_pairs + 1
+            endif
+         enddo
+         allocate( rjs(n_atom_pairs) )
+         allocate( thetas(n_atom_pairs) )
+         allocate( phis(n_atom_pairs) )
+         allocate( mask(n_atom_pairs,this%n_species) )
+         mask = .false.
+
+         i_n = 1 ! Start with central atom
+         rjs(i_n) = 0.0_dp
+         thetas(i_n) = 0.0_dp
+         phis(i_n) = 0.0_dp
+         mask(i_n,species_map(at%Z(i))) = .true.
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij, diff = d_ij, cosines = u_ij)
+
+            if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
+            i_n = i_n + 1
+
+            rjs(i_n) = r_ij
+
+            thetas(i_n) = dacos( u_ij(3) )
+            phis(i_n) = datan2( d_ij(2), d_ij(1) )
+            mask(i_n,species_map(at%Z(j))) = .true.
+         enddo
+
+         if( my_do_grad_descriptor ) then
+            i_n = 0
+            do n = 1, n_neighbours(at,i)
+               j = neighbour(at, i, n, distance = r_ij, shift = shift_ij)
+               if( r_ij >= this%rcut_hard .or. species_map(at%Z(j)) == 0 ) cycle
+               i_n = i_n + 1
+               descriptor_out%x(i_desc)%ii(i_n) = j
+               descriptor_out%x(i_desc)%pos(:,i_n) = at%pos(:,j) + matmul(at%lattice,shift_ij)
+               descriptor_out%x(i_desc)%has_grad_data(i_n) = .true.
+            enddo
+         endif
+
+         descriptor_i = 0.0_dp
+         if( my_do_grad_descriptor ) then
+            allocate(grad_descriptor_i(3,d,n_atom_pairs))
+            grad_descriptor_i = 0.0_dp
+         endif
+         call get_soap(1, (/n_atom_pairs/), this%n_species, reshape( (/species_map(at%Z(i))/), (/1,1/)), (/1/), &
+            n_atom_pairs, mask, rjs, thetas, phis, this%alpha_max, this%l_max, rcut_hard, rcut_soft, nf, &
+            global_scaling, this%atom_sigma_r, this%atom_sigma_r_scaling, &
+            this%atom_sigma_t, this%atom_sigma_t_scaling, this%amplitude_scaling, this%radial_enhancement, this%central_weight, &
+            this%basis, this%scaling_mode, .false., my_do_grad_descriptor, this%compress, this%compress_P_nonzero, this%compress_P_i, &
+            this%compress_P_j, this%compress_P_el, descriptor_i, grad_descriptor_i)
+
+         if(my_do_descriptor) then
+            descriptor_out%x(i_desc)%data = descriptor_i(:,1)
+         endif
+
+         if(my_do_grad_descriptor) then
+            do k = 1, 3
+               descriptor_out%x(i_desc)%grad_data(:,k,0:n_atom_pairs-1) = grad_descriptor_i(k,:,1:n_atom_pairs)
+            enddo
+         endif
+
+         deallocate(rjs)
+         deallocate(thetas)
+         deallocate(phis)
+         deallocate(mask)
+         if(allocated(grad_descriptor_i)) deallocate(grad_descriptor_i)
+      enddo
+
+      deallocate(descriptor_i)
+      deallocate(species_map)
+      deallocate(rcut_hard)
+      deallocate(rcut_soft)
+      deallocate(nf)
+      deallocate(global_scaling)
+
+      call system_timer('soap_turbo_calc')
+
+   endsubroutine soap_turbo_calc
+
    subroutine distance_Nb_calc_get_clusters(this,at,atoms_in_descriptors,n_descriptors,mask,error)
 
       type(distance_Nb), intent(in) :: this
@@ -8874,7 +9691,7 @@ module descriptors_module
 
          allocate(atoms_in_descriptors(4,1,Table_atoms_in_descriptors%N))
          atoms_in_descriptors = reshape(Table_atoms_in_descriptors%int(:,1:Table_atoms_in_descriptors%N),(/4,1,Table_atoms_in_descriptors%N/))
-         
+
          call finalise(Table_atoms_in_descriptors)
 
          if( this%order > 1 ) &
@@ -8952,7 +9769,7 @@ module descriptors_module
       integer :: ii, jj, n
       integer, dimension(size(array,1)) :: tmp
       logical :: do_swap
-  
+
       integer, dimension(size(array,1)+1,size(array,2)) :: Z_array
 
       Z_array(1,:) = at%Z(array(1,:))
@@ -8968,7 +9785,7 @@ module descriptors_module
       enddo
 
       array(:,:) = Z_array(2:,:)
-  
+
       order_and_check_for_duplicates = .true.
 
    endfunction order_and_check_for_duplicates
@@ -9053,6 +9870,8 @@ module descriptors_module
             descriptor_dimensions = alex_dimensions(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             descriptor_dimensions = distance_Nb_dimensions(this%descriptor_distance_Nb,error)
+         case(DT_SOAP_TURBO)
+            descriptor_dimensions = soap_turbo_dimensions(this%descriptor_soap_turbo,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             descriptor_dimensions = bond_real_space_dimensions(this%descriptor_bond_real_space,error)
@@ -9060,18 +9879,16 @@ module descriptors_module
             descriptor_dimensions = AN_monomer_dimensions(this%descriptor_AN_monomer,error)
          case(DT_COM_DIMER)
             descriptor_dimensions = com_dimer_dimensions(this%descriptor_com_dimer,error)
-         case(DT_GENERAL_MONOMER)  
-            descriptor_dimensions = general_monomer_dimensions(this%descriptor_general_monomer,error)  
-         case(DT_GENERAL_DIMER)  
-            descriptor_dimensions = general_dimer_dimensions(this%descriptor_general_dimer,error)  
-         case(DT_GENERAL_TRIMER)  
-            descriptor_dimensions = general_trimer_dimensions(this%descriptor_general_trimer,error)  
-         case(DT_MOLECULE_LO_D)  
-            descriptor_dimensions = molecule_lo_d_dimensions(this%descriptor_molecule_lo_d,error)  
+         case(DT_GENERAL_MONOMER)
+            descriptor_dimensions = general_monomer_dimensions(this%descriptor_general_monomer,error)
+         case(DT_GENERAL_DIMER)
+            descriptor_dimensions = general_dimer_dimensions(this%descriptor_general_dimer,error)
+         case(DT_GENERAL_TRIMER)
+            descriptor_dimensions = general_trimer_dimensions(this%descriptor_general_trimer,error)
+         case(DT_MOLECULE_LO_D)
+            descriptor_dimensions = molecule_lo_d_dimensions(this%descriptor_molecule_lo_d,error)
          case(DT_SOAP_EXPRESS)
             descriptor_dimensions = soap_express_dimensions(this%descriptor_soap_express,error)
-         case(DT_SOAP_TURBO)
-            descriptor_dimensions = soap_turbo_dimensions(this%descriptor_soap_turbo,error)
 #endif
          case default
             RAISE_ERROR("descriptor_dimensions: unknown descriptor type "//this%descriptor_type,error)
@@ -9360,7 +10177,9 @@ module descriptors_module
    function soap_dimensions(this,error) result(i)
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
-      integer :: i
+      integer :: i, NS1, NS2
+      logical :: sym_desc
+      type(int_2d), dimension(:), allocatable :: gs_index
 
       INIT_ERROR(error)
 
@@ -9368,20 +10187,26 @@ module descriptors_module
          RAISE_ERROR("soap_dimensions: descriptor object not initialised", error)
       endif
 
-      !i = (this%l_max+1) * ( this%n_max * (this%n_max+1) / 2 ) * ( this%n_species * (this%n_species+1) / 2 ) + 1
-      !i = (this%l_max+1) * this%n_max**2 * this%n_species**2 + 1
       if(this%diagonal_radial) then
          i = (this%l_max+1) * this%n_max * this%n_species * (this%n_species+1) / 2 + 1
       else
-         i = (this%l_max+1) * ( (this%n_max*this%n_species)*(this%n_max*this%n_species+1) ) / 2 + 1
+         call form_gs_index(this,gs_index, error)
+
+         NS1 = size(gs_index(1)%mm(:,0))
+         NS2 = size(gs_index(2)%mm(:,0))
+
+         if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
+            i = NS1 * NS2 * (this%l_max + 1) +1
+         else
+            i = NS1 * (NS1+1) * (this%l_max +1) /2 +1
+         endif
       endif
 
+      if (allocated(gs_index)) deallocate(gs_index)
    endfunction soap_dimensions
 
-  
-  
-  
-  
+
+
    function rdf_dimensions(this,error) result(i)
       type(rdf), intent(in) :: this
       integer, optional, intent(out) :: error
@@ -9412,7 +10237,7 @@ module descriptors_module
 
    endfunction as_distance_2b_dimensions
 
-  
+
    function alex_dimensions(this,error) result(i)
       type(alex), intent(in) :: this
       integer, optional, intent(out) :: error
@@ -9494,6 +10319,8 @@ module descriptors_module
             descriptor_cutoff = cutoff(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             descriptor_cutoff = cutoff(this%descriptor_distance_Nb,error)
+         case(DT_SOAP_TURBO)
+            descriptor_cutoff = cutoff(this%descriptor_soap_turbo,error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             descriptor_cutoff = cutoff(this%descriptor_bond_real_space,error)
@@ -9501,18 +10328,16 @@ module descriptors_module
             descriptor_cutoff = cutoff(this%descriptor_molecule_lo_d,error)
          case(DT_AN_MONOMER)
             descriptor_cutoff = cutoff(this%descriptor_AN_monomer,error)
-         case(DT_GENERAL_MONOMER)  
-            descriptor_cutoff = cutoff(this%descriptor_general_monomer,error)  
-         case(DT_GENERAL_DIMER)  
-            descriptor_cutoff = cutoff(this%descriptor_general_dimer,error)  
-         case(DT_GENERAL_TRIMER)  
-            descriptor_cutoff = cutoff(this%descriptor_general_trimer,error)  
-         case(DT_COM_DIMER) 
-            descriptor_cutoff = cutoff(this%descriptor_com_dimer,error) 
+         case(DT_GENERAL_MONOMER)
+            descriptor_cutoff = cutoff(this%descriptor_general_monomer,error)
+         case(DT_GENERAL_DIMER)
+            descriptor_cutoff = cutoff(this%descriptor_general_dimer,error)
+         case(DT_GENERAL_TRIMER)
+            descriptor_cutoff = cutoff(this%descriptor_general_trimer,error)
+         case(DT_COM_DIMER)
+            descriptor_cutoff = cutoff(this%descriptor_com_dimer,error)
          case(DT_SOAP_EXPRESS)
             descriptor_cutoff = cutoff(this%descriptor_soap_express,error)
-         case(DT_SOAP_TURBO)
-            descriptor_cutoff = cutoff(this%descriptor_soap_turbo,error)
 #endif
          case default
             RAISE_ERROR("descriptor_cutoff: unknown descriptor type "//this%descriptor_type,error)
@@ -9520,7 +10345,7 @@ module descriptors_module
 
    endfunction descriptor_cutoff
 
-   function bispectrum_SO4_cutoff(this,error) 
+   function bispectrum_SO4_cutoff(this,error)
       type(bispectrum_SO4), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: bispectrum_SO4_cutoff
@@ -9535,7 +10360,7 @@ module descriptors_module
 
    endfunction bispectrum_SO4_cutoff
 
-   function bispectrum_SO3_cutoff(this,error) 
+   function bispectrum_SO3_cutoff(this,error)
       type(bispectrum_SO3), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: bispectrum_SO3_cutoff
@@ -9550,7 +10375,7 @@ module descriptors_module
 
    endfunction bispectrum_SO3_cutoff
 
-   function behler_cutoff(this,error) 
+   function behler_cutoff(this,error)
       type(behler), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: behler_cutoff
@@ -9565,7 +10390,7 @@ module descriptors_module
 
    endfunction behler_cutoff
 
-   function distance_2b_cutoff(this,error) 
+   function distance_2b_cutoff(this,error)
       type(distance_2b), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: distance_2b_cutoff
@@ -9580,7 +10405,7 @@ module descriptors_module
 
    endfunction distance_2b_cutoff
 
-   function co_distance_2b_cutoff(this,error) 
+   function co_distance_2b_cutoff(this,error)
       type(co_distance_2b), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: co_distance_2b_cutoff
@@ -9595,7 +10420,7 @@ module descriptors_module
 
    endfunction co_distance_2b_cutoff
 
-   function coordination_cutoff(this,error) 
+   function coordination_cutoff(this,error)
       type(coordination), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: coordination_cutoff
@@ -9610,7 +10435,7 @@ module descriptors_module
 
    endfunction coordination_cutoff
 
-   function angle_3b_cutoff(this,error) 
+   function angle_3b_cutoff(this,error)
       type(angle_3b), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: angle_3b_cutoff
@@ -9625,7 +10450,7 @@ module descriptors_module
 
    endfunction angle_3b_cutoff
 
-   function co_angle_3b_cutoff(this,error) 
+   function co_angle_3b_cutoff(this,error)
       type(co_angle_3b), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: co_angle_3b_cutoff
@@ -9640,7 +10465,7 @@ module descriptors_module
 
    endfunction co_angle_3b_cutoff
 
-   function cosnx_cutoff(this,error) 
+   function cosnx_cutoff(this,error)
       type(cosnx), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: cosnx_cutoff
@@ -9655,7 +10480,7 @@ module descriptors_module
 
    endfunction cosnx_cutoff
 
-   function trihis_cutoff(this,error) 
+   function trihis_cutoff(this,error)
       type(trihis), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: trihis_cutoff
@@ -9670,7 +10495,7 @@ module descriptors_module
 
    endfunction trihis_cutoff
 
-   function water_monomer_cutoff(this,error) 
+   function water_monomer_cutoff(this,error)
       type(water_monomer), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: water_monomer_cutoff
@@ -9685,7 +10510,7 @@ module descriptors_module
 
    endfunction water_monomer_cutoff
 
-   function water_dimer_cutoff(this,error) 
+   function water_dimer_cutoff(this,error)
       type(water_dimer), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: water_dimer_cutoff
@@ -9700,7 +10525,7 @@ module descriptors_module
 
    endfunction water_dimer_cutoff
 
-   function A2_dimer_cutoff(this,error) 
+   function A2_dimer_cutoff(this,error)
       type(A2_dimer), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: A2_dimer_cutoff
@@ -9715,7 +10540,7 @@ module descriptors_module
 
    endfunction A2_dimer_cutoff
 
-   function AB_dimer_cutoff(this,error) 
+   function AB_dimer_cutoff(this,error)
       type(AB_dimer), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: AB_dimer_cutoff
@@ -9746,7 +10571,7 @@ module descriptors_module
 
    endfunction atom_real_space_cutoff
 
-   function power_so3_cutoff(this,error) 
+   function power_so3_cutoff(this,error)
       type(power_so3), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: power_so3_cutoff
@@ -9761,38 +10586,38 @@ module descriptors_module
 
    endfunction power_so3_cutoff
 
-   function power_so4_cutoff(this,error) 
+   function power_so4_cutoff(this,error)
       type(power_so4), intent(in) :: this
-      integer, optional, intent(out) :: error  
+      integer, optional, intent(out) :: error
       real(dp) :: power_so4_cutoff
-  
-      INIT_ERROR(error)  
-  
-      if(.not. this%initialised) then  
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
          RAISE_ERROR("power_so4_cutoff: descriptor object not initialised", error)
-      endif  
-  
+      endif
+
       power_so4_cutoff = this%cutoff
-  
+
    endfunction power_so4_cutoff
-  
-   function soap_cutoff(this,error) 
+
+   function soap_cutoff(this,error)
       type(soap), intent(in) :: this
-      integer, optional, intent(out) :: error  
+      integer, optional, intent(out) :: error
       real(dp) :: soap_cutoff
-  
-      INIT_ERROR(error)  
-  
-      if(.not. this%initialised) then  
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
          RAISE_ERROR("soap_cutoff: descriptor object not initialised", error)
-      endif  
-  
+      endif
+
       soap_cutoff = this%cutoff
 
    endfunction soap_cutoff
-  
-  
-   function rdf_cutoff(this,error) 
+
+
+   function rdf_cutoff(this,error)
       type(rdf), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: rdf_cutoff
@@ -9807,7 +10632,7 @@ module descriptors_module
 
    endfunction rdf_cutoff
 
-   function as_distance_2b_cutoff(this,error) 
+   function as_distance_2b_cutoff(this,error)
       type(as_distance_2b), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: as_distance_2b_cutoff
@@ -9822,8 +10647,8 @@ module descriptors_module
 
    endfunction as_distance_2b_cutoff
 
-  
-   function alex_cutoff(this,error) 
+
+   function alex_cutoff(this,error)
       type(alex), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: alex_cutoff
@@ -9838,7 +10663,7 @@ module descriptors_module
 
    endfunction alex_cutoff
 
-   function distance_Nb_cutoff(this,error) 
+   function distance_Nb_cutoff(this,error)
       type(distance_Nb), intent(in) :: this
       integer, optional, intent(out) :: error
       real(dp) :: distance_Nb_cutoff
@@ -9852,6 +10677,21 @@ module descriptors_module
       distance_Nb_cutoff = this%cutoff
 
    endfunction distance_Nb_cutoff
+
+   function soap_turbo_cutoff(this,error)
+      type(soap_turbo), intent(in) :: this
+      integer, optional, intent(out) :: error
+      real(dp) :: soap_turbo_cutoff
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("soap_turbo_cutoff: descriptor object not initialised", error)
+      endif
+
+      soap_turbo_cutoff = this%rcut_hard
+
+   endfunction soap_turbo_cutoff
 
 
    subroutine descriptor_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
@@ -9931,6 +10771,9 @@ module descriptors_module
          case(DT_DISTANCE_Nb)
             call distance_Nb_sizes(this%descriptor_distance_Nb,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
+         case(DT_SOAP_TURBO)
+            call soap_turbo_sizes(this%descriptor_soap_turbo,at, &
+               n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
 #ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_BOND_REAL_SPACE)
             call bond_real_space_sizes(this%descriptor_bond_real_space,at, &
@@ -9941,24 +10784,21 @@ module descriptors_module
          case(DT_AN_MONOMER)
             call AN_monomer_sizes(this%descriptor_AN_monomer,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
-         case(DT_GENERAL_MONOMER)  
+         case(DT_GENERAL_MONOMER)
             call general_monomer_sizes(this%descriptor_general_monomer,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
-         case(DT_GENERAL_DIMER)  
+         case(DT_GENERAL_DIMER)
             call general_dimer_sizes(this%descriptor_general_dimer,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
-         case(DT_GENERAL_TRIMER)  
+         case(DT_GENERAL_TRIMER)
             call general_trimer_sizes(this%descriptor_general_trimer,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
-         case(DT_COM_DIMER) 
+         case(DT_COM_DIMER)
             call com_dimer_sizes(this%descriptor_com_dimer,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
          case(DT_SOAP_EXPRESS)
             call soap_express_sizes(this%descriptor_soap_express,at, &
                  n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
-         case(DT_SOAP_TURBO)
-            call soap_turbo_sizes(this%descriptor_soap_turbo,at, &
-               n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
 #endif
          case default
             RAISE_ERROR("descriptor_sizes: unknown descriptor type "//this%descriptor_type,error)
@@ -9991,7 +10831,7 @@ module descriptors_module
             if(.not. mask(i)) cycle
          endif
          n_descriptors = n_descriptors + 1
-         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1 
+         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
 
       if( present(n_index) ) n_index = 1
@@ -10022,7 +10862,7 @@ module descriptors_module
             if(.not. mask(i)) cycle
          endif
          n_descriptors = n_descriptors + 1
-         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1 
+         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
 
       if( present(n_index) ) n_index = 1
@@ -10054,7 +10894,7 @@ module descriptors_module
          if( this%Z /= 0 .and. this%Z /= at%Z(i) ) cycle
 
          n_descriptors = n_descriptors + 1
-         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1 
+         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
 
       if( present(n_index) ) n_index = 1
@@ -10073,24 +10913,24 @@ module descriptors_module
       logical :: Zi1, Zi2, Zj1, Zj2
       real(dp) :: r_ij
 
-      logical :: needs_resid 
-      integer, dimension(:), pointer :: resid_pointer 
-    
+      logical :: needs_resid
+      integer, dimension(:), pointer :: resid_pointer
+
       INIT_ERROR(error)
 
       if(.not. this%initialised) then
          RAISE_ERROR("distance_2b_sizes: descriptor object not initialised", error)
       endif
 
-      needs_resid = this%only_intra .or. this%only_inter 
-      if (needs_resid) then 
-         if (.not. assign_pointer(at, trim(this%resid_name), resid_pointer)) then 
-            RAISE_ERROR("distance_2b_sizes did not find "//trim(this%resid_name)//" property (residue id) in the atoms object.", error) 
-         end if 
-      else   
-         resid_pointer => null() 
-      end if   
-   
+      needs_resid = this%only_intra .or. this%only_inter
+      if (needs_resid) then
+         if (.not. assign_pointer(at, trim(this%resid_name), resid_pointer)) then
+            RAISE_ERROR("distance_2b_sizes did not find "//trim(this%resid_name)//" property (residue id) in the atoms object.", error)
+         end if
+      else
+         resid_pointer => null()
+      end if
+
       n_descriptors = 0
       n_cross = 0
 
@@ -10101,8 +10941,8 @@ module descriptors_module
 
          Zi1 = (this%Z1 == 0) .or. (at%Z(i) == this%Z1)
          Zi2 = (this%Z2 == 0) .or. (at%Z(i) == this%Z2)
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance=r_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance=r_ij)
             if(r_ij >= this%cutoff) cycle
 !if(r_ij < 3.5_dp) cycle
 
@@ -10110,11 +10950,11 @@ module descriptors_module
             Zj2 = (this%Z2 == 0) .or. (at%Z(j) == this%Z2)
             if( .not. ( ( Zi1 .and. Zj2 ) .or. ( Zi2 .and. Zj1 ) ) ) cycle ! this pair doesn't belong to the descriptor type
 
-            if (needs_resid) then  
-               if (this%only_intra .and. resid_pointer(i) /= resid_pointer(j)) cycle 
-               if (this%only_inter .and. resid_pointer(i) == resid_pointer(j)) cycle 
-            end if 
-    
+            if (needs_resid) then
+               if (this%only_intra .and. resid_pointer(i) /= resid_pointer(j)) cycle
+               if (this%only_inter .and. resid_pointer(i) == resid_pointer(j)) cycle
+            end if
+
             n_descriptors = n_descriptors + 1
          enddo
       enddo
@@ -10149,7 +10989,7 @@ module descriptors_module
             if(.not. mask(i)) cycle
          endif
          n_descriptors = n_descriptors + 1
-         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1 
+         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
 
       if( present(n_index) ) n_index = 1
@@ -10183,17 +11023,17 @@ module descriptors_module
             if(.not. mask(i)) cycle
          endif
 
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij)
             if( r_ij >= this%cutoff ) cycle
 
             Zj1 = (this%Z1 == 0) .or. (at%Z(j) == this%Z1)
             Zj2 = (this%Z2 == 0) .or. (at%Z(j) == this%Z2)
 
-            do m = 1, n_neighbours(at,i) 
+            do m = 1, n_neighbours(at,i)
                if( n == m ) cycle
 
-               k = neighbour(at, i, m, distance = r_ik) 
+               k = neighbour(at, i, m, distance = r_ik)
                if( r_ik >= this%cutoff ) cycle
 
                Zk1 = (this%Z1 == 0) .or. (at%Z(k) == this%Z1)
@@ -10237,18 +11077,18 @@ module descriptors_module
             if(.not. mask(i)) cycle
          endif
 
-         n_neighbours_coordination = n_neighbours(at,i,max_dist=this%coordination_cutoff) 
+         n_neighbours_coordination = n_neighbours(at,i,max_dist=this%coordination_cutoff)
 
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at, i, n, distance = r_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at, i, n, distance = r_ij)
             if( r_ij >= this%cutoff ) cycle
 
             Zj1 = (this%Z1 == 0) .or. (at%Z(j) == this%Z1)
             Zj2 = (this%Z2 == 0) .or. (at%Z(j) == this%Z2)
 
-            do m = 1, n_neighbours(at,i) 
+            do m = 1, n_neighbours(at,i)
                if( n == m ) cycle
-               k = neighbour(at, i, m, distance = r_ik) 
+               k = neighbour(at, i, m, distance = r_ik)
                if( r_ik >= this%cutoff ) cycle
 
                Zk1 = (this%Z1 == 0) .or. (at%Z(k) == this%Z1)
@@ -10292,8 +11132,8 @@ module descriptors_module
          endif
          Zi1 = (this%Z1 == 0) .or. (at%Z(i) == this%Z1)
          Zi2 = (this%Z2 == 0) .or. (at%Z(i) == this%Z2)
-         do n = 1, n_neighbours(at,i) 
-            j = neighbour(at,i,n,distance=r_ij) 
+         do n = 1, n_neighbours(at,i)
+            j = neighbour(at,i,n,distance=r_ij)
             if( r_ij >= this%cutoff ) cycle
 !if( r_ij < 3.5_dp ) cycle
 
@@ -10303,7 +11143,7 @@ module descriptors_module
             if( .not. ( ( Zi1 .and. Zj2 ) .or. ( Zi2 .and. Zj1 ) ) ) cycle ! this pair doesn't belong to the descriptor type
 
             n_descriptors = n_descriptors + 1
-            n_cross = n_cross + 4 + n_neighbours(at,i,max_dist=this%coordination_cutoff) + n_neighbours(at,j,max_dist=this%coordination_cutoff) 
+            n_cross = n_cross + 4 + n_neighbours(at,i,max_dist=this%coordination_cutoff) + n_neighbours(at,j,max_dist=this%coordination_cutoff)
          enddo
       enddo
 
@@ -10336,7 +11176,7 @@ module descriptors_module
             if(.not. mask(i)) cycle
          endif
          n_descriptors = n_descriptors + 1
-         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1 
+         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
 
       if( present(n_index) ) n_index = 1
@@ -10367,7 +11207,7 @@ module descriptors_module
          if(present(mask)) then
             if(.not. mask(i)) cycle
          endif
-         n_cross = n_cross + n_neighbours(at,i) + 1 
+         n_cross = n_cross + n_neighbours(at,i) + 1
       enddo
 
       if( present(n_index) ) n_index = 1
@@ -10426,14 +11266,14 @@ module descriptors_module
 
       n_descriptors = 0
       n_cross = 0
-call print("mask present ? "//present(mask))   
+call print("mask present ? "//present(mask))
       do i = 1, at%N
          if(at%Z(i) == 8) then
             if(present(mask)) then
                if(.not. mask(i)) cycle
             endif
-            do n = 1, n_neighbours(at,i) 
-               j = neighbour(at,i,n,distance=r_ij) 
+            do n = 1, n_neighbours(at,i)
+               j = neighbour(at,i,n,distance=r_ij)
                if(at%Z(j) == 8 .and. r_ij < this%cutoff) then
                   n_descriptors = n_descriptors + 1
                   n_cross = n_cross + 6
@@ -10471,12 +11311,12 @@ call print("mask present ? "//present(mask))
 
       do i = 1, at%N
          iA1 = i
-         iA2 = neighbour(at,i,A2_monomer_index(i),distance=r_A1_A2) 
+         iA2 = neighbour(at,i,A2_monomer_index(i),distance=r_A1_A2)
          if( iA1 > iA2 ) cycle
 
          do j = i + 1, at%N
             iB1 = j
-            iB2 = neighbour(at,j,A2_monomer_index(j),distance=r_B1_B2) 
+            iB2 = neighbour(at,j,A2_monomer_index(j),distance=r_B1_B2)
             if( iB1 > iB2 ) cycle
 
             r_A1_B1 = distance_min_image(at,iA1,iB1)
@@ -10484,7 +11324,7 @@ call print("mask present ? "//present(mask))
 
             r_A2_B1 = distance_min_image(at,iA2,iB1)
             r_A2_B2 = distance_min_image(at,iA2,iB2)
-            
+
             if( all( (/r_A1_A2,r_B1_B2,r_A1_B1,r_A1_B2,r_A2_B1,r_A2_B2/) < this%cutoff) ) then
                n_descriptors = n_descriptors + 1
                n_cross = n_cross + 4
@@ -10541,7 +11381,7 @@ call print("mask present ? "//present(mask))
 
             r_A1_B2 = distance_min_image(at,iA1,iB2)
             r_A2_B1 = distance_min_image(at,iA2,iB1)
-            
+
             if( all( (/r_A1_A2,r_B1_B2,r_A1_B1,r_A1_B2,r_A2_B1,r_A2_B2/) < this%cutoff) ) then
                n_descriptors = n_descriptors + 1
                n_cross = n_cross + 4
@@ -10558,117 +11398,117 @@ call print("mask present ? "//present(mask))
 
    subroutine atom_real_space_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(atom_real_space), intent(in) :: this
-      type(atoms), intent(in) :: at  
-      integer, intent(out) :: n_descriptors, n_cross  
-      logical, dimension(:), intent(in), optional :: mask  
+      type(atoms), intent(in) :: at
+      integer, intent(out) :: n_descriptors, n_cross
+      logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
-      integer, optional, intent(out) :: error  
+      integer, optional, intent(out) :: error
 
-      integer :: i  
-  
-      INIT_ERROR(error)  
-  
-      if(.not. this%initialised) then  
+      integer :: i
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
          RAISE_ERROR("atom_real_space_sizes: descriptor object not initialised", error)
-      endif  
-  
+      endif
+
       n_descriptors = at%N
       n_cross = 0
-  
+
       do i = 1, at%N
          if(present(mask)) then
             if(.not. mask(i)) cycle
-         endif 
-         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff)*2 
+         endif
+         n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff)*2
       enddo
 
       if( present(n_index) ) n_index = 1
-  
+
    endsubroutine atom_real_space_sizes
-  
+
    subroutine power_so3_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(power_so3), intent(in) :: this
-      type(atoms), intent(in) :: at  
-      integer, intent(out) :: n_descriptors, n_cross  
-      logical, dimension(:), intent(in), optional :: mask  
+      type(atoms), intent(in) :: at
+      integer, intent(out) :: n_descriptors, n_cross
+      logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
-      integer, optional, intent(out) :: error  
+      integer, optional, intent(out) :: error
 
       integer :: i
-  
-      INIT_ERROR(error) 
-   
-      if(.not. this%initialised) then 
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
          RAISE_ERROR("power_so3_sizes: descriptor object not initialised", error)
-      endif 
-  
+      endif
+
       n_descriptors = 0
       n_cross = 0
-  
+
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
          if(present(mask)) then
             if(.not. mask(i)) cycle
-         endif 
+         endif
          n_descriptors = n_descriptors + 1
          n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
 
       if( present(n_index) ) n_index = 1
-   
+
    endsubroutine power_so3_sizes
-  
+
    subroutine power_SO4_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(power_SO4), intent(in) :: this
-      type(atoms), intent(in) :: at 
-      integer, intent(out) :: n_descriptors, n_cross 
-      logical, dimension(:), intent(in), optional :: mask 
+      type(atoms), intent(in) :: at
+      integer, intent(out) :: n_descriptors, n_cross
+      logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
-      integer, optional, intent(out) :: error 
+      integer, optional, intent(out) :: error
 
       integer :: i
-  
-      INIT_ERROR(error)  
-  
-      if(.not. this%initialised) then  
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
          RAISE_ERROR("power_SO4_sizes: descriptor object not initialised", error)
-      endif  
-  
+      endif
+
       n_descriptors = 0
       n_cross = 0
-  
+
       do i = 1, at%N
          if( at%Z(i) /= this%Z .and. this%Z /=0 ) cycle
          if(present(mask)) then
             if(.not. mask(i)) cycle
-         endif 
+         endif
          n_descriptors = n_descriptors + 1
          n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
-  
+
       if( present(n_index) ) n_index = 1
-  
+
    endsubroutine power_SO4_sizes
-  
+
    subroutine soap_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(soap), intent(in) :: this
-      type(atoms), intent(in) :: at  
-      integer, intent(out) :: n_descriptors, n_cross  
-      logical, dimension(:), intent(in), optional :: mask  
+      type(atoms), intent(in) :: at
+      integer, intent(out) :: n_descriptors, n_cross
+      logical, dimension(:), intent(in), optional :: mask
       integer, intent(out), optional :: n_index
-      integer, optional, intent(out) :: error  
+      integer, optional, intent(out) :: error
 
       integer :: i
-  
-      INIT_ERROR(error)  
-  
-      if(.not. this%initialised) then  
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
          RAISE_ERROR("soap_sizes: descriptor object not initialised", error)
-      endif  
-  
+      endif
+
       n_descriptors = 0
       n_cross = 0
-  
+
       do i = 1, at%N
          if( .not. any( at%Z(i) == this%Z ) .and. .not. any(this%Z == 0) ) cycle
          if(present(mask)) then
@@ -10677,7 +11517,7 @@ call print("mask present ? "//present(mask))
          n_descriptors = n_descriptors + 1
          n_cross = n_cross + n_neighbours(at,i,max_dist=this%cutoff) + 1
       enddo
-  
+
       if(this%global) then
          n_descriptors = 1
          if( present(n_index) ) then
@@ -10686,13 +11526,13 @@ call print("mask present ? "//present(mask))
             else
                n_index = count( (/(any(at%Z(i)==this%Z),i=1,at%N)/) )
             endif
-         endif 
-      else   
+         endif
+      else
          if( present(n_index) ) n_index = 1
       endif
 
    endsubroutine soap_sizes
-  
+
    subroutine rdf_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(rdf), intent(in) :: this
       type(atoms), intent(in) :: at
@@ -10765,7 +11605,7 @@ call print("mask present ? "//present(mask))
 
    endsubroutine as_distance_2b_sizes
 
-  
+
    subroutine alex_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(alex), intent(in) :: this
       type(atoms), intent(in) :: at
@@ -10823,12 +11663,32 @@ call print("mask present ? "//present(mask))
 
    endsubroutine distance_Nb_sizes
 
+   function soap_turbo_dimensions(this,error) result(i)
+      type(soap_turbo), intent(in) :: this
+      integer, optional, intent(out) :: error
+      integer :: i
+      integer :: n_max
+
+      INIT_ERROR(error)
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("soap_turbo_dimensions: descriptor object not initialised", error)
+      endif
+
+      if( this%compress )then
+         i = maxval(this%compress_P_i)
+      else
+         n_max = sum(this%alpha_max)
+         i = ( this%l_max+1 ) * ( n_max*(n_max+1) ) / 2
+      endif
+
+   endfunction soap_turbo_dimensions
 
    function descriptor_n_permutations(this,error)
       type(descriptor), intent(in) :: this
       integer, optional, intent(out) :: error
 
-      integer :: descriptor_n_permutations, i  
+      integer :: descriptor_n_permutations, i
 
       INIT_ERROR(error)
 
@@ -10839,7 +11699,7 @@ call print("mask present ? "//present(mask))
             DT_SOAP_EXPRESS,DT_SOAP_TURBO)
 
             descriptor_n_permutations = 1
-            
+
          case(DT_WATER_DIMER)
             descriptor_n_permutations = NP_WATER_DIMER
          case(DT_A2_DIMER)
@@ -10853,47 +11713,47 @@ call print("mask present ? "//present(mask))
             else
                descriptor_n_permutations = factorial(this%descriptor_AN_monomer%N)
             endif
-         case(DT_GENERAL_MONOMER)  
-            if (.not. this%descriptor_general_monomer%permutation_data%initialised)then  
-              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error) 
-            end if  
-            descriptor_n_permutations = this%descriptor_general_monomer%permutation_data%n_perms  
-         case(DT_GENERAL_DIMER)  
-            if (.not. this%descriptor_general_dimer%permutation_data%initialised)then  
-              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error) 
-            end if  
-            descriptor_n_permutations = this%descriptor_general_dimer%permutation_data%n_perms  
-         case(DT_GENERAL_TRIMER)  
-            if (.not. this%descriptor_general_trimer%permutation_data%initialised)then  
-              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)  
-            end if  
-            descriptor_n_permutations = this%descriptor_general_trimer%permutation_data%n_perms  
-         case(DT_MOLECULE_LO_D)  
-            if (.not. this%descriptor_molecule_lo_d%permutation_data%initialised)then  
-              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error) 
-            end if  
-            descriptor_n_permutations = this%descriptor_molecule_lo_d%permutation_data%n_perms  
+         case(DT_GENERAL_MONOMER)
+            if (.not. this%descriptor_general_monomer%permutation_data%initialised)then
+              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)
+            end if
+            descriptor_n_permutations = this%descriptor_general_monomer%permutation_data%n_perms
+         case(DT_GENERAL_DIMER)
+            if (.not. this%descriptor_general_dimer%permutation_data%initialised)then
+              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)
+            end if
+            descriptor_n_permutations = this%descriptor_general_dimer%permutation_data%n_perms
+         case(DT_GENERAL_TRIMER)
+            if (.not. this%descriptor_general_trimer%permutation_data%initialised)then
+              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)
+            end if
+            descriptor_n_permutations = this%descriptor_general_trimer%permutation_data%n_perms
+         case(DT_MOLECULE_LO_D)
+            if (.not. this%descriptor_molecule_lo_d%permutation_data%initialised)then
+              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)
+            end if
+            descriptor_n_permutations = this%descriptor_molecule_lo_d%permutation_data%n_perms
 #endif
          case(DT_DISTANCE_NB)
             descriptor_n_permutations = this%descriptor_distance_Nb%n_permutations
          case default
-            RAISE_ERROR("descriptor_n_permutations: unknown descriptor type "//this%descriptor_type,error)  
+            RAISE_ERROR("descriptor_n_permutations: unknown descriptor type "//this%descriptor_type,error)
       endselect
 
    endfunction descriptor_n_permutations
 
    subroutine descriptor_permutations(this,permutations,error)
-      type(descriptor), intent(in) :: this  
+      type(descriptor), intent(in) :: this
 #ifdef DESCRIPTORS_NONCOMMERCIAL
-      type(permutation_data_type) :: my_permutation_data  
+      type(permutation_data_type) :: my_permutation_data
 #endif
       integer, dimension(:,:), intent(out) :: permutations
       integer, optional, intent(out) :: error
 
-      integer :: i, d, np, n, m, ip, j  
-      integer,dimension(1) :: unit_vec  
-      integer, dimension(:), allocatable :: this_perm  
-      integer, dimension(:,:), allocatable :: distance_matrix, atom_permutations, sliced_permutations  
+      integer :: i, d, np, n, m, ip, j
+      integer,dimension(1) :: unit_vec
+      integer, dimension(:), allocatable :: this_perm
+      integer, dimension(:,:), allocatable :: distance_matrix, atom_permutations, sliced_permutations
 
       INIT_ERROR(error)
 
@@ -10906,7 +11766,7 @@ call print("mask present ? "//present(mask))
             DT_ANGLE_3B,DT_CO_ANGLE_3B,DT_CO_DISTANCE_2b,DT_COSNX,DT_TRIHIS,DT_WATER_MONOMER,DT_BOND_REAL_SPACE,&
             DT_ATOM_REAL_SPACE,DT_POWER_SO3,DT_POWER_SO4,DT_SOAP,DT_RDF, DT_ALEX, DT_COM_DIMER,&
             DT_SOAP_EXPRESS,DT_SOAP_TURBO)
-            
+
             permutations(:,1) = (/ (i, i = 1, size(permutations,1)) /)
          case(DT_WATER_DIMER)
             permutations(:,1) = (/1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15/) ! original order
@@ -10927,7 +11787,7 @@ call print("mask present ? "//present(mask))
             permutations(:,6) = (/2, 1, 5, 3, 6, 4/) ! swap monomers and atoms on monomer A
             permutations(:,7) = (/2, 1, 4, 6, 3, 5/) ! swap monomers and atoms on monomer B
             permutations(:,8) = (/2, 1, 6, 4, 5, 3/) ! swap monomers and atoms on both monomers
-            
+
          case(DT_AB_DIMER)
             permutations(:,1) = (/1, 2, 3, 4, 5, 6/) ! original order
             permutations(:,2) = (/2, 1, 3, 4, 6, 5/) ! swap monomers
@@ -10955,10 +11815,10 @@ call print("mask present ? "//present(mask))
       if(.not.allocated(atom_coefficient)) allocate(atom_coefficient(at%N))
 
       do i = 1, at%N
-         if(.not. allocated(atom_coefficient(i)%neighbour)) allocate(atom_coefficient(i)%neighbour(n_neighbours(at,i))) 
-         do n = 1, n_neighbours(at,i) 
+         if(.not. allocated(atom_coefficient(i)%neighbour)) allocate(atom_coefficient(i)%neighbour(n_neighbours(at,i)))
+         do n = 1, n_neighbours(at,i)
 
-            j = neighbour(at,i,n,distance = r, diff = d) 
+            j = neighbour(at,i,n,distance = r, diff = d)
             atom_coefficient(i)%neighbour(n)%r = r
             atom_coefficient(i)%neighbour(n)%u = d / r
 
@@ -11000,7 +11860,7 @@ call print("mask present ? "//present(mask))
 
       logical :: do_derivative
 
-      do_derivative = (present(f1) .or. present(f2)) 
+      do_derivative = (present(f1) .or. present(f2))
 
       real_space_covariance_in = CPLX_ZERO
 
@@ -11071,7 +11931,7 @@ call print("mask present ? "//present(mask))
 
 
                if(do_derivative) grad_mo_spher_bess_fi_ki_l = 0.5_dp * (mo_spher_bess_fi_ki_lp - mo_spher_bess_fi_ki_l / arg_bess + mo_spher_bess_fi_ki_lm)
-                  
+
                do m1 = -l, l
                   do m2 = -l, l
                      I_lm1m2 = conjg(anc1(i1)%neighbour(n1)%spherical_harmonics(l)%m(m1)) * anc2(i2)%neighbour(n2)%spherical_harmonics(l)%m(m2) * mo_spher_bess_fi_ki_l*fac_exp
@@ -11168,7 +12028,7 @@ call print("mask present ? "//present(mask))
 
       logical :: do_derivative
 
-      do_derivative = (present(f1) .or. present(f2)) 
+      do_derivative = (present(f1) .or. present(f2))
 
       real_space_covariance_in = CPLX_ZERO
 
@@ -11178,10 +12038,10 @@ call print("mask present ? "//present(mask))
          integral_r(l)%mm = CPLX_ZERO
       enddo
 
-      do n1 = 1, n_neighbours(at1,i1) 
-         j1 = neighbour(at1,i1,n1,distance = r1, diff = d1) 
-         do n2 = 1, n_neighbours(at2,i2) 
-            j2 = neighbour(at2,i2,n2,distance = r2, diff = d2) 
+      do n1 = 1, n_neighbours(at1,i1)
+         j1 = neighbour(at1,i1,n1,distance = r1, diff = d1)
+         do n2 = 1, n_neighbours(at2,i2)
+            j2 = neighbour(at2,i2,n2,distance = r2, diff = d2)
 
             arg_bess = alpha*r1*r2
             fac_exp = exp(-0.5_dp*alpha*(r1**2+r2**2))
@@ -11198,7 +12058,7 @@ call print("mask present ? "//present(mask))
                   mo_spher_bess_fi_ki_lm = mo_spher_bess_fi_ki_l
                   mo_spher_bess_fi_ki_lmm = mo_spher_bess_fi_ki_lm
                endif
-                  
+
                do m1 = -l, l
                   do m2 = -l, l
                      I_lm1m2 = conjg(SphericalYCartesian(l,m1,d1)) * SphericalYCartesian(l,m2,d2)*mo_spher_bess_fi_ki_l*fac_exp
@@ -11227,10 +12087,10 @@ call print("mask present ? "//present(mask))
       integer, intent(in) :: i
 
       real(dp) :: RadialFunction
-   
+
       real(dp), dimension(this%n_max) :: h
       integer :: j
-   
+
       if( r < this%cutoff ) then
          do j = 1, this%n_max
             h(j) = (this%cutoff-r)**(j+2) / this%NormFunction(j)
@@ -11239,19 +12099,19 @@ call print("mask present ? "//present(mask))
       else
          RadialFunction = 0.0_dp
       endif
-   
+
    endfunction RadialFunction
-   
+
    function GradRadialFunction(this,r,i)
       type(RadialFunction_type), intent(in) :: this
       real(dp), intent(in) :: r
       integer, intent(in) :: i
 
       real(dp) :: GradRadialFunction
-   
+
       real(dp), dimension(this%n_max) :: h
       integer :: j
-   
+
       if( r < this%cutoff ) then
          do j = 1, this%n_max
             h(j) = - (j+2) * (this%cutoff-r)**(j+1) / this%NormFunction(j)
@@ -11260,11 +12120,11 @@ call print("mask present ? "//present(mask))
       else
          GradRadialFunction = 0.0_dp
       endif
-   
+
    endfunction GradRadialFunction
 
-  
-  
+
+
    function graphIsConnected(connectivityMatrix,error)
 
       logical, dimension(:,:), intent(in) :: connectivityMatrix

@@ -32,7 +32,7 @@ function git_date
 {
   if [ -e "$1" ]
   then
-    DATE=$(git log -n1 --format="%at" "$1")
+    DATE=$(git log -n 1 --format="%at" -- `/bin/ls | grep -v doc_src`)
     [[ $? -eq 0 && ! -z $DATE ]] && echo "$DATE" || echo 0
   else
     echo 0
