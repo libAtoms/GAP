@@ -56,6 +56,7 @@ module gp_fit_module
    use dictionary_module, only : STRING_LENGTH
    use gp_predict_module
    use clustering_module
+   use task_manager_module, only : task_manager_type
    implicit none
    private
 
@@ -70,11 +71,12 @@ module gp_fit_module
 
    contains
 
-   subroutine gpCoordinates_sparsify_config_type(this, n_sparseX, default_all, sparse_method, sparse_file, use_actual_gpcov, print_sparse_index, &
-         unique_hash_tolerance, unique_descriptor_tolerance, error)
+   subroutine gpCoordinates_sparsify_config_type(this, n_sparseX, default_all, task_manager, sparse_method, sparse_file, &
+         use_actual_gpcov, print_sparse_index, unique_hash_tolerance, unique_descriptor_tolerance, error)
       type(gpCoordinates), intent(inout) :: this
       integer, dimension(:), intent(in) :: n_sparseX
       logical, intent(in) :: default_all
+      type(task_manager_type), intent(in) :: task_manager
       integer, intent(in), optional :: sparse_method
       character(len=STRING_LENGTH), intent(in), optional :: sparse_file, print_sparse_index
       logical, intent(in), optional :: use_actual_gpcov
@@ -106,6 +108,12 @@ module gp_fit_module
       if( .not. this%initialised ) then
          RAISE_ERROR('gpCoordinates_sparsify: : object not initialised',error)
       endif
+
+      if (task_manager%active) then
+         if (my_sparse_method /= GP_SPARSE_FILE) then
+            call system_abort("Only sparse_method FILE implemented for MPI.")
+         end if
+      end if
 
       d = size(this%x,1)
       n_x = count(EXCLUDE_CONFIG_TYPE /= this%config_type)
@@ -387,11 +395,12 @@ module gp_fit_module
       end select
    end function count_entries_in_sparse_file
 
-   subroutine gpFull_sparsify_array_config_type(this, n_sparseX, default_all, sparse_method, sparse_file, use_actual_gpcov, print_sparse_index, &
-         unique_hash_tolerance, unique_descriptor_tolerance, error)
+   subroutine gpFull_sparsify_array_config_type(this, n_sparseX, default_all, task_manager, sparse_method, sparse_file, &
+         use_actual_gpcov, print_sparse_index, unique_hash_tolerance, unique_descriptor_tolerance, error)
       type(gpFull), intent(inout) :: this
       integer, dimension(:,:), intent(in) :: n_sparseX
       logical, dimension(:), intent(in) :: default_all
+      type(task_manager_type), intent(in) :: task_manager
       integer, dimension(:), intent(in), optional :: sparse_method
       character(len=STRING_LENGTH), dimension(:), intent(in), optional :: sparse_file, print_sparse_index
       logical, intent(in), optional :: use_actual_gpcov
@@ -414,11 +423,10 @@ module gp_fit_module
       my_sparse_file = optional_default((/ ("", i=1,this%n_coordinate) /),sparse_file)
 
       do i = 1, this%n_coordinate
-         call gpCoordinates_sparsify_config_type(this%coordinate(i),n_sparseX(:,i), default_all(i), &
+         call gpCoordinates_sparsify_config_type(this%coordinate(i), n_sparseX(:,i), default_all(i), task_manager, &
             sparse_method=my_sparse_method(i), sparse_file=my_sparse_file(i), use_actual_gpcov=use_actual_gpcov, &
-            print_sparse_index = print_sparse_index(i), &
-            unique_hash_tolerance=unique_hash_tolerance(i), unique_descriptor_tolerance=unique_descriptor_tolerance(i), &
-            error = error)
+            print_sparse_index=print_sparse_index(i), unique_hash_tolerance=unique_hash_tolerance(i), &
+            unique_descriptor_tolerance=unique_descriptor_tolerance(i), error=error)
       enddo
    endsubroutine gpFull_sparsify_array_config_type
 
