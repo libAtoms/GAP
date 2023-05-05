@@ -85,7 +85,7 @@ module gp_fit_module
       integer, intent(out), optional :: error
 
       integer :: my_sparse_method, i, j, li, ui, i_config_type, n_config_type, d, n_x
-      integer, dimension(:), allocatable :: config_type_index, sparseX_index, my_n_sparseX, x_index, x_counts
+      integer, dimension(:), allocatable :: config_type_index, sparseX_index, my_n_sparseX, x_index
       real(dp), dimension(:,:), allocatable :: sparseX_array
 
       integer, dimension(:), pointer :: config_type_ptr, x_size_ptr
@@ -131,7 +131,7 @@ module gp_fit_module
                   my_sparse_method = GP_SPARSE_SKIP
                end if
 
-               call gatherv(task_manager%mpi_obj, this%config_type, config_type_ptr, x_counts, error=error)
+               call gatherv(task_manager%mpi_obj, this%config_type, config_type_ptr, error=error)
                call gatherv(task_manager%mpi_obj, this%x, x_ptr, error=error)
 
                if (this%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
@@ -373,7 +373,6 @@ module gp_fit_module
          call bcast(task_manager%mpi_obj, this%sparseCutoff, error=error)
          call bcast(task_manager%mpi_obj, this%sparseX, error=error)
          if (allocated(this%sparseX_size)) call bcast(task_manager%mpi_obj, this%sparseX_size, error=error)
-         call scatterv(task_manager%mpi_obj, config_type_ptr, this%config_type, x_counts, error=error)
 
          if (is_root(task_manager%mpi_obj)) then
             deallocate(config_type_ptr)
@@ -382,6 +381,7 @@ module gp_fit_module
          end if
       end if
 
+      if (allocated(this%config_type)) deallocate(this%config_type)
       this%sparsified = .true.
    endsubroutine gpCoordinates_sparsify_config_type
 
