@@ -57,6 +57,7 @@ module gp_fit_module
    use gp_predict_module
    use clustering_module
    use task_manager_module, only : task_manager_type
+   use MPI_context_module, only: bcast, gatherv, is_root, scatterv, sum
    implicit none
    private
 
@@ -84,13 +85,11 @@ module gp_fit_module
       integer, intent(out), optional :: error
 
       integer :: my_sparse_method, i, j, li, ui, i_config_type, n_config_type, d, n_x
-      integer, dimension(:), allocatable :: config_type_index, sparseX_index, my_n_sparseX
+      integer, dimension(:), allocatable :: config_type_index, sparseX_index, my_n_sparseX, x_index, x_counts
       real(dp), dimension(:,:), allocatable :: sparseX_array
-      real(dp), pointer, dimension(:,:) :: dm
-      integer, dimension(:), allocatable :: x_index
 
       integer, dimension(:), pointer :: config_type_ptr, x_size_ptr
-      real(dp), dimension(:,:), pointer :: x_ptr
+      real(dp), dimension(:,:), pointer  :: dm, x_ptr
 
       character(len=STRING_LENGTH) :: my_sparse_file
       type(Inoutput) :: inout_sparse_index
@@ -104,23 +103,51 @@ module gp_fit_module
          RAISE_ERROR('gpCoordinates_sparsify: : object not initialised',error)
       endif
 
+      d = size(this%x, 1)
+
       if (task_manager%active) then
-         if (my_sparse_method /= GP_SPARSE_FILE) then
-            call system_abort("Only sparse_method FILE implemented for MPI.")
-         end if
+         select case(my_sparse_method)
+            case (GP_SPARSE_INDEX_FILE)
+               call system_abort("sparse_method INDEX_FILE is not implemented for MPI.")
+            case (GP_SPARSE_FILE)
+               x_ptr => this%x
+               x_size_ptr => this%x_size
+               config_type_ptr => this%config_type
+            case default
+               call print("Collecting x on a single process for sparsification with MPI.")
+               n_x = sum(task_manager%mpi_obj, size(this%config_type), error)
+
+               if (is_root(task_manager%mpi_obj)) then
+                  allocate(x_ptr(d, n_x))
+                  allocate(config_type_ptr(n_x))
+                  allocate(x_size_ptr(n_x))
+               else
+                  my_sparse_method = GP_SPARSE_SKIP
+               end if
+
+               call gatherv(task_manager%mpi_obj, this%config_type, config_type_ptr, x_counts, error=error)
+               call gatherv(task_manager%mpi_obj, this%x, x_ptr, error=error)
+
+               if (this%covariance_type == COVARIANCE_BOND_REAL_SPACE) then
+                  call gatherv(task_manager%mpi_obj, this%x_size, x_size_ptr, error=error)
+               end if
+         end select
+      else
+         x_ptr => this%x
+         x_size_ptr => this%x_size
+         config_type_ptr => this%config_type
       end if
 
-      x_ptr => this%x
-      x_size_ptr => this%x_size
-      config_type_ptr => this%config_type
+      if (my_sparse_method /= GP_SPARSE_SKIP) then
+         allocate(my_n_sparseX(size(n_sparseX)), source=0)
 
-      d = size(x_ptr, 1)
-      allocate(my_n_sparseX(size(n_sparseX)), source=0)
+         call exclude_duplicates(x_ptr, config_type_ptr, unique_descriptor_tolerance, unique_hash_tolerance, error)
+         n_x = count(EXCLUDE_CONFIG_TYPE /= config_type_ptr)
+      end if
 
-      call exclude_duplicates(x_ptr, config_type_ptr, unique_descriptor_tolerance, unique_hash_tolerance, error)
-      n_x = count(EXCLUDE_CONFIG_TYPE /= config_type_ptr)
-
-      if(my_sparse_method == GP_SPARSE_UNIQ) then
+      if (my_sparse_method == GP_SPARSE_SKIP) then
+         ! pass
+      elseif(my_sparse_method == GP_SPARSE_UNIQ) then
          RAISE_ERROR('gpCoordinates_sparsify: UNIQ is no longer in use, please use NONE instead.',error)
 
       elseif(my_sparse_method == GP_SPARSE_NONE) then
@@ -174,6 +201,10 @@ module gp_fit_module
          this%n_sparseX = sum(my_n_sparseX)
       endif
 
+      if (task_manager%active .and. my_sparse_method /= GP_SPARSE_FILE) then
+         call bcast(task_manager%mpi_obj, this%n_sparseX, error)
+      end if
+
       call reallocate(this%sparseX, this%d,this%n_sparseX, zero = .true.)
 
       call reallocate(this%sparseX_index, this%n_sparseX, zero = .true.)
@@ -182,7 +213,9 @@ module gp_fit_module
       call reallocate(this%sparseCutoff, this%n_sparseX, zero = .true.)
       this%sparseCutoff = 1.0_dp
 
-      if( my_sparse_method /= GP_SPARSE_FILE .and. my_sparse_method /= GP_SPARSE_INDEX_FILE) then
+      if (my_sparse_method == GP_SPARSE_SKIP) then
+         ! pass
+      elseif( my_sparse_method /= GP_SPARSE_FILE .and. my_sparse_method /= GP_SPARSE_INDEX_FILE) then
          ui = 0
          do i_config_type = 1, size(my_n_sparseX)
 
@@ -291,7 +324,9 @@ module gp_fit_module
       if(allocated(this%covarianceDiag_sparseX_sparseX)) deallocate(this%covarianceDiag_sparseX_sparseX)
       allocate(this%covarianceDiag_sparseX_sparseX(this%n_sparseX))
 
-      if(my_sparse_method == GP_SPARSE_FILE) then
+      if (my_sparse_method == GP_SPARSE_SKIP) then
+         ! pass
+      elseif(my_sparse_method == GP_SPARSE_FILE) then
          call print('Started reading sparse descriptors from file '//trim(my_sparse_file))
          allocate(sparseX_array(d+1,this%n_sparseX))
          call fread_array_d(size(sparseX_array),sparseX_array(1,1),trim(my_sparse_file)//C_NULL_CHAR)
@@ -325,6 +360,21 @@ module gp_fit_module
             endif
          endif
       endif
+
+      if (task_manager%active .and. my_sparse_method /= GP_SPARSE_FILE) then
+         call print("Distributing sparseX after sparsification with MPI.")
+         call bcast(task_manager%mpi_obj, this%covarianceDiag_sparseX_sparseX, error=error)
+         call bcast(task_manager%mpi_obj, this%sparseCutoff, error=error)
+         call bcast(task_manager%mpi_obj, this%sparseX, error=error)
+         if (allocated(this%sparseX_size)) call bcast(task_manager%mpi_obj, this%sparseX_size, error=error)
+         call scatterv(task_manager%mpi_obj, config_type_ptr, this%config_type, x_counts, error=error)
+
+         if (is_root(task_manager%mpi_obj)) then
+            deallocate(config_type_ptr)
+            deallocate(x_ptr)
+            deallocate(x_size_ptr)
+         end if
+      end if
 
       this%sparsified = .true.
    endsubroutine gpCoordinates_sparsify_config_type
