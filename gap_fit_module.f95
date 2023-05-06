@@ -1338,16 +1338,9 @@ contains
        enddo
 
        if( has_local_property ) then
-          if( has_local_property_mask ) then
-             !if( n_descriptors /= count(local_property_mask) ) then
-             !   RAISE_ERROR("fit_data_from_xyz: local_properties found in configuration, but number of descriptors do not match &
-             !   & the number of properties is the configuration",error)
-             !endif
-          else
-             if( n_descriptors /= this%at(n_con)%N ) then
-                RAISE_ERROR("fit_data_from_xyz: local_properties found in configuration, but number of descriptors do not match &
-                & the number of atoms. Check your descriptors.",error)
-             endif
+          if( n_descriptors /= this%at(n_con)%N ) then
+             RAISE_ERROR("fit_data_from_xyz: local_properties found in configuration, but number of descriptors do not match &
+             & the number of atoms. Check your descriptors.",error)
           endif
        endif
 
