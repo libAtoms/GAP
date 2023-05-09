@@ -129,6 +129,9 @@ module gp_fit_module
                   allocate(x_size_ptr(n_x))
                else
                   my_sparse_method = GP_SPARSE_SKIP
+                  allocate(x_ptr(1, 1))
+                  allocate(config_type_ptr(1))
+                  allocate(x_size_ptr(1))
                end if
 
                call gatherv(task_manager%mpi_obj, this%config_type, config_type_ptr, error=error)
@@ -374,11 +377,9 @@ module gp_fit_module
          call bcast(task_manager%mpi_obj, this%sparseX, error=error)
          if (allocated(this%sparseX_size)) call bcast(task_manager%mpi_obj, this%sparseX_size, error=error)
 
-         if (is_root(task_manager%mpi_obj)) then
-            deallocate(config_type_ptr)
-            deallocate(x_ptr)
-            deallocate(x_size_ptr)
-         end if
+         deallocate(config_type_ptr)
+         deallocate(x_ptr)
+         deallocate(x_size_ptr)
       end if
 
       if (allocated(this%config_type)) deallocate(this%config_type)
