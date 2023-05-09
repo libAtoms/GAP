@@ -390,6 +390,7 @@ module gp_fit_module
       end if
 
       if (allocated(this%config_type)) deallocate(this%config_type)
+      if (allocated(this%sparseX_index)) deallocate(this%sparseX_index)
       this%sparsified = .true.
    endsubroutine gpCoordinates_sparsify_config_type
 
