@@ -52,6 +52,7 @@ module gap_fit_module
 
   integer, parameter :: SPARSE_LENGTH = 10000
   integer, parameter :: THETA_LENGTH = 10000
+  integer, parameter :: GAP_STRING_SIZE = 200
 
   integer, parameter :: E0_ISOLATED = 1
   integer, parameter :: E0_AVERAGE = 2
@@ -105,7 +106,7 @@ module gap_fit_module
      type(task_manager_type) :: task_manager
 
      type(descriptor), dimension(:), allocatable :: my_descriptor
-     character(len=STRING_LENGTH), dimension(200) :: gap_str
+     character(len=STRING_LENGTH), dimension(:), allocatable :: gap_str
 
      real(dp), dimension(:), allocatable :: delta, f0, theta_uniform, zeta, unique_hash_tolerance, unique_descriptor_tolerance !, theta
      real(dp), dimension(:,:), allocatable :: sigma
@@ -437,7 +438,8 @@ contains
      call print('')
      call print('Initial parsing of command line arguments finished.')
 
-     call split_string(gap_str,':;','{}',this%gap_str(:),this%n_coordinate,matching=.true.)
+     call reallocate(this%gap_str, GAP_STRING_SIZE, zero=.true.)
+     call split_string(gap_str,':;','{}',this%gap_str,this%n_coordinate,matching=.true.)
 
      call print('Found '//this%n_coordinate//' GAPs.')
 
@@ -519,6 +521,10 @@ contains
      character(len=STRING_LENGTH) :: config_type_n_sparseX_string, theta_fac_string, theta_file, sparse_file, print_sparse_index, &
                                      covariance_type_str, sparse_method_str
      logical :: mark_sparse_atoms, add_species, has_sparse_file
+
+     if (.not. allocated(this%gap_str)) then
+        call system_abort("gap_fit_parse_gap_str: gap_str is not allocated.")
+     end if
 
      allocate(this%delta(this%n_coordinate))
      allocate(this%f0(this%n_coordinate))
