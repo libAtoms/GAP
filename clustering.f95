@@ -1,9 +1,9 @@
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ! HND X
 ! HND X   GAP (Gaussian Approximation Potental)
-! HND X   
 ! HND X
-! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi, 
+! HND X
+! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi,
 ! HND X   Copyright 2006-2021.
 ! HND X
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
@@ -14,7 +14,7 @@
 ! HND X      Academic Software License v1.0 (ASL)
 ! HND X
 ! HND X   GAP is distributed in the hope that it will be useful for non-commercial
-! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied 
+! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied
 ! HND X   warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 ! HND X   ASL for more details.
 ! HND X
@@ -58,13 +58,13 @@ module clustering_module
      real(dp) :: sse
      integer :: N
   endtype lst
-  
+
   type clstr
      type(lst), dimension(:), allocatable :: cluster
      real(dp), dimension(:,:), pointer :: dm
      integer :: N
   endtype clstr
-  
+
   contains
 
   subroutine distance_matrix(x,dm,theta_fac,theta)
@@ -92,7 +92,7 @@ module clustering_module
         allocate(my_theta(d))
 
         do i = 1, d
-           my_theta(i) = ( maxval(x(i,:)) - minval(x(i,:)) ) 
+           my_theta(i) = ( maxval(x(i,:)) - minval(x(i,:)) )
    !        theta(i) = sqrt( & !take square root
    !                         & sum( x(i,:)**2 ) / size(x(i,:)) - &
    !                         & (sum( x(i,:) ) / size(x(i,:)))**2 )
@@ -164,35 +164,35 @@ module clustering_module
      integer, dimension(:), intent(out) :: pivout
      real(dp), intent(in), optional :: theta_fac
      real(dp), dimension(:), intent(in), optional :: theta
-     
+
      real(dp), dimension(:,:), allocatable :: knn
      real(dp), dimension(:), allocatable :: ktmp
      integer, dimension(:), allocatable :: pivin
-     
+
      integer :: stat, i, j, k, d, m, n, jtmp, jmax
      real(dp) :: dmax
-     
+
      d = size(x,1)
      n = size(x,2)
-     
+
      m = size(pivout)
 
      if( m > n ) call system_abort('pivot: required number of changes ('//m//') greater than possible number of changes ('//n//')')
-     
+
      allocate(knn(n,n),stat=stat)
      if(stat /=0 ) call system_abort('pivot: could not allocate knn matrix.')
-     
+
      allocate(pivin(n),ktmp(n))
-     
+
      call distance_matrix(x,knn,theta_fac=theta_fac,theta=theta)
      do i = 1, n
         do j = 1, n
            knn(j,i) = exp(-0.5_dp*knn(j,i))
         enddo
      enddo
-     
+
      pivin = (/ (i, i=1,n) /)
-     
+
      do k = 1, m
         dmax = 0.0_dp
         do j = k, n
@@ -228,11 +228,11 @@ module clustering_module
             enddo
          enddo
       enddo
-        
+
       pivout = pivin(1:m)
-     
+
       deallocate(knn,pivin,ktmp)
-  
+
   endsubroutine pivot
 
   subroutine bisect_kmedoids(dat,n_clusters_in, c,med, theta_fac,theta, is_distance_matrix)
@@ -250,7 +250,7 @@ module clustering_module
 
      real(dp), dimension(:), allocatable :: dv
      real(dp) :: max_sse, min_sse, sse
-  
+
      integer, dimension(:), allocatable :: sub_cluster1, sub_cluster2, sub_cluster1_min, sub_cluster2_min
      integer, dimension(1) :: ml
      integer  :: stat, i, j, k, km, m, n, nc, &
@@ -281,7 +281,7 @@ module clustering_module
 
      ! start clustering
      my_cluster%N = 1                               ! start with one big cluster
-     allocate( my_cluster%cluster(1) )              
+     allocate( my_cluster%cluster(1) )
      my_cluster%cluster(1)%N = n                    ! put every object in the initial cluster
      allocate( my_cluster%cluster(1)%object(n) )
      my_cluster%cluster(1)%object = (/(i,i=1,n)/)
@@ -295,7 +295,7 @@ module clustering_module
 
      ! main loop starts here, bisects initial clusters until desired number of
      ! clusters are found
-                                                       
+
      iter = 0
      do
         iter = iter + 1
@@ -395,7 +395,7 @@ module clustering_module
         my_cluster%cluster(my_cluster%N)%object = sub_cluster2_min(:n2_min)
         my_cluster%cluster(my_cluster%N)%sse = sum( my_cluster%dm(hi_med_min,sub_cluster2_min(:n2_min)) )
         my_cluster%cluster(my_cluster%N)%medoid = hi_med_min
-     
+
         do j = 1, tmp%N
            deallocate( tmp%cluster(j)%object )
         enddo
@@ -424,9 +424,9 @@ module clustering_module
      enddo
      deallocate(my_cluster%cluster)
      if (allocated(dm)) deallocate(dm)
-           
+
   endsubroutine bisect_kmedoids
-     
+
   subroutine kmedoid(this)
      type(clstr), intent(inout) :: this
 
@@ -449,7 +449,7 @@ module clustering_module
 
      ! main loop starts here, perfom k-medoid clustering until medoids don't
      ! change anymore
-     do 
+     do
         do j = 1, tmp%N
            tmp%cluster(j)%N = 0
         enddo
@@ -466,7 +466,7 @@ module clustering_module
            & tmp%cluster(j)%object(:tmp%cluster(j)%N) ), dim=1) )
            tmp%cluster(j)%medoid = tmp%cluster(j)%object(ml(1))
         enddo
-        
+
         refined = .true.
 
         ! check whether medoids have changed
@@ -490,7 +490,7 @@ module clustering_module
         deallocate( tmp%cluster(j)%object )
      enddo
      deallocate( tmp%cluster, medoids )
-     
+
   endsubroutine kmedoid
 
   subroutine cluster_kmeans(x,cluster_index,theta_fac,theta)
@@ -538,7 +538,7 @@ module clustering_module
 
      iter = 0
      d_total = huge(1.0_dp)
-     do 
+     do
         iter = iter + 1
         call print("iteration: "//iter,verbosity=PRINT_NERD)
         cluster_same = .true.
@@ -561,7 +561,7 @@ module clustering_module
            if( cluster_info_old /= cluster_info(i) ) cluster_same = cluster_same .and. .false.
            d_total = d_total + d_min
         enddo
-!$omp end parallel do        
+!$omp end parallel do
         call print("cluster_kmeans iteration="//iter//" d_total="//d_total)
 
 !$omp parallel do default(none) shared(x,cluster_centre,cluster_info,m,d,n) private(j,k,n_points_cluster_j)
@@ -644,9 +644,9 @@ module clustering_module
      endif
 
      allocate(cluster_centre(d,m), w(n,m))
-!$omp parallel     
+!$omp parallel
      allocate(d_i(m), wx_j(d))
-!$omp end parallel     
+!$omp end parallel
 
      call fill_random_integer(cluster_index, n) !choose random points as cluster centres.
 
@@ -729,10 +729,10 @@ module clustering_module
      enddo
 
      deallocate(cluster_centre, w)
-!$omp parallel     
+!$omp parallel
      if(allocated(d_i)) deallocate(d_i)
      if(allocated(wx_j)) deallocate(wx_j)
-!$omp end parallel     
+!$omp end parallel
 
      if(present(theta)) then
         my_theta => null()
@@ -746,7 +746,7 @@ module clustering_module
      real(dp), dimension(:,:), intent(in) :: x
      integer, dimension(:), intent(out) :: index_out
 
-     integer :: i, j, d, n, m, n_grid, i_global, i_index_out
+     integer :: i, d, n, m, n_grid, i_global, i_index_out, d_max
      integer, dimension(:), allocatable :: p_grid, i_hist, histogram, x_histogram, index_out_histogram
      real(dp), dimension(:), allocatable :: lower_bound, upper_bound, x_range
 
@@ -762,7 +762,12 @@ module clustering_module
      upper_bound = maxval(x,dim=2)
      x_range = upper_bound - lower_bound
 
-     n_grid = ceiling( real(m,kind=dp)**(1.0_dp/real(d,kind=dp)) )
+     n_grid = ceiling( real(m, dp)**(1.0_dp / real(d, dp)) )
+     d_max = floor( log(real(huge(1), dp)) / log(real(n_grid, dp)) )
+     if (d > d_max) then
+        call system_abort('select_uniform: Descriptor is too large ('//d//' > '//d_max//'). &
+                          &Use another sparse method or descriptor.')
+     end if
      p_grid = (/ ( n_grid**(i-1), i = 1, d ) /)
 
      allocate(histogram(n_grid**d))
