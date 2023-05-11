@@ -89,7 +89,7 @@ module gp_fit_module
       real(dp), dimension(:,:), allocatable :: sparseX_array
 
       integer, dimension(:), pointer :: config_type_ptr, x_size_ptr
-      real(dp), dimension(:), pointer :: cutoff_ptr
+      real(dp), dimension(:), pointer :: cutoff_ptr, covdiag_x_x_ptr
       real(dp), dimension(:,:), pointer  :: dm, x_ptr
 
       character(len=STRING_LENGTH) :: my_sparse_file
@@ -121,6 +121,7 @@ module gp_fit_module
                x_size_ptr => this%x_size
                config_type_ptr => this%config_type
                cutoff_ptr => this%cutoff
+               covdiag_x_x_ptr => this%covarianceDiag_x_x
             case default
                call print("Collecting x on a single process for sparsification with MPI.")
                n_x = sum(task_manager%mpi_obj, size(this%config_type), error)
@@ -130,12 +131,14 @@ module gp_fit_module
                   allocate(config_type_ptr(n_x))
                   allocate(x_size_ptr(n_x))
                   allocate(cutoff_ptr(n_x))
+                  allocate(covdiag_x_x_ptr(n_x))
                else
                   my_sparse_method = GP_SPARSE_SKIP
                   allocate(x_ptr(1, 1))
                   allocate(config_type_ptr(1))
                   allocate(x_size_ptr(1))
                   allocate(cutoff_ptr(1))
+                  allocate(covdiag_x_x_ptr(1))
                end if
 
                call gatherv(task_manager%mpi_obj, this%config_type, config_type_ptr, error=error)
@@ -151,6 +154,7 @@ module gp_fit_module
          x_size_ptr => this%x_size
          config_type_ptr => this%config_type
          cutoff_ptr => this%cutoff
+         covdiag_x_x_ptr => this%covarianceDiag_x_x
       end if
 
       if (my_sparse_method /= GP_SPARSE_SKIP) then
@@ -363,7 +367,7 @@ module gp_fit_module
             this%sparseX(:,:) = x_ptr(:,this%sparseX_index)
          endif
 
-         this%covarianceDiag_sparseX_sparseX = this%covarianceDiag_x_x(this%sparseX_index)
+         this%covarianceDiag_sparseX_sparseX = covdiag_x_x_ptr(this%sparseX_index)
 
          this%sparseCutoff = cutoff_ptr(this%sparseX_index)
 
@@ -387,6 +391,7 @@ module gp_fit_module
          deallocate(x_ptr)
          deallocate(x_size_ptr)
          deallocate(cutoff_ptr)
+         deallocate(covdiag_x_x_ptr)
       end if
 
       if (allocated(this%config_type)) deallocate(this%config_type)
