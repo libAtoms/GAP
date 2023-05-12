@@ -2231,7 +2231,7 @@ contains
 
     n_sparseX = sum(this%config_type_n_sparseX)
 
-    ! add special task for Cholesky matrix addon to last worker
+    ! add special task (size, offset) for Cholesky matrix addon shared by all workers
     call task_manager_add_task(this%task_manager, n_sparseX, n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
     call task_manager_check_distribution(this%task_manager)
