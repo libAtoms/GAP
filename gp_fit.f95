@@ -176,7 +176,7 @@ module gp_fit_module
 
          this%n_sparseX = n_x
 
-         call print('NONE type sparsification specified. The number of sparse points was changed to '//this%n_sparseX//' from '//n_sparseX//'.')
+         call print('NONE type sparsification specified. The number of sparse points was changed from '//n_sparseX//' to '//this%n_sparseX//'.')
 
       elseif(my_sparse_method == GP_SPARSE_FILE .or. my_sparse_method == GP_SPARSE_INDEX_FILE) then
          this%n_sparseX = count_entries_in_sparse_file(my_sparse_file, my_sparse_method, d, error)
@@ -333,8 +333,7 @@ module gp_fit_module
          call print('Finished reading sparse indices from file, '//size(this%sparseX_index)//' of them.')
       endif
 
-      if(allocated(this%covarianceDiag_sparseX_sparseX)) deallocate(this%covarianceDiag_sparseX_sparseX)
-      allocate(this%covarianceDiag_sparseX_sparseX(this%n_sparseX))
+      call reallocate(this%covarianceDiag_sparseX_sparseX, this%n_sparseX)
 
       if (my_sparse_method == GP_SPARSE_SKIP) then
          ! pass
