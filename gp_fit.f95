@@ -89,11 +89,15 @@ module gp_fit_module
       real(dp), dimension(:,:), allocatable :: sparseX_array
 
       integer, dimension(:), pointer :: config_type_ptr, x_size_ptr
-      real(dp), dimension(:), pointer :: cutoff_ptr, covdiag_x_x_ptr
+      real(dp), dimension(:), pointer :: covdiag_x_x_ptr, cutoff_ptr
       real(dp), dimension(:,:), pointer  :: dm, x_ptr
 
       character(len=STRING_LENGTH) :: my_sparse_file
       type(Inoutput) :: inout_sparse_index
+
+      nullify(config_type_ptr, x_size_ptr)
+      nullify(covdiag_x_x_ptr, cutoff_ptr)
+      nullify(dm, x_ptr)
 
       INIT_ERROR(error)
 
@@ -128,11 +132,11 @@ module gp_fit_module
                   n_x = 1
                end if
 
-               allocate(x_ptr(d, n_x))
                allocate(config_type_ptr(n_x))
                allocate(x_size_ptr(n_x))
-               allocate(cutoff_ptr(n_x))
                allocate(covdiag_x_x_ptr(n_x))
+               allocate(cutoff_ptr(n_x))
+               allocate(x_ptr(d, n_x))
 
                call gatherv(task_manager%mpi_obj, this%config_type, config_type_ptr, error=error)
                call gatherv(task_manager%mpi_obj, this%x, x_ptr, error=error)
@@ -144,11 +148,11 @@ module gp_fit_module
          end select
       end if
 
-      if (.not. associated(x_ptr)) x_ptr => this%x
-      if (.not. associated(x_size_ptr)) x_size_ptr => this%x_size
       if (.not. associated(config_type_ptr)) config_type_ptr => this%config_type
-      if (.not. associated(cutoff_ptr)) cutoff_ptr => this%cutoff
+      if (.not. associated(x_size_ptr)) x_size_ptr => this%x_size
       if (.not. associated(covdiag_x_x_ptr)) covdiag_x_x_ptr => this%covarianceDiag_x_x
+      if (.not. associated(cutoff_ptr)) cutoff_ptr => this%cutoff
+      if (.not. associated(x_ptr)) x_ptr => this%x
 
       if (my_sparse_method /= GP_SPARSE_SKIP) then
          allocate(my_n_sparseX(size(n_sparseX)), source=0)
@@ -217,7 +221,7 @@ module gp_fit_module
          call bcast(task_manager%mpi_obj, this%n_sparseX, error)
       end if
 
-      call reallocate(this%sparseX, this%d,this%n_sparseX, zero = .true.)
+      call reallocate(this%sparseX, this%d, this%n_sparseX, zero = .true.)
 
       call reallocate(this%sparseX_index, this%n_sparseX, zero = .true.)
       call reallocate(this%map_sparseX_globalSparseX, this%n_sparseX, zero = .true.)
@@ -380,10 +384,10 @@ module gp_fit_module
          if (allocated(this%sparseX_size)) call bcast(task_manager%mpi_obj, this%sparseX_size, error=error)
 
          deallocate(config_type_ptr)
-         deallocate(x_ptr)
          deallocate(x_size_ptr)
-         deallocate(cutoff_ptr)
          deallocate(covdiag_x_x_ptr)
+         deallocate(cutoff_ptr)
+         deallocate(x_ptr)
       end if
 
       if (allocated(this%config_type)) deallocate(this%config_type)
