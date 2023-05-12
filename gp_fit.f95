@@ -117,29 +117,22 @@ module gp_fit_module
             case (GP_SPARSE_CUR_COVARIANCE) ! routines depend directly on gpCoordinates
                call system_abort("sparse_method GP_SPARSE_CUR_COVARIANCE is not implemented for MPI.")
             case (GP_SPARSE_FILE)
-               x_ptr => this%x
-               x_size_ptr => this%x_size
-               config_type_ptr => this%config_type
-               cutoff_ptr => this%cutoff
-               covdiag_x_x_ptr => this%covarianceDiag_x_x
+               ! use serial pointers
             case default
                call print("Collecting x on a single process for sparsification with MPI.")
                n_x = sum(task_manager%mpi_obj, size(this%config_type), error)
 
-               if (is_root(task_manager%mpi_obj)) then
-                  allocate(x_ptr(d, n_x))
-                  allocate(config_type_ptr(n_x))
-                  allocate(x_size_ptr(n_x))
-                  allocate(cutoff_ptr(n_x))
-                  allocate(covdiag_x_x_ptr(n_x))
-               else
+               if (.not. is_root(task_manager%mpi_obj)) then
                   my_sparse_method = GP_SPARSE_SKIP
-                  allocate(x_ptr(1, 1))
-                  allocate(config_type_ptr(1))
-                  allocate(x_size_ptr(1))
-                  allocate(cutoff_ptr(1))
-                  allocate(covdiag_x_x_ptr(1))
+                  d = 1
+                  n_x = 1
                end if
+
+               allocate(x_ptr(d, n_x))
+               allocate(config_type_ptr(n_x))
+               allocate(x_size_ptr(n_x))
+               allocate(cutoff_ptr(n_x))
+               allocate(covdiag_x_x_ptr(n_x))
 
                call gatherv(task_manager%mpi_obj, this%config_type, config_type_ptr, error=error)
                call gatherv(task_manager%mpi_obj, this%x, x_ptr, error=error)
@@ -149,13 +142,13 @@ module gp_fit_module
                   call gatherv(task_manager%mpi_obj, this%x_size, x_size_ptr, error=error)
                end if
          end select
-      else
-         x_ptr => this%x
-         x_size_ptr => this%x_size
-         config_type_ptr => this%config_type
-         cutoff_ptr => this%cutoff
-         covdiag_x_x_ptr => this%covarianceDiag_x_x
       end if
+
+      if (.not. associated(x_ptr)) x_ptr => this%x
+      if (.not. associated(x_size_ptr)) x_size_ptr => this%x_size
+      if (.not. associated(config_type_ptr)) config_type_ptr => this%config_type
+      if (.not. associated(cutoff_ptr)) cutoff_ptr => this%cutoff
+      if (.not. associated(covdiag_x_x_ptr)) covdiag_x_x_ptr => this%covarianceDiag_x_x
 
       if (my_sparse_method /= GP_SPARSE_SKIP) then
          allocate(my_n_sparseX(size(n_sparseX)), source=0)
