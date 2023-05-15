@@ -112,14 +112,16 @@ module gp_fit_module
 
       if (task_manager%active) then
          select case(my_sparse_method)
+            case (GP_SPARSE_NONE) ! shared task for Kmm breaks if n_sparseX increases
+               call system_abort("sparse_method NONE is not implemented for MPI.")
             case (GP_SPARSE_INDEX_FILE) ! keeping original ordering of xyz frames would be too much effort
                call system_abort("sparse_method INDEX_FILE is not implemented for MPI.")
             case (GP_SPARSE_CLUSTER) ! routines depend directly on gpCoordinates
-               call system_abort("sparse_method GP_SPARSE_CLUSTER is not implemented for MPI.")
+               call system_abort("sparse_method CLUSTER is not implemented for MPI.")
             case (GP_SPARSE_COVARIANCE) ! routines depend directly on gpCoordinates
-               call system_abort("sparse_method GP_SPARSE_COVARIANCE is not implemented for MPI.")
+               call system_abort("sparse_method COVARIANCE is not implemented for MPI.")
             case (GP_SPARSE_CUR_COVARIANCE) ! routines depend directly on gpCoordinates
-               call system_abort("sparse_method GP_SPARSE_CUR_COVARIANCE is not implemented for MPI.")
+               call system_abort("sparse_method CUR_COVARIANCE is not implemented for MPI.")
             case (GP_SPARSE_FILE)
                ! use serial pointers
             case default
