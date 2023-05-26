@@ -1476,15 +1476,8 @@ contains
 
     if( this%do_core ) call Finalise(this%core_pot)
 
-    ! @info move this check to gp_sparsify when implementing more methods
-    if (this%task_manager%active) then
-      if (any(this%sparse_method /= GP_SPARSE_FILE)) then
-         call system_abort("Only sparse_method FILE implemented for MPI.")
-      end if
-    end if
-
-    call gp_sparsify(this%my_gp,n_sparseX=this%config_type_n_sparseX,default_all=(this%n_sparseX/=0), &
-       sparseMethod=this%sparse_method, sparse_file=this%sparse_file, &
+    call gp_sparsify(this%my_gp, n_sparseX=this%config_type_n_sparseX, default_all=(this%n_sparseX /= 0), &
+       task_manager=this%task_manager, sparse_method=this%sparse_method, sparse_file=this%sparse_file, &
        use_actual_gpcov=this%sparse_use_actual_gpcov, print_sparse_index = this%print_sparse_index, &
        unique_hash_tolerance=this%unique_hash_tolerance, unique_descriptor_tolerance=this%unique_descriptor_tolerance)
 
@@ -2238,7 +2231,7 @@ contains
 
     n_sparseX = sum(this%config_type_n_sparseX)
 
-    ! add special task for Cholesky matrix addon to last worker
+    ! add special task (size, offset) for Cholesky matrix addon shared by all workers
     call task_manager_add_task(this%task_manager, n_sparseX, n_idata=2, worker_id=SHARED)
     call task_manager_distribute_tasks(this%task_manager)
     call task_manager_check_distribution(this%task_manager)

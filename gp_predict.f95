@@ -136,6 +136,7 @@ module gp_predict_module
    integer, parameter, public :: GP_SPARSE_CUR_COVARIANCE = 11
    integer, parameter, public :: GP_SPARSE_CUR_POINTS = 12
    integer, parameter, public :: GP_SPARSE_NONE = 13
+   integer, parameter, public :: GP_SPARSE_SKIP = 99 ! internal use for MPI
 
    integer, parameter, public :: COVARIANCE_NONE             = 0
    integer, parameter, public :: COVARIANCE_ARD_SE           = 1

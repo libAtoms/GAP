@@ -235,22 +235,29 @@ Running with MPI
 ****************
 
 In order to run ``gap_fit`` with MPI, you need to configure and compile it
-accordingly, see the `QUIP Readme <http://github.com/libAtoms/QUIP>`_ for more details.
+accordingly, see the `QUIP Readme <http://github.com/libAtoms/QUIP>`_ for
+more details. Then run with ``mpirun -np …``  (or ``srun …`` for Slurm).
 
-Choosing the sparse points is not parallelised, therefore you have to provide
-the sparse points for each descriptor in a separate file. The main workflow is:
+Note that the sparsification is still done on a single process by collecting
+the relevant data from all processes and distributing the sparse points
+afterwards. This adds additional communication and requires more memory on
+the node of the first process. See below for an alternative way.
+
+Some sparse methods are not implemented for MPI runs: CLUSTER, COVARIANCE,
+CUR_COVARIANCE, INDEX_FILE. In these cases, sparse points may be chosen
+in a separate serial run, using the workflow below.
 
 #. Calculate without MPI to get the sparseX output files.
 
-   * Use ``sparsify_only_no_fit=T`` to just create the sparseX files (less memory needed).
-   
+   * Use ``sparsify_only_no_fit=T`` to just create the sparseX files (fast, less memory needed).
+
 #. Convert output files to input files (``$QUIP_ROOT/bin/gap_prepare_sparsex_input.py gp.xml``).
 
    * Optional: Rename them to something shorter (e.g. ``1.input``, ``2.input`` etc.).
-   
+
 #. Change input method (``sparse_method=FILE sparse_file=1.input``).
 
    * For more than one species use ``add_species=F`` and explicit input.
    * Check the number of braces (``gap={{$gap1}:{$gap2}:{$gap3}}``).
-   
+
 #. Run with ``mpirun -np …``  (or ``srun …`` for Slurm).
