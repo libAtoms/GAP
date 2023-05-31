@@ -1,7 +1,7 @@
 ! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ! HND X
 ! HND X   GAP (Gaussian Approximation Potental)
-! HND X
+! HND X   
 ! HND X
 ! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi,
 ! HND X   and Sascha Klawohn. Copyright 2006-2021.
@@ -174,7 +174,7 @@ contains
         parameter_name_prefix
 
      logical, pointer :: sigma_per_atom, do_copy_at_file, sparseX_separate_file, sparse_use_actual_gpcov, sparsify_only_no_fit
-     logical, pointer :: dryrun
+     logical, pointer :: dryrun, do_export_covariance
      logical :: do_ip_timing, has_sparse_file, has_theta_uniform, has_at_file, has_gap, has_config_file, has_default_sigma
      logical :: mpi_print_all, file_exists
 
@@ -219,7 +219,8 @@ contains
      linear_system_dump_file => this%linear_system_dump_file
      mpi_blocksize_rows => this%mpi_blocksize_rows
      mpi_blocksize_cols => this%mpi_blocksize_cols
-
+     do_export_covariance => this%gp_sp%do_export_R
+     
      call initialise(params)
 
      call param_register(params, 'config_file', '', config_file, has_value_target=has_config_file, &
@@ -363,6 +364,9 @@ contains
 
      call param_register(params, 'mpi_print_all', 'F', mpi_print_all, &
           help_string="If true, each MPI processes will print its output. Otherwise, only the first process does (default).")
+
+     call param_register(params, 'export_covariance', 'F', do_export_covariance, &
+          help_string="If true, posterior covariance of the GAP model is saved.")
 
      if (.not. param_read_line(params, replace(string(this%config_string), quip_new_line, ' '))) then
         call system_abort('Exit: Mandatory argument(s) missing...')
@@ -1633,6 +1637,8 @@ contains
      ! Print GP bit of the potential
      if (my_sparseX_separate_file) then
         call gp_printXML(this%gp_sp,xf,label=gp_label,sparseX_base_filename=trim(filename)//".sparseX")
+
+        call gp_write_covariance(this%gp_sp, trim(filename)//".R", gp_label)
      else
         call gp_printXML(this%gp_sp,xf,label=gp_label)
      endif
