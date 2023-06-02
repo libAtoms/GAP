@@ -4419,7 +4419,7 @@ module gp_predict_module
       character(STRING_LENGTH) :: my_label, R_fname
       integer :: M
 
-      if (present(label)) my_label = "." // trim(label)
+      my_label = optional_default("", "." // trim(label))
 
       R_fname = trim(basename) // trim(my_label)
 
