@@ -283,6 +283,8 @@ module gp_predict_module
       type(gpCoordinates), dimension(:), allocatable :: coordinate
       logical :: initialised = .false.
       logical :: fitted = .false.
+      logical :: do_export_R = .false.
+      real(dp), dimension(:, :), allocatable :: R
    endtype gpSparse
 
    type cplx_1d_array
@@ -402,6 +404,8 @@ module gp_predict_module
    public :: gpCoordinates_Covariance
    public :: gpCoordinates_initialise_variance_estimate
    public :: covariancePP
+
+   public :: gp_write_covariance
 
    contains
 
@@ -880,7 +884,7 @@ module gp_predict_module
       call system_timer('Solve linear system')
       if (task_manager%active) then
          call print("Using ScaLAPACK to solve QR")
-         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%ScaLAPACK_obj, mb_A, nb_A)
+         call SP_Matrix_QR_Solve(a, globalY, alpha, task_manager%ScaLAPACK_obj, mb_A, nb_A, this%R, this%do_export_R)
       else
          call print("Using LAPACK to solve QR")
          call initialise(LA_q_subYsubY, a, use_allocate=.false.)
@@ -4405,6 +4409,28 @@ module gp_predict_module
       call xml_EndElement(xf,"gpSparse")
 
    endsubroutine gpSparse_printXML
+
+   subroutine gp_write_covariance(this, basename, label)
+      type(gpSparse), intent(in) :: this
+      character(*), intent(in) :: basename
+      character(*),intent(in), optional :: label
+
+
+      character(STRING_LENGTH) :: my_label, R_fname
+      integer :: M
+
+      my_label = optional_default("", "." // trim(label))
+
+      R_fname = trim(basename) // trim(my_label)
+
+
+
+      if (this%do_export_R .and. allocated(this%R)) then
+         M = size(this%R, 1)
+         call fwrite_array_d(M * M, this%R, trim(R_fname)//C_NULL_CHAR)
+      end if
+   end subroutine gp_write_covariance
+
 
    subroutine gpCoordinates_readXML(this,xp,label,error)
       type(gpCoordinates), intent(inout), target :: this
