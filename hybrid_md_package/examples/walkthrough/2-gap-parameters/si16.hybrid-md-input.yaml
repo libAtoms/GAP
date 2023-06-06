@@ -1,0 +1,24 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021-2023.
+
+# Example input file for the first calculation
+#
+
+can_update: true
+check_interval: 10
+num_initial_steps: 1
+tolerances:
+  ediff: 0.01  # eV
+adaptive_method_parameters:
+  n_min: 10
+  n_max: 200
+  factor: 1.5
+refit:
+  e0_method: "average"
+  num_threads: 4
+  descriptor_str: "distance_Nb order=2 n_sparse=20 cutoff=5.5 cutoff_transition_width=1.0 compact_clusters covariance_type=ard_se theta_uniform=1.0 sparse_method=uniform f0=0.0 add_species=T delta=1.0                   : soap n_sparse=1000 n_max=10 l_max=4 cutoff=5.0 cutoff_transition_width=1.0 atom_sigma=0.5 add_species=True covariance_type=dot_product zeta=4 sparse_method=cur_points delta=3.0 "
+  previous_data: [
+    "previous_si16.hybrid-md.xyz"
+  ]
+  default_sigma: "0.005 0.1 0.05 1.0"

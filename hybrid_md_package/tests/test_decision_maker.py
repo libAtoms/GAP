@@ -1,3 +1,6 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021-2023.
 import os
 from pathlib import Path
 
@@ -10,7 +13,9 @@ check_interval: 5
 num_initial_steps: 3
 tolerances:
   ediff: 0.01  # eV
-        """
+refit:
+  e0_method: "average"
+"""
 
 
 def test_simple_decision_maker(tmp_path):

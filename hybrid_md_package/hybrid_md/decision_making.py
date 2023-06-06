@@ -1,3 +1,6 @@
+#  Hybrid MD decision making package
+#
+#  Copyright (c) Tamas K. Stenczel 2021-2023.
 """
 Decision maker utilities for the Hybrid MD
 """
@@ -7,8 +10,20 @@ from abc import ABC, abstractmethod
 from hybrid_md.state_objects import HybridMD, StepKinds
 
 
+def get_decision_maker(state: HybridMD):
+    """Choose the decision maker class
+
+    If you implement any new ones, please include them in here with the appropriate
+    logic for selecting in based on the settings.
+
+    """
+    if state.settings.adaptive_method_parameters:
+        return AdaptiveDecisionMaker(state)
+    return SimpleDecisionMaker(state)
+
+
 class DecisionMakerBase(ABC):
-    """Base class for decision making
+    """Base class for decision-making
 
     used for pre-step decisions
     """
@@ -18,9 +33,14 @@ class DecisionMakerBase(ABC):
 
     @abstractmethod
     def get_step_kind(self, md_iteration: int) -> StepKinds:
-        """ Perform the decision making in any way needed
+        """Perform the decision-making in any way needed"""
+
+    @abstractmethod
+    def post_step_action(self, md_iteration: int):
+        """Actions post any DFT calculation step
+
+        This happens before dumping the state
         """
-        ...
 
 
 class SimpleDecisionMaker(DecisionMakerBase):
@@ -32,7 +52,7 @@ class SimpleDecisionMaker(DecisionMakerBase):
     """
 
     def get_step_kind(self, md_iteration: int) -> StepKinds:
-        """ Uniform checking, with optional initial DFT steps
+        """Uniform checking, with optional initial DFT steps
 
         Parameters
         ----------
@@ -42,28 +62,92 @@ class SimpleDecisionMaker(DecisionMakerBase):
         -------
         step_kind
         """
-        if md_iteration < self.state.num_initial_steps:
+
+        if self.state.carry.continuation:
+            num_initial_steps = self.state.carry.continuation_initial_steps
+        else:
+            num_initial_steps = self.state.settings.num_initial_steps
+
+        if md_iteration < num_initial_steps:
             return StepKinds.INITIAL
 
-        if md_iteration == self.state.num_initial_steps:
+        if md_iteration == num_initial_steps:
             return StepKinds.LAST_INITIAL
 
-        if (
-            md_iteration - self.state.num_initial_steps
-        ) % self.state.check_interval == 0:
+        if (md_iteration - num_initial_steps) % self.state.settings.check_interval == 0:
             return StepKinds.CHECK
 
         return StepKinds.GENERIC
 
+    def post_step_action(self, md_iteration: int):
+        # not doing anything in this case
+        pass
+
 
 class AdaptiveDecisionMaker(DecisionMakerBase):
     """
-    Adaptive decision making, with increasing and decreasing
+    Adaptive decision-making, with increasing and decreasing
     the interval based on accuracy target being met or not.
     """
 
-    def get_step_kind(self, md_iteration: int):
-        raise NotImplementedError
+    def __init__(self, state: HybridMD):
+        super().__init__(state)
+        self.settings = state.settings.adaptive_method_parameters
+        self.step_kind = None
+
+    def get_step_kind(self, md_iteration: int) -> StepKinds:
+        if self.state.carry.continuation:
+            num_initial_steps = self.state.carry.continuation_initial_steps
+        else:
+            num_initial_steps = self.state.settings.num_initial_steps
+
+        if md_iteration < num_initial_steps:
+            self.state.carry.current_check_interval = self.state.settings.check_interval
+            return StepKinds.INITIAL
+        if num_initial_steps == 0 and md_iteration == 0:
+            # to function in case we have no initial steps
+            self.state.carry.last_check_step = 0
+        if md_iteration == num_initial_steps:
+            # we need to remember this one as well
+            self.state.carry.current_check_interval = self.state.settings.check_interval
+            self.state.carry.last_check_step = md_iteration
+            return StepKinds.LAST_INITIAL
+        if (
+            md_iteration - self.state.carry.last_check_step
+        ) == self.state.carry.current_check_interval:
+            # This is the crucial difference
+            self.state.carry.last_check_step = md_iteration
+            return StepKinds.CHECK
+        return StepKinds.GENERIC
+
+    def post_step_action(self, md_iteration: int):
+        # we change the step size in case we had a checking step
+        if self.state.carry.do_comparison:
+            if self.state.check_tolerances():
+                # increase N
+                self.state.carry.current_check_interval = min(
+                    int(self.state.carry.current_check_interval * self.settings.factor),
+                    self.settings.n_max,
+                )
+                word = "INCREASE"
+            else:
+                # decrease N
+                self.state.carry.current_check_interval = max(
+                    int(self.state.carry.current_check_interval / self.settings.factor),
+                    self.settings.n_min,
+                )
+                word = "DECREASE"
+
+            # write log, common
+            self.state.write_to_tmp_log(
+                [
+                    f"               Hybrid-MD: {word} interval to "
+                    f"{self.state.carry.current_check_interval:6} "
+                    f"at iter {md_iteration:8}"
+                    f"   <-- Hybrid-MD-Adapt"
+                ],
+                append=True,
+            )
 
 
 class PreStepReturnNumber:
@@ -99,13 +183,13 @@ class PreStepReturnNumber:
         self._set_internals(value)
 
         # save values into state
-        self.state.next_is_pre_step = False
-        self.state.next_ab_initio = self.next_ab_initio
-        self.state.do_comparison = self.do_comparison
+        self.state.carry.next_is_pre_step = False
+        self.state.carry.next_ab_initio = self.next_ab_initio
+        self.state.carry.do_comparison = self.do_comparison
 
         if self.do_update_model:
-            if self.state.can_update:
-                self.state.do_update_model = self.do_update_model
+            if self.state.settings.can_update:
+                self.state.carry.do_update_model = self.do_update_model
             else:
                 raise RuntimeError(
                     "Tried to update model, but input settings do not allow it!"

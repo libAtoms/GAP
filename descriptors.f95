@@ -35,6 +35,12 @@
 
 #include "error.inc"
 
+#ifdef _OPENMP
+#define OMP_SAVE ,save
+#else
+#define OMP_SAVE
+#endif
+
 module descriptors_module
 
    use error_module
@@ -7687,13 +7693,13 @@ module descriptors_module
       logical :: has_atom_mask_name
       logical, dimension(:), pointer :: atom_mask_pointer
 
-      type(cplx_1d), dimension(:), allocatable, save :: SphericalY_ij
-      type(cplx_2d), dimension(:), allocatable, save :: grad_SphericalY_ij
+      type(cplx_1d), dimension(:), allocatable OMP_SAVE :: SphericalY_ij
+      type(cplx_2d), dimension(:), allocatable OMP_SAVE :: grad_SphericalY_ij
 
       !SPEED type(cplx_1d), dimension(:,:,:), allocatable :: fourier_so3
       !SPEED type(cplx_2d), dimension(:,:,:), allocatable :: grad_fourier_so3
-      type(real_1d), dimension(:,:,:), allocatable, save :: fourier_so3_r, fourier_so3_i, global_fourier_so3_r, global_fourier_so3_i
-      type(real_2d), dimension(:,:,:), allocatable, save :: grad_fourier_so3_r, grad_fourier_so3_i
+      type(real_1d), dimension(:,:,:), allocatable OMP_SAVE :: fourier_so3_r, fourier_so3_i, global_fourier_so3_r, global_fourier_so3_i
+      type(real_2d), dimension(:,:,:), allocatable OMP_SAVE :: grad_fourier_so3_r, grad_fourier_so3_i
       real(dp), allocatable :: t_g_r(:,:), t_g_i(:,:), t_f_r(:,:), t_f_i(:,:), t_g_f_rr(:,:), t_g_f_ii(:,:)
       integer :: alpha
 
@@ -7707,12 +7713,13 @@ module descriptors_module
       real(dp) :: r_ij, arg_bess, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, mo_spher_bess_fi_ki_lp, &
          exp_p, exp_m, f_cut, df_cut, norm_descriptor_i, radial_decay, dradial_decay, norm_radial_decay
       real(dp), dimension(3) :: u_ij, d_ij
-      real(dp), dimension(:,:), allocatable, save :: radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient, grad_descriptor_i
-      real(dp), dimension(:), allocatable, save :: descriptor_i
+      real(dp), dimension(:,:), allocatable OMP_SAVE :: radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient, grad_descriptor_i
+      real(dp), dimension(:), allocatable OMP_SAVE :: descriptor_i
       real(dp), dimension(:), allocatable :: global_fourier_so3_r_array, global_fourier_so3_i_array
       type(real_2d_array), dimension(:), allocatable :: global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array
       integer, dimension(total_elements) :: species_map
-      complex(dp), allocatable, save :: sphericalycartesian_all_t(:,:), gradsphericalycartesian_all_t(:,:,:)
+
+      complex(dp), allocatable OMP_SAVE :: sphericalycartesian_all_t(:,:), gradsphericalycartesian_all_t(:,:,:)
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
 
@@ -7735,7 +7742,7 @@ module descriptors_module
       integer :: na, ix
       ! Create a thread private QR_factor here as dormqr modifies it and restores it during solve
       ! and this doesn't work with OMP threading, hence the thread private copy.
-      real(dp), dimension(:,:,:), allocatable, save :: QR_factor
+      real(dp), dimension(:,:,:), allocatable OMP_SAVE :: QR_factor
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
