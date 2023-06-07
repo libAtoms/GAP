@@ -9,7 +9,7 @@
 ! HND X   Portions of GAP were written by Noam Bernstein as part of
 ! HND X   his employment for the U.S. Government, and are not subject
 ! HND X   to copyright in the USA.
-! HND X
+! HND X©
 ! HND X   GAP is published and distributed under the
 ! HND X      Academic Software License v1.0 (ASL)
 ! HND X
@@ -44,7 +44,7 @@
 module descriptors_module
 
    use error_module
-   use system_module, only : dp, print, optional_default, system_timer, operator(//), split_string, string_to_int, split_string_simple, inoutput, OUTPUT, PRINT_VERBOSE, PRINT_NERD
+   use system_module, only : dp, print, optional_default, system_timer, operator(//), split_string, string_to_int, split_string_simple, inoutput, OUTPUT, PRINT_VERBOSE, PRINT_NERD, ran_normal, system_reseed_rng, system_get_random_seed
    use linkedlist_module
    use units_module
    use periodictable_module
@@ -403,6 +403,14 @@ module descriptors_module
       logical :: normalise = .true.
       logical :: initialised = .false.
 
+      logical :: Z_mix = .false.
+      logical :: R_mix = .false.
+      logical :: sym_mix = .false.
+      logical :: coupling = .false.
+      integer :: K
+      integer :: mix_shift = 0
+
+      character(len=STRING_LENGTH) :: Z_map_str
       character(len=STRING_LENGTH) :: radial_basis
       real(dp), dimension(:,:,:), allocatable :: QR_factor
       real(dp), dimension(:,:), allocatable :: QR_tau
@@ -2519,6 +2527,13 @@ module descriptors_module
 
       call param_register(params, 'nu_R', '2', this%nu_R, help_string="radially sensitive correlation order")
       call param_register(params, 'nu_S', '2', this%nu_S, help_string="species sensitive correlation order")
+      call param_register(params, 'Z_mix', 'F', this%Z_mix, help_string="mix Z channels together")
+      call param_register(params, 'R_mix', 'F', this%R_mix, help_string="mix radial channels together")
+      call param_register(params, 'sym_mix', 'F', this%sym_mix, help_string="symmetric mixing")
+      call param_register(params, 'coupling', 'T', this%coupling, help_string="Full tensor product(=T) or Elementwise product(=F) between density channels")
+      call param_register(params, 'K', '0', this%K, help_string="Number of mixing channels to create")
+      call param_register(params, 'mix_shift', '0', this%mix_shift, help_string="shift for random number seed used to generate mixing weights")
+      call param_register(params, 'Z_map', '', this%Z_map_str, help_string="string defining the Zmap")
       call param_register(params, 'radial_basis', '', this%radial_basis, help_string="Radial basis functions to use. Options are EQUISPACED_GAUSS, POLY and GTO (default for xml_version > 1987654320")
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_initialise args_str')) then
@@ -2530,11 +2545,10 @@ module descriptors_module
       if( xml_version < 1426512068 ) this%central_reference_all_species = .true.
 
       !backwards compatibility: only EQUISPACED_GAUSS allowed for old versions. default is GTO for new versions.
-      if( xml_version < 1987654321) then
+      if (this%radial_basis == "") then
          this%radial_basis = "EQUISPACED_GAUSS"
-      elseif (this%radial_basis == "") then
-         this%radial_basis = "GTO"
       endif
+
 
       allocate(this%species_Z(0:this%n_species))
       allocate(this%Z(this%n_Z))
@@ -2755,8 +2769,6 @@ module descriptors_module
          endif
       endif
 
-
-
       this%initialised = .true.
 
    endsubroutine soap_initialise
@@ -2788,6 +2800,13 @@ module descriptors_module
       this%n_species = 0
       this%nu_R = 2
       this%nu_S = 2
+
+      this%Z_mix = .false.
+      this%R_mix = .false.
+      this%sym_mix = .false.
+      this%coupling = .true.
+      this%K = 0
+      this%mix_shift = 0
 
       if(allocated(this%r_basis)) deallocate(this%r_basis)
       if(allocated(this%transform_basis)) deallocate(this%transform_basis)
@@ -7253,18 +7272,92 @@ module descriptors_module
 
    endsubroutine power_SO4_calc
 
-   subroutine form_gs_index(this, gs_index, error)
+   subroutine form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
+      !forms coupling inds
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      integer, intent(in) :: K1
+
+      integer :: i, d, a, b, k, ik, ub, i_species, j_species
+      integer, dimension(:, :), allocatable :: coupling_inds
+      real, dimension(:), allocatable :: sym_facs
+
+      !Z_mixing only
+      if (this%Z_mix .and. (.not. this%R_mix)) then
+         if (this%sym_mix) then
+            d = this%K * (this%n_max*(this%n_max+1))/2
+         else
+            d = this%K* this%n_max**2
+         endif
+         allocate(coupling_inds(d, 2))
+         allocate(sym_facs(d))
+         i = 1
+         do k = 1, this%K
+            ik = (k-1) * this%n_max
+            do a = 1, this%n_max
+                  ub = this%n_max
+                  if (this%sym_mix) ub = a
+                  do b = 1, ub
+                     coupling_inds(i,:) = (/ik+a, ik+b /)
+                     if (a /= b .and. this%sym_mix) then
+                        sym_facs(i) = SQRT_TWO
+                     else
+                        sym_facs(i) = 1.0
+                     endif
+                     i = i + 1
+                  enddo
+            enddo
+         enddo
+
+      !radial mixing only
+      elseif (this%R_mix .and. (.not. this%Z_mix)) then
+         if (this%sym_mix) then
+            d = this%K * (this%n_species*(this%n_species+1))/2
+         else
+            d = this%K * this%n_species**2
+         endif
+         allocate(coupling_inds(d, 2))
+         allocate(sym_facs(d))
+         i = 1
+
+         do i_species = 1, this%n_species
+            ub = this%n_species
+            if (this%sym_mix) ub = i_species
+            do j_species = 1, ub
+                  do k = 1, this%K
+                     coupling_inds(i,:) = (/(i_species-1)*this%K + k,  (j_species-1)*this%K + k/)
+                     if (i_species /= j_species .and. this%sym_mix) then
+                        sym_facs(i) = SQRT_TWO
+                     else
+                        sym_facs(i) = 1.0
+                     endif
+                     i = i + 1
+                  enddo
+            enddo
+         enddo
+
+      !everything else aka default is elementwise coupling only
+      else
+         allocate(coupling_inds(K1, 2))
+         allocate(sym_facs(K1))
+         do i = 1, K1
+            coupling_inds(i,:) = (/i, i/)
+            sym_facs(i) = 1.0
+         enddo
+      endif
+
+   endsubroutine form_coupling_inds
+
+
+   subroutine form_nu_W(this, W, sym_desc, error)
       !replacement for the old rs_index
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
-      integer :: a, i, j, smin, smax, sdif, nmin, nmax, ndif, j_species, nu_R, nu_S
-      type(int_2d), dimension(:), allocatable :: gs_index
+      integer :: K, nu_R, nu_S, i, dn, ds, ir, ic, n, s, s2, n2, n2_max, s2_max
+      type(real_2d), dimension(:), allocatable :: W
+      logical  :: sym_desc
 
       INIT_ERROR(error)
-
-      if(.not. this%initialised) then
-         RAISE_ERROR("form_gs_index: descriptor object not initialised", error)
-      endif
 
       if (( this%nu_R > 2) .OR. (this%nu_R < 0)) then
          RAISE_ERROR("nu_R outside allowed range of 0-2", error)
@@ -7274,47 +7367,319 @@ module descriptors_module
          RAISE_ERROR("nu_S outside allowed range of 0-2", error)
       endif
 
+      ! decide if the l-slices are symmetric matricies
+      if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
+         sym_desc = .false.
+      else
+         sym_desc = .true.
+      endif
+      allocate(W(2))
 
-      allocate(gs_index(2))
+      ! construct W(i) as required
       nu_R = this%nu_R
       nu_S = this%nu_S
-
-      !new loop
       do i = 1,2
+         ! determine size of W(i) and allocate
+         K = 1
+         ds = 0
+         dn = 0
+         n2_max = 1
+         s2_max = 1
+
          if (nu_R > 0) then
-            nmin = 1
-            nu_R  = nu_R - 1
-         else
-            nmin = 0
+            K = K * this%n_max
+            nu_R = nu_R -1
+            dn = 1
+            n2_max = this%n_max
          endif
-         nmax =this%n_max * nmin
-         ndif = nmax-nmin
-
          if (nu_S > 0) then
-            smin = 1
-            nu_S  = nu_S - 1
-         else
-            smin = 0
+            K = K * this%n_species
+            nu_S = nu_S -1
+            ds = 1
+            s2_max = this%n_species
          endif
-         smax = this%n_species* smin
-         sdif = smax-smin
-         allocate(gs_index(i)%mm((ndif+1)*(sdif+1), 2))
+         allocate(W(i)%mm(this%n_max * this%n_species, K))
+         W(i)%mm(:,:) = 0.0_dp
 
-         j = 0
-         do j_species = smin, smax
-            do a = nmin, nmax
-               j = j +1
-               gs_index(i)%mm(j,:) = (/ j_species, a /)
+         !loop over S and N, populating W. 4 Loops but just looping over rows and columns of matrix
+         ir = 0
+         do s = 1, this%n_species
+            do n = 1, this%n_max
+               ir = ir + 1       ! row index in W
+
+               ic = 0
+               do s2 = 1, s2_max
+                  do n2 = 1, n2_max
+                     ic = ic + 1
+                     if (ds*s == ds*s2 .and. dn*n == dn*n2) then
+                        !ic = 1 + (s2-1)*ds*n2_max + (n2-1)*dn
+                        W(i)%mm(ir, ic) = 1.0_dp
+                     endif
+                  enddo
+               enddo
             enddo
          enddo
-      enddo
-   endsubroutine form_gs_index
 
+      enddo
+   endsubroutine form_nu_W
+
+   subroutine form_mix_W(this, W, sym_desc, error)
+      !replacement for the old rs_index
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      type(real_2d), dimension(:), allocatable :: W
+      logical  :: sym_desc
+      integer  :: ik, in, is, ic, ir, j, r_r, r_c
+      real(dp), dimension(:,:), allocatable :: R
+      integer :: orig_seed
+
+      !store the original random seed and reset it to this at the end
+      orig_seed = system_get_random_seed()
+      sym_desc = this%sym_mix
+
+      INIT_ERROR(error)
+
+      !full Z and R mixing
+      allocate(W(2))
+      if (this%R_mix .and. this%Z_mix) then
+         do j = 1, 2
+            allocate(W(j)%mm(this%n_species*this%n_max, this%K))
+            if (this%sym_mix .and. j == 2) then
+               W(2)%mm = W(1)%mm
+            else
+               do is = 1, this%n_species
+                  !seed = this%species_Z(is)
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j*200)
+                  ir = (is-1)*this%n_max
+                  !call random_number(W(j)%mm(ir+1:ir+this%n_max, :))
+                  do r_r = ir+1, ir+this%n_max
+                     do r_c = 1, this%K
+                        W(j)%mm(r_r, r_c) = ran_normal()
+                     enddo
+                  enddo
+
+               enddo
+            endif
+         enddo
+
+      !mix elements only
+      elseif (this%Z_mix) then
+         do j = 1, 2
+            allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_max))
+            W(j)%mm = 0.0_dp
+            if (this%sym_mix .and. j == 2) then
+               W(2)%mm = W(1)%mm
+            else
+               allocate(R(this%n_species, this%K))
+               do is = 1, this%n_species
+                  !call random_number(R(is,:))
+                  call system_reseed_rng(this%species_Z(is)+this%mix_shift+j*200)
+                  do r_c = 1, this%K
+                     R(is, r_c) = ran_normal()
+                  enddo
+               enddo
+
+               ir = 0
+               do is = 1, this%n_species
+                  do in = 1, this%n_max
+                     ir = ir + 1
+                     do ik = 1, this%k
+                        ic = (ik-1)*this%n_max + in
+                        W(j)%mm(ir, ic) = R(is, ik)
+                     enddo
+                  enddo
+               enddo
+               deallocate(R)
+            endif
+         enddo
+
+      !mix radial channels only
+      elseif (this%R_mix) then
+         do j = 1, 2
+            allocate(W(j)%mm(this%n_species*this%n_max, this%K*this%n_species))
+            W(j)%mm = 0.0_dp
+            if (this%sym_mix .and. j == 2) then
+               W(2)%mm = W(1)%mm
+            else
+               allocate(R(this%n_max, this%K))
+               !call random_number(R)
+               call system_reseed_rng(this%n_max+this%mix_shift+j*200)
+               do r_r = 1, this%n_max
+                  do r_c = 1, this%K
+                     R(r_r, r_c) = ran_normal()
+                  enddo
+               enddo
+
+               ir = 0
+               do is = 1, this%n_species
+                  do in = 1, this%n_max
+                     ir = ir + 1
+                     do ik = 1, this%K
+                        ic = (is-1)*this%K + ik
+                        W(j)%mm(ir, ic) = R(in, ik)
+                     enddo
+                  enddo
+               enddo
+               deallocate(R)
+            endif
+         enddo
+
+      else
+         RAISE_ERROR("form_mix_W: not mixing anything", error)
+      endif
+
+      !reset the system random seed
+      call system_reseed_rng(orig_seed)
+
+   endsubroutine form_mix_W
+
+
+   subroutine form_Zmap_W(this, W, sym_desc, error)
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      logical :: sym_desc
+      character ::  let
+      integer :: i, a, i_species, i_row, i_col
+      integer :: i_s, i_group, i_density, Z
+      integer :: n_groups(2), Ks(2)
+      type(real_2d), dimension(:), allocatable :: W
+
+      !set how many groups there are
+      n_groups = 1
+      i_density = 1
+      do i = 1, len(this%Z_map_str)
+         let = this%Z_map_str(i:i)
+         if (let == ",") n_groups(i_density) = n_groups(i_density) + 1
+         if (let == ":") i_density = i_density + 1
+      enddo
+      !print*, "n_groups= ", n_groups
+
+      !allocate W with the correct size
+      allocate(W(2))
+      Ks(1) = this%n_max*n_groups(1)
+      if (i_density==2) then
+         sym_desc=.false.
+         Ks(2) = this%n_max*n_groups(2)
+      else
+         sym_desc=.true.
+         Ks(2) = this%n_max*n_groups(1)
+      endif
+
+      do i_density = 1, 2
+         allocate( W(i_density)%mm(this%n_max*this%n_species, Ks(i_density)) )
+         W(i_density)%mm = 0.0_dp
+      enddo
+      !print*, "Ks are=", Ks
+
+      !loop over the string populating W
+      i_s = 0
+      i_group = 1
+      i_density = 1
+      do i = 1, len(this%Z_map_str)
+         let = this%Z_map_str(i:i)
+
+         !any number
+         if (SCAN(let, "1234567890") > 0 .and. i_s == 0) then
+            i_s = i
+         endif
+
+         !anything but a number
+         if (SCAN(let, "{} ,:") > 0 .and. i_s > 0 ) then
+            !Z -> i_species
+            read(this%Z_map_str(i_s:i-1), *) Z
+            i_species = 0
+            do i_s = 1, this%n_species
+               if (this%species_Z(i_s) == Z) i_species = i_s
+            enddo
+            i_s = 0
+            !print*, "Z is", Z, "i_group is", i_group, "i_density is", i_density, "i_species is", i_species
+
+            !now populate the correct bit in W
+            do a = 1, this%n_max
+               i_row = (i_species-1)*this%n_max + a
+               i_col = (i_group-1)*this%n_max + a
+               !print*, "i_species=", i_species, 'this%n_max=', this%n_max, "a=", a, "i_row=", i_row
+               W(i_density)%mm(i_row, i_col) = 1.0_dp
+            enddo
+         endif
+
+         !increment group and density
+         if (SCAN(let, ",") > 0)   i_group = i_group + 1
+         if (SCAN(let, ":") > 0) then
+            i_density = i_density + 1
+            i_group = 1
+         endif
+
+      enddo
+
+      if (sym_desc) W(2)%mm = W(1)%mm
+   endsubroutine form_Zmap_W
+
+   subroutine form_W(this, W, sym_desc, error)
+      !replacement for the old rs_index
+      type(soap), intent(in) :: this
+      integer, optional, intent(out) :: error
+      type(real_2d), dimension(:), allocatable :: W
+      logical  :: sym_desc, using_Zmap, mixing
+      integer :: n
+
+      INIT_ERROR(error)
+
+      !print*, "Zmap_str is", trim(this%Z_map_str)
+      n = len(trim(this%Z_map_str))
+      if (len(trim(this%Z_map_str)) > 0 ) then
+         using_Zmap = .true.
+      else
+         using_Zmap = .false.
+      endif
+
+
+      if(.not. this%initialised) then
+         RAISE_ERROR("form_W: descriptor object not initialised", error)
+      endif
+
+      if ((this%nu_R /= 2 .OR. this%nu_R /= 2) .and. (this%R_mix .or. this%Z_mix .or. this%sym_mix)) then
+         RAISE_ERROR("(nu_R, nu_S) = (2,2) required to use channel mixing", error)
+      endif
+
+      if ((this%nu_R /= 2 .OR. this%nu_R /= 2) .and. (this%diagonal_radial)) then
+         RAISE_ERROR("(nu_R, nu_S) = (2,2) required to use diagonal radial", error)
+      endif
+
+      if ((this%nu_R /= 2 .OR. this%nu_R /= 2) .and. (using_Zmap)) then
+         RAISE_ERROR("(nu_R, nu_S) = (2,2) required to use Zmap", error)
+      endif
+
+      if ((this%R_mix .or. this%Z_mix .or. this%sym_mix) .and. using_Zmap) then
+         RAISE_ERROR("cant' using mixing and Zmap at the same time", error)
+      endif
+
+      !call the correct
+      if (this%R_mix .or. this%Z_mix .or. this%sym_mix) then
+         call form_mix_W(this, W, sym_desc, error)
+      elseif (using_Zmap) then
+         call form_Zmap_W(this, W, sym_desc, error)
+      else
+         call form_nu_W(this, W, sym_desc, error)
+      endif
+
+      ! Printing these is useful for debugging and was used to check the mixing is working correctly
+      ! print*, "W(1) is", W(1)%mm
+      ! print*, "W(2) is", W(2)%mm
+      ! print*, "sym_desc is", sym_desc
+   endsubroutine form_W
+
+
+   ! main branch currently ~1000 lines long, would be nice not to blow this up
    subroutine soap_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
 
       type real_2d_array
          type(real_2d), dimension(:,:,:), allocatable :: x
       endtype real_2d_array
+
+      type real_2d_2d
+         type(real_2d), dimension(:,:), allocatable :: x
+      endtype real_2d_2d
 
       type(soap), intent(in) :: this
       type(atoms), intent(in) :: at
@@ -7341,7 +7706,7 @@ module descriptors_module
       logical :: my_do_descriptor, my_do_grad_descriptor, do_two_l_plus_one, sym_desc
       integer :: d, i, j, n, a, b, k, l, m, i_pow, i_coeff, l_n_neighbours, n_i, &
          n_descriptors, n_cross, i_species, j_species, ia, jb, i_desc_i, &
-         xml_version, sum_l_n_neighbours, i_pair, i_pair_i, n_index, ub, ia_rs, jb_rs
+         xml_version, sum_l_n_neighbours, i_pair, i_pair_i, n_index, ub
       integer, dimension(3) :: shift_ij
       integer, dimension(:), allocatable :: i_desc
       integer, dimension(:,:), allocatable :: rs_index
@@ -7353,22 +7718,39 @@ module descriptors_module
       real(dp), dimension(:), allocatable :: global_fourier_so3_r_array, global_fourier_so3_i_array
       type(real_2d_array), dimension(:), allocatable :: global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array
       integer, dimension(total_elements) :: species_map
-      type(int_2d), dimension(:), allocatable :: gs_index
+
       complex(dp), allocatable OMP_SAVE :: sphericalycartesian_all_t(:,:), gradsphericalycartesian_all_t(:,:,:)
       complex(dp) :: c_tmp(3)
       integer :: max_n_neigh
 
+      ! new variables
+      type(real_2d), dimension(:), allocatable, save :: X_r, X_i, W
+      type(real_2d), dimension(:, :), allocatable, save :: Y_r, Y_i, dT_i, dT_r
+      type(real_2d), dimension(:, :, :), allocatable, save ::  dY_r, dY_i
+      type(real_2d), dimension(:, :), allocatable, save :: dX_r, dX_i
+      type(real_2d_2d), dimension(:), allocatable, save :: dXG_r, dXG_i !global gradients
+      type(real_2d_2d), dimension(:, :), allocatable, save :: dYG_r, dYG_i
+      real(dp), dimension(:, :), allocatable, save :: Pl, Pl_g1, Pl_g2
+      integer :: ic, K1, K2, ir, ig, ik
+      real(dp) ::  tlpo
+      real(dp) :: r_tmp(3)
+      complex(dp), dimension(:), allocatable, save :: l_tmp
+      logical :: original
+      integer, dimension(:, :), allocatable :: coupling_inds
+      real, dimension(:), allocatable :: sym_facs
+      real(dp), external :: ddot
+      integer :: na, ix
       ! Create a thread private QR_factor here as dormqr modifies it and restores it during solve
       ! and this doesn't work with OMP threading, hence the thread private copy.
       real(dp), dimension(:,:,:), allocatable OMP_SAVE :: QR_factor
 
 !$omp threadprivate(radial_fun, radial_coefficient, grad_radial_fun, grad_radial_coefficient)
 !$omp threadprivate(sphericalycartesian_all_t, gradsphericalycartesian_all_t)
-!$omp threadprivate(fourier_so3_r, fourier_so3_i)
+!$omp threadprivate(fourier_so3_r, fourier_so3_i, X_i, X_r, Pl, Y_r, Y_i)
 !$omp threadprivate(SphericalY_ij,grad_SphericalY_ij)
 !$omp threadprivate(descriptor_i, grad_descriptor_i)
-!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, QR_factor)
-
+!$omp threadprivate(grad_fourier_so3_r, grad_fourier_so3_i, QR_factor, dY_r, dY_i, Pl_g1, Pl_g2, l_tmp, dX_r, dX_i)
+!$omp threadprivate(dT_i, dT_r)
 
       INIT_ERROR(error)
 
@@ -7386,13 +7768,19 @@ module descriptors_module
          RAISE_ERROR("nu_S outside allowed range of 0-2", error)
       endif
 
-      call form_gs_index(this, gs_index, error)
-      if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
-         sym_desc = .false.
-      else
-         sym_desc = .true.
-      endif
+      ! for special routines to keep original power spectrum fast
+      original = .false.
+      if (this%coupling .and. this%nu_R == 2 .and. this%nu_S == 2) original = .true.
+      if (this%R_mix .or. this%Z_mix .or. this%sym_mix) original = .false.
+      if (len(trim(this%Z_map_str)) > 0 ) original = .false.
 
+      !  form W mixing matrices
+      call form_W(this, W, sym_desc, error)
+      K1 = size(W(1)%mm(0,:))
+      K2 = size(W(2)%mm(0,:))
+      if (.not. this%coupling)   call form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
+
+      species_map = 0
       do i_species = 1, this%n_species
          if(this%species_Z(i_species) == 0) then
             species_map = 1
@@ -7400,6 +7788,7 @@ module descriptors_module
             species_map(this%species_Z(i_species)) = i_species
          endif
       enddo
+
 
       my_do_descriptor = optional_default(.false., do_descriptor)
       my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
@@ -7447,10 +7836,10 @@ module descriptors_module
 
       do_two_l_plus_one = (xml_version >= 1423143769)
 
-      allocate(rs_index(2,(this%n_max+1)*(this%n_species+1)))
+      allocate(rs_index(2,this%n_max*this%n_species))
       i = 0
-      do i_species = 0, this%n_species
-         do a = 0, this%n_max
+      do i_species = 1, this%n_species
+         do a = 1, this%n_max
             i = i + 1
             rs_index(:,i) = (/a,i_species/)
          enddo
@@ -7458,7 +7847,7 @@ module descriptors_module
 
       call finalise(descriptor_out)
 
-      d = soap_dimensions(this,error)
+      d = soap_dimensions(this, error)
 
       if(associated(atom_mask_pointer)) then
          call descriptor_sizes(this,at,n_descriptors,n_cross, &
@@ -7475,13 +7864,32 @@ module descriptors_module
          max_n_neigh = max(max_n_neigh, n_neighbours(at, n_i))
       end do
 
-!$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh) private(i_species, a, l, n_i, ub)
+
+!$omp parallel default(none) shared(this,my_do_grad_descriptor,d,max_n_neigh, K1, K2, original, sym_desc) private(i_species, a, l, n_i, ub, ik, k)
       allocate(descriptor_i(d))
       if(my_do_grad_descriptor) allocate(grad_descriptor_i(d,3))
 
       allocate(radial_fun(0:this%l_max, size(this%r_basis)), radial_coefficient(0:this%l_max, this%n_max))
       !SPEED allocate(fourier_so3(0:this%l_max,this%n_max,this%n_species), SphericalY_ij(0:this%l_max))
-      allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), SphericalY_ij(0:this%l_max))
+      !allocate(fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species))
+      allocate(SphericalY_ij(0:this%l_max))
+      allocate(X_r(0:this%l_max), X_i(0:this%l_max))
+      allocate(l_tmp(1:2*this%l_max + 1))
+      do l = 0, this%l_max
+         allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max))
+         allocate(X_i(l)%mm(2*l+1, this%n_species*this%n_max))
+      enddo
+
+      allocate(Pl(K1, K2))
+
+      allocate(Y_r(2, 0:this%l_max), Y_i(2, 0:this%l_max))
+      do l = 0, this%l_max
+         allocate(Y_r(1, l)%mm(2*l+1, K1))
+         allocate(Y_i(1, l)%mm(2*l+1, K1))
+         allocate(Y_r(2, l)%mm(2*l+1, K2))
+         allocate(Y_i(2, l)%mm(2*l+1, K2))
+      enddo
+
 
       if(my_do_grad_descriptor) then
          allocate(grad_radial_fun(0:this%l_max, size(this%r_basis)), grad_radial_coefficient(0:this%l_max, this%n_max))
@@ -7491,20 +7899,7 @@ module descriptors_module
       allocate(sphericalycartesian_all_t(0:this%l_max, -this%l_max:this%l_max))
       if(my_do_grad_descriptor) then
           allocate(gradsphericalycartesian_all_t(0:this%l_max, -this%l_max:this%l_max, 3))
-      end if
-
-      do i_species = 0, this%n_species
-         do a = 0, this%n_max
-            do l = 0, this%l_max
-               !SPEED allocate(fourier_so3(l,a,i_species)%m(-l:l))
-               !SPEED fourier_so3(l,a,i_species)%m(:) = CPLX_ZERO
-               allocate(fourier_so3_r(l,a,i_species)%m(-l:l))
-               allocate(fourier_so3_i(l,a,i_species)%m(-l:l))
-               fourier_so3_r(l,a,i_species)%m(:) = 0.0_dp
-               fourier_so3_i(l,a,i_species)%m(:) = 0.0_dp
-            enddo
-         enddo
-      enddo
+      endif
 
       if (this%radial_basis /= "EQUISPACED_GAUSS") then
          allocate(QR_factor(size(this%r_basis), this%n_max, 0:this%l_max))
@@ -7519,26 +7914,51 @@ module descriptors_module
       enddo
 
       if (my_do_grad_descriptor) then
-          !SPEED allocate( grad_fourier_so3(0:this%l_max,this%n_max,n_neighbours(at,i,max_dist=this%cutoff)) )
-          allocate( grad_fourier_so3_r(0:this%l_max,0:this%n_max,max_n_neigh) )
-          allocate( grad_fourier_so3_i(0:this%l_max,0:this%n_max,max_n_neigh) )
-          do n_i=1, max_n_neigh
-              do a = 0, this%n_max
+         if (original) then
+            allocate(Pl_g1(K1, 3*this%n_max))
+         else
+            allocate(Pl_g1(K1, 3*K2), Pl_g2(3*K1, K2))
+         endif
+
+          ! allocate new grad storage
+         if (original) then
+            allocate(dX_r(0:this%l_max, max_n_neigh), dX_i(0:this%l_max, max_n_neigh))
+            do l = 0, this%l_max
+               do n_i = 1, max_n_neigh
+                  allocate(dX_r(l, n_i)%mm(2*l+1, 3*this%n_max))
+                  allocate(dX_i(l, n_i)%mm(2*l+1, 3*this%n_max))
+               enddo
+            enddo
+         ! general
+         else
+            allocate(dY_r(2, 0:this%l_max, max_n_neigh), dY_i(2, 0:this%l_max, max_n_neigh))
+            do n_i = 1, max_n_neigh
+               do ik = 1, 2
+                  if (sym_desc .and. ik == 1) cycle
+                  k = K1
+                  if (ik == 2) k = K2
                   do l = 0, this%l_max
-                     !SPEED allocate(grad_fourier_so3(l,a,n_i)%mm(3,-l:l))
-                     !SPEED grad_fourier_so3(l,a,n_i)%mm(:,:) = CPLX_ZERO
-                     allocate(grad_fourier_so3_r(l,a,n_i)%mm(3,-l:l))
-                     allocate(grad_fourier_so3_i(l,a,n_i)%mm(3,-l:l))
-                  end do
-              end do
-          end do
+                     allocate(dY_r(ik, l, n_i)%mm(2*l+1, 3*k))
+                     allocate(dY_i(ik, l, n_i)%mm(2*l+1, 3*k))
+                  enddo
+               enddo
+            enddo
+         endif
+
+         !temporary storage for the gradient cofficients before multiplication
+         allocate(dT_r(0:2, 0:this%l_max), dT_i(0:2, 0:this%l_max))
+         do l = 0, this%l_max
+            allocate(dT_r(0, l)%mm(2*l+1, this%n_max), dT_i(0, l)%mm(2*l+1, this%n_max))
+            allocate(dT_r(1, l)%mm(2*l+1, K1), dT_i(1, l)%mm(2*l+1, K1))
+            allocate(dT_r(2, l)%mm(2*l+1, K2), dT_i(2, l)%mm(2*l+1, K2))
+         enddo
+
       endif
 !$omp end parallel
 
       i_desc = 0
       i_desc_i = 0
       do i = 1, at%N
-
          if( .not. any( at%Z(i) == this%Z ) .and. .not. any(this%Z == 0) ) cycle
 
          if(associated(atom_mask_pointer)) then
@@ -7577,12 +7997,18 @@ module descriptors_module
          endif
       enddo
 
+      ! Test, might ahve to always allocate this for omp reduction...
       allocate( &
-         global_fourier_so3_r_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
-         global_fourier_so3_i_array((this%l_max+1)**2 * (this%n_max+1) * (this%n_species+1)), &
-         global_grad_fourier_so3_r_array( count(i_desc/=0) ), &
-         global_grad_fourier_so3_i_array( count(i_desc/=0) ) )
+            global_fourier_so3_r_array((this%l_max+1)**2 * this%n_max*this%n_species), &
+            global_fourier_so3_i_array((this%l_max+1)**2 * this%n_max*this%n_species+1))
 
+      if (this%global) then
+         if (original) then
+            allocate(dXG_r(count(i_desc/=0)), dXG_i(count(i_desc/=0)))
+         else
+            allocate(dYG_r(count(i_desc/=0), 2), dYG_i(count(i_desc/=0), 2))
+         endif
+      endif
 
 
       if(this%global) then
@@ -7613,21 +8039,48 @@ module descriptors_module
                ! allocate( &
                ! global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,0:this%n_max,l_n_neighbours), &
                !global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,0:this%n_max,l_n_neighbours) )
-               allocate( &
-               global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh), &
-               global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh) )
+               !allocate( &
+               !global_grad_fourier_so3_r_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh), &
+               !global_grad_fourier_so3_i_array(i_desc_i)%x(0:this%l_max,0:this%n_max,max_n_neigh) )
+               if (original) then
+                  allocate(dXG_r(i_desc_i)%x(0:this%l_max, l_n_neighbours), dXG_i(i_desc_i)%x(0:this%l_max, l_n_neighbours) )
+               else
+                  do k = 1, 2
+                     allocate(dYG_r(i_desc_i, k)%x(0:this%l_max, l_n_neighbours), dYG_i(i_desc_i, k)%x(0:this%l_max, l_n_neighbours) )
+                  enddo
+               endif
 
-               do n_i = 1, l_n_neighbours
-                  do a = 0, this%n_max
-                     do l = 0, this%l_max
-                        allocate( &
-                           global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(3,-l:l), &
-                           global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm(3,-l:l) )
-                        global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm = 0.0_dp
-                        global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm = 0.0_dp
-                     enddo ! l
-                  enddo ! a
-               enddo ! n_i
+               ! do n_i = 1, l_n_neighbours
+               !    do a = 0, this%n_max
+               !       do l = 0, this%l_max
+               !          !allocate( &
+               !             !global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(3,-l:l), &
+               !             !global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm(3,-l:l) )
+
+               !          global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm = 0.0_dp
+               !          global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm = 0.0_dp
+               !       enddo ! l
+               !    enddo ! a
+               ! enddo ! n_i
+
+               do l = 0,this%l_max
+                  do n_i = 1, l_n_neighbours
+                     if (original) then
+                        allocate(dXG_r(i_desc_i)%x(l, n_i)%mm(0:2*l+1, 3*this%n_max))
+                        allocate(dXG_i(i_desc_i)%x(l, n_i)%mm(0:2*l+1, 3*this%n_max))
+                        dXG_r(i_desc_i)%x(l, n_i)%mm = 0.0_dp
+                        dXG_i(i_desc_i)%x(l, n_i)%mm = 0.0_dp
+                     else
+                        do k = 1, 2
+                           allocate(dYG_r(i_desc_i, k)%x(l, n_i)%mm(0:2*l+1, 3*this%n_max))
+                           allocate(dYG_i(i_desc_i, k)%x(l, n_i)%mm(0:2*l+1, 3*this%n_max))
+                           dYG_r(i_desc_i, k)%x(l, n_i)%mm = 0.0_dp
+                           dYG_i(i_desc_i, k)%x(l, n_i)%mm = 0.0_dp
+                        enddo
+                     endif
+                  enddo
+               enddo
+
             enddo ! i
 
             allocate(descriptor_out%x(1)%grad_data(d,3,sum_l_n_neighbours))
@@ -7644,16 +8097,14 @@ module descriptors_module
       endif ! this%global
 
 
-!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, gs_index, sym_desc) &
-!$omp shared(global_grad_fourier_so3_r_array, global_grad_fourier_so3_i_array, norm_radial_decay) &
-!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ia_rs, jb_rs) &
-!$omp private(c_tmp) &
+!$omp parallel do schedule(dynamic) default(none) shared(this, at, descriptor_out, my_do_descriptor, my_do_grad_descriptor, d, i_desc, species_map, rs_index, do_two_l_plus_one, sym_desc, W, K1, K2, max_n_neigh) &
+!$omp shared(dXG_r, dXG_i, dYG_r, dYG_i, norm_radial_decay, coupling_inds, sym_facs, original) &
+!$omp private(i, j, i_species, j_species, a, b, l, m, n, n_i, r_ij, u_ij, d_ij, shift_ij, i_pow, i_coeff, ia, jb, alpha, i_desc_i, ub, ic, ir, ig, ik, k, na, ix) &
+!$omp private(c_tmp, r_tmp, tlpo) &
 !$omp private(t_g_r, t_g_i, t_f_r, t_f_i, t_g_f_rr, t_g_f_ii) &
 !$omp private(f_cut, df_cut, arg_bess, exp_p, exp_m, mo_spher_bess_fi_ki_l, mo_spher_bess_fi_ki_lp, mo_spher_bess_fi_ki_lm, mo_spher_bess_fi_ki_lmm, norm_descriptor_i) &
 !$omp private(radial_decay, dradial_decay) &
 !$omp reduction(+:global_fourier_so3_r_array,global_fourier_so3_i_array)
-
-
 
 
       do i = 1, at%N
@@ -7662,6 +8113,7 @@ module descriptors_module
          else
             i_desc_i = i_desc(i)
          endif
+
 
          if(.not.this%global) then
             if(my_do_descriptor) then
@@ -7672,6 +8124,27 @@ module descriptors_module
                descriptor_out%x(i_desc_i)%ii(0) = i
                descriptor_out%x(i_desc_i)%pos(:,0) = at%pos(:,i)
                descriptor_out%x(i_desc_i)%has_grad_data(0) = .true.
+
+               ! zero the gradient contributions
+               if (original) then
+                  do n_i= 1, max_n_neigh
+                     do l = 0, this%l_max
+                        dX_r(l, n_i)%mm = 0.0_dp
+                        dX_i(l, n_i)%mm = 0.0_dp
+                     enddo
+                  enddo
+               ! general
+               else
+                  do n_i = 1, max_n_neigh
+                     do l = 0, this%l_max
+                        do k = 1, 2
+                           if (sym_desc .and. k == 1) cycle
+                           dY_r(k, l, n_i)%mm = 0.0_dp
+                           dY_i(k, l, n_i)%mm = 0.0_dp
+                        enddo
+                     enddo
+                  enddo
+               endif
             endif
          endif
 
@@ -7691,29 +8164,20 @@ module descriptors_module
             !radial_coefficient = matmul(radial_coefficient, this%cholesky_overlap_basis(0, :, :))
          endif
 
+         !zero the coefficients and initialise counter
+         do l = 0, this%l_max
+            X_r(l)%mm = 0.0_dp
+            X_i(l)%mm = 0.0_dp
+         enddo
 
          do i_species = 0, this%n_species
             do a = 0, this%n_max
-               !SPEED fourier_so3(0,a,i_species)%m(0) = radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/))
 
-               if (i_species == 0 .or.  this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) then
-                  if (a == 0) then
-                     fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
-                     fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag( SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
-                  else
-                     fourier_so3_r(0,a,i_species)%m(0) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
-                     fourier_so3_i(0,a,i_species)%m(0) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
-                  endif
-               else
-                  fourier_so3_i(0,a,i_species)%m(0) = 0.0_dp
-                  fourier_so3_r(0,a,i_species)%m(0) = 0.0_dp
+               if ((this%central_reference_all_species .or. this%species_Z(i_species) == at%Z(i) .or. this%species_Z(i_species) == 0) .and. i_species > 0 .and. a > 0) then
+                  ic = (i_species-1) * this%n_max + a
+                  X_r(0)%mm(1, ic) = this%central_weight * real(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)), dp)
+                  X_i(0)%mm(1, ic) = this%central_weight * aimag(radial_coefficient(0,a) * SphericalYCartesian(0,0,(/0.0_dp, 0.0_dp, 0.0_dp/)))
                endif
-
-               do l = 1, this%l_max
-                  !SPEED fourier_so3(l,a,i_species)%m(:) = CPLX_ZERO
-                  fourier_so3_r(l,a,i_species)%m(:) = 0.0_dp
-                  fourier_so3_i(l,a,i_species)%m(:) = 0.0_dp
-               enddo
             enddo
          enddo
 
@@ -7813,7 +8277,6 @@ module descriptors_module
                radial_coefficient = radial_coefficient * f_cut
             endif
 
-
             sphericalycartesian_all_t = SphericalYCartesian_all(this%l_max, d_ij)
             if(my_do_grad_descriptor) gradsphericalycartesian_all_t = GradSphericalYCartesian_all(this%l_max, d_ij)
             do l = 0, this%l_max
@@ -7823,247 +8286,329 @@ module descriptors_module
                enddo
             enddo
 
-            do a = 0, this%n_max
-               do l = 0, this%l_max
-                  do m = -l, l
-                     !SPEED fourier_so3(l,a,i_species)%m(m) = fourier_so3(l,a,i_species)%m(m) + radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
-                     !SPEED if(my_do_grad_descriptor) grad_fourier_so3(l,a,n_i)%mm(:,m) = grad_fourier_so3(l,a,n_i)%mm(:,m) + &
-                     !SPEED    grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
+            do l = 0, this%l_max
+               do a = 1, this%n_max
+                  ic = (i_species-1) * this%n_max + a
+                  X_r(l)%mm(:, ic) = X_r(l)%mm(:, ic)  + radial_coefficient(l,a) * real(SphericalY_ij(l)%m(:))
+                  X_i(l)%mm(:, ic) = X_i(l)%mm(:, ic)  + radial_coefficient(l,a) * aimag(SphericalY_ij(l)%m(:))
+               enddo ! a
+            enddo ! l
 
-                     if (a==0) then
-                        c_tmp(1) = f_cut * SphericalY_ij(l)%m(m)
-                     else
-                        c_tmp(1) = radial_coefficient(l,a) * SphericalY_ij(l)%m(m)
+            if(my_do_grad_descriptor .and. original) then
+               do k = 1, 3
+                  do l = 0, this%l_max
+                     !special case for original power spectrum
+                     do a = 1, this%n_max
+                        ic = (a-1)*3 + k
+                        l_tmp(1:2*l+1) =  grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(:) * u_ij(k) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(k,:)
+                        dX_r(l, n_i)%mm(:, ic) = real(l_tmp(1:2*l+1))
+                        dX_i(l, n_i)%mm(:, ic) = aimag(l_tmp(1:2*l+1))
+                     enddo ! a
+                  enddo ! l
+               enddo ! k
+            endif ! my_do_grad_descriptor
 
-                     endif
+            if(my_do_grad_descriptor .and. (.not. original)) then
+               do k = 1, 3
+                  do l = 0, this%l_max
+                     do a = 1, this%n_max
+                        l_tmp(1:2*l+1) =  grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(:) * u_ij(k) + radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(k,:)
+                        dT_r(0, l)%mm(:, a) =  real(l_tmp(1:2*l+1))
+                        dT_i(0, l)%mm(:, a) = aimag(l_tmp(1:2*l+1))
+                     enddo ! a
 
-                     fourier_so3_r(l,a,i_species)%m(m) = fourier_so3_r(l,a,i_species)%m(m) + real(c_tmp(1))
-                     fourier_so3_i(l,a,i_species)%m(m) = fourier_so3_i(l,a,i_species)%m(m) + aimag(c_tmp(1))
-                     fourier_so3_r(l,a,0)%m(m) = fourier_so3_r(l,a,0)%m(m) + real(c_tmp(1))
-                     fourier_so3_i(l,a,0)%m(m) = fourier_so3_i(l,a,0)%m(m) + aimag(c_tmp(1))
+                     !operate on the coefficients then pack them
+                     ic = (i_species-1) * this%n_max
+                     do ia = 1, 2
+                        if (sym_desc .and. ia == 1) cycle
+                        dT_r(ia, l)%mm = matmul(dT_r(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
+                        dT_i(ia, l)%mm = matmul(dT_i(0, l)%mm, W(ia)%mm(ic+1:ic+this%n_max, :))
 
-
-                     if(my_do_grad_descriptor) then
-                        if (a==0) then
-                           c_tmp(:) = df_cut * SphericalY_ij(l)%m(m) * u_ij(:) + &
-                                       f_cut * grad_SphericalY_ij(l)%mm(:,m)
-
-                        else
-                           c_tmp(:) = grad_radial_coefficient(l,a) * SphericalY_ij(l)%m(m) * u_ij(:) + &
-                                   radial_coefficient(l,a) * grad_SphericalY_ij(l)%mm(:,m)
-                        endif
-                        ! grad_fourier_so3_r(l,a,n_i)%mm(:,m) = grad_fourier_so3_r(l,a,n_i)%mm(:,m) + real(c_tmp)
-                        ! grad_fourier_so3_i(l,a,n_i)%mm(:,m) = grad_fourier_so3_i(l,a,n_i)%mm(:,m) + imag(c_tmp)
-
-                        grad_fourier_so3_r(l,a,n_i)%mm(:,m) = real(c_tmp)
-                        grad_fourier_so3_i(l,a,n_i)%mm(:,m) = aimag(c_tmp)
-                     endif ! my_do_grad_descriptor
-                  enddo ! m
-               enddo ! l
-            enddo ! a
+                        ub = K1
+                        if (ia == 2) ub = K2
+                        do ik = 1, ub
+                           ir = (ik-1)*3 + k
+                           dY_r(ia, l, n_i)%mm(:, ir) = dT_r(ia, l)%mm(:, ik)
+                           dY_i(ia, l, n_i)%mm(:, ir) = dT_i(ia, l)%mm(:, ik)
+                        enddo
+                     enddo
+                  enddo ! l
+               enddo ! k
+            endif ! my_do_grad_descriptor
 
          enddo ! n
 
 
+
          if(this%global .and. my_do_grad_descriptor) then
-            global_grad_fourier_so3_r_array(i_desc_i)%x = grad_fourier_so3_r(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
-            global_grad_fourier_so3_i_array(i_desc_i)%x = grad_fourier_so3_i(:,:,1:n_neighbours(at,i,max_dist=this%cutoff))
-            !do n_i = lbound(grad_fourier_so3_r,3), ubound(grad_fourier_so3_r,3)
-            !   do a = lbound(grad_fourier_so3_r,2), ubound(grad_fourier_so3_r,2)
-            !      do l = lbound(grad_fourier_so3_r,1), ubound(grad_fourier_so3_r,1)
-            !         global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm = grad_fourier_so3_r(l,a,n_i)%mm
-            !         global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm = grad_fourier_so3_i(l,a,n_i)%mm
-            !      enddo ! l
-            !   enddo ! a
-            !enddo ! n_i
+            if (original) then
+               dXG_r(i_desc_i)%x = dX_r(:, 1:n_neighbours(at,i,max_dist=this%cutoff))
+               dXG_i(i_desc_i)%x = dX_i(:, 1:n_neighbours(at,i,max_dist=this%cutoff))
+            else
+               ! copy the operated gradients
+               do k = 1, 2
+                  dYG_r(i_desc_i, k)%x = dY_r(k, :, 1:n_neighbours(at,i,max_dist=this%cutoff))
+                  dYG_i(i_desc_i, k)%x = dY_i(k, :, 1:n_neighbours(at,i,max_dist=this%cutoff))
+               enddo
+            endif
          endif
 
 
          if(this%global) then
             i_coeff = 0
-            do ia = 1, (this%n_species+1)*(this%n_max+1)
+            do ia = 1, this%n_species*this%n_max
                a = rs_index(1,ia)
                i_species = rs_index(2,ia)
                do l = 0, this%l_max
-                  global_fourier_so3_r_array(i_coeff+1:i_coeff+2*l+1) = global_fourier_so3_r_array(i_coeff+1:i_coeff+2*l+1) + fourier_so3_r(l,a,i_species)%m(:)
-                  global_fourier_so3_i_array(i_coeff+1:i_coeff+2*l+1) = global_fourier_so3_i_array(i_coeff+1:i_coeff+2*l+1) + fourier_so3_i(l,a,i_species)%m(:)
+                  global_fourier_so3_r_array(i_coeff+1:i_coeff+2*l+1) = global_fourier_so3_r_array(i_coeff+1:i_coeff+2*l+1) + X_r(l)%mm(:, ia)
+                  global_fourier_so3_i_array(i_coeff+1:i_coeff+2*l+1) = global_fourier_so3_i_array(i_coeff+1:i_coeff+2*l+1) + X_i(l)%mm(:, ia)
                   i_coeff = i_coeff + 2*l+1
                enddo
             enddo
          endif
 
-         i_pow = 0
-         do ia = 1, size(gs_index(1)%mm(:,0))
-            a = gs_index(1)%mm(ia,2)
-            i_species = gs_index(1)%mm(ia,1)
+         if (this%coupling) then
+            !standard full tensor product coupling between density channels.
+            i_pow = 0
+            do l = 0, this%l_max
+               tlpo = 1.0_dp
+               if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+               ! special case for regular power spectrum
+               if (original) then
+                  ! Pl = matmul(tranpose(X_r(l)%mm), X_r(l)%mm)
+                  call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, X_r(l)%mm, 2*l+1, 0.0_dp, Pl, K1)
+                  call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, X_i(l)%mm, 2*l+1, 1.0_dp, Pl, K1)
+               ! everything else
+               else
 
-            !set upper bound for the second loop
-            ub = size(gs_index(2)%mm(:,0))
-            if (sym_desc) then
-               ub = ia
-            endif
-            do jb = 1, ub
-               b = gs_index(2)%mm(jb, 2)
-               j_species = gs_index(2)%mm(jb, 1)
+                  call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
+                  call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
 
-               if(this%diagonal_radial .and. a /= b) cycle
-
-               do l = 0, this%l_max
-                  i_pow = i_pow + 1
-                  !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
-                  descriptor_i(i_pow) = dot_product(fourier_so3_r(l,a,i_species)%m, fourier_so3_r(l,b,j_species)%m) + dot_product(fourier_so3_i(l,a,i_species)%m, fourier_so3_i(l,b,j_species)%m)
-                  if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
-                  if( ia /= jb .and. sym_desc) then
-                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  !skipping this for regular power spec saves 1e-3
+                  if (sym_desc) then
+                     Y_r(2, l)%mm = Y_r(1, l)%mm
+                     Y_i(2, l)%mm = Y_i(1, l)%mm
+                  else
+                     Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                     Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
                   endif
-               enddo !l
-            enddo !jb
-         enddo !ia
 
+                  !Pl = matmul(transpose(Y_r(1, l)%mm), Y_r(2, l)%mm) + matmul(transpose(Y_i(1, l)%mm), Y_i(2, l)%mm)
+                  call dgemm('T', 'N', K1, K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, Y_r(2, l)%mm, 2*l+1, 0.0_dp, Pl, K1)
+                  call dgemm('T', 'N', K1, K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, Y_i(2, l)%mm, 2*l+1, 1.0_dp, Pl, K1)
+               endif
+
+               ! unpack l-slice
+               i_pow = l + 1
+               do ia = 1, K1
+                  ub = K2
+                  if (sym_desc) then
+                     ub = ia
+                  endif
+                  if (this%diagonal_radial .and. original) a = rs_index(1,ia)
+                  do jb = 1, ub
+                     if (this%diagonal_radial .and. original) b = rs_index(1,jb)
+                     if (this%diagonal_radial .and. original .and. a /= b) cycle
+                     descriptor_i(i_pow) = Pl(ia, jb)
+                     if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                     i_pow = i_pow + this%l_max+1
+                  enddo
+               enddo
+
+            enddo
+         else
+            !elementwise coupling between density channels. For use with tensor-reduced compression.
+            do l = 0, this%l_max
+
+               tlpo = 1.0_dp
+               if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+               ! Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+               ! Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+               call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
+               call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
+               if (this%sym_mix) then
+                  Y_r(2, l)%mm = Y_r(1, l)%mm
+                  Y_i(2, l)%mm = Y_i(1, l)%mm
+               else
+                  Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                  Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
+               endif
+
+               i_pow = l + 1
+               do ik = 1, SIZE(sym_facs)
+                  ia = coupling_inds(ik, 1)
+                  jb = coupling_inds(ik, 2)
+                  !descriptor_i(i_pow) = (dot_product(Y_r(1, l)%mm(:, ia), Y_r(2, l)%mm(:, jb)) + dot_product(Y_i(1, l)%mm(:, ia), Y_i(2, l)%mm(:, jb))) * sym_facs(ik)
+                  descriptor_i(i_pow) = (ddot(2*l+1, Y_r(1, l)%mm(:, ia), 1, Y_r(2, l)%mm(:, jb), 1) + ddot(2*l+1, Y_i(1, l)%mm(:, ia), 1, Y_i(2, l)%mm(:, jb), 1)) * sym_facs(ik)
+                  if (do_two_l_plus_one) descriptor_i(i_pow)  = descriptor_i(i_pow) * tlpo
+                  i_pow = i_pow + this%l_max + 1
+               enddo
+            enddo
+         endif
+
+         !normalise the descriptor
          descriptor_i(d) = 0.0_dp
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
-
          if(.not. this%global .and. my_do_descriptor) then
             if(this%normalise) then
                descriptor_out%x(i_desc_i)%data = descriptor_i / norm_descriptor_i
             else
                descriptor_out%x(i_desc_i)%data = descriptor_i
             endif
-
             descriptor_out%x(i_desc_i)%data(d) = this%covariance_sigma0
          endif
 
-         if(my_do_grad_descriptor) then
-! soap_calc 33 takes 0.047 s
-	    allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
-	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
-	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
-            !do n_i = 1, n_neighbours(at,i,max_dist=this%cutoff)
-
+         !new gradients calcuation
+         if (my_do_grad_descriptor) then
             n_i = 0
             do n = 1, n_neighbours(at,i)
                j = neighbour(at, i, n, distance = r_ij)
                if( r_ij >= this%cutoff ) cycle
-
                n_i = n_i + 1
-
                if( species_map(at%Z(j)) == 0 ) cycle
-
-               i_pow = 0
                grad_descriptor_i = 0.0_dp
 
-               !V1 ***********************
-               !SPEED do ia = 1, this%n_species*this%n_max
-               !SPEED    a = rs_index(1,ia)
-               !SPEED    i_species = rs_index(2,ia)
-               !SPEED    do jb = 1, ia
-               !SPEED       b = rs_index(1,jb)
-               !SPEED       j_species = rs_index(2,jb)
-               !SPEED       do l = 0, this%l_max
-               !SPEED          i_pow = i_pow + 1
-               !SPEED          if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + real( matmul(conjg(grad_fourier_so3(l,a,n_i)%mm),fourier_so3(l,b,j_species)%m) )
-               !SPEED          if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow,:) = grad_descriptor_i(i_pow,:) + real( matmul(grad_fourier_so3(l,b,n_i)%mm,conjg(fourier_so3(l,a,i_species)%m)) )
-               !SPEED          !grad_descriptor_i(i_pow,:) = real( matmul(conjg(grad_fourier_so3(l,a,n_i)%mm),fourier_so3(l,b)%m) + matmul(grad_fourier_so3(l,b,n_i)%mm,conjg(fourier_so3(l,a)%m)) )
-               !SPEED          if( ia /= jb ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-               !SPEED       enddo !l
-               !SPEED    enddo !jb
-               !SPEED enddo !ia
+               if (this%coupling .and. (.not. original)) then
+                  do l = 0, this%l_max
+                     ! call dgemm(transA, transB, M, N, K, alpha, A, LDA, B, LDB, beta, C, LDC)
+                     tlpo = 1.0_dp
+                     if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                     call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dY_r(2, l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
+                     call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dY_i(2, l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
 
-               !V3 ****************** save
+                     ! TODO check if this is really necessary... think very likely it's not!
+                     if (.not. sym_desc) then
+                        Pl_g2 = matmul(transpose(dY_r(1, l, n_i)%mm), Y_r(2,l)%mm) + matmul(transpose(dY_i(1, l, n_i)%mm), Y_i(2,l)%mm)
+                        if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
+                     endif
 
-               !do each l_block separately to use matrix multiplication
-               do l=0, this%l_max
-                  !put density gradients for neighbour atom n_i into t_g_r matrix
-                  do a = 0, this%n_max
-                     do alpha=1, 3
-                        !t_g_r(3*(a-1)+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                        t_g_r(3*a+alpha, 1:2*l+1) = grad_fourier_so3_r(l,a,n_i)%mm(alpha,-l:l)
-                        t_g_i(3*a+alpha, 1:2*l+1) = grad_fourier_so3_i(l,a,n_i)%mm(alpha,-l:l)
+                     i_pow = l + 1
+                     do ia = 1, K1
+                        ub = K2
+                        if (sym_desc) ub = ia
+                        do jb = 1, ub
+                           ic = (jb-1) * 3
+                           ir = (ia-1) * 3
+                           if (sym_desc) then
+                              r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g1(jb, ir+1:ir+3)
+                           else
+                              r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
+                           endif
+
+                           if(ia /= jb .and. sym_desc ) r_tmp = r_tmp * SQRT_TWO
+                           grad_descriptor_i(i_pow, :) = r_tmp
+                           i_pow = i_pow + this%l_max+1
+                        enddo
                      enddo
-                  enddo
+                  enddo !l
 
-               !put expansion coefficients into temporary array
-               do ia = 1, (this%n_species+1)*(this%n_max+1)
-                  a = rs_index(1,ia)
-                  i_species = rs_index(2,ia)
+            !special case for diagonal coupling only - testing how fast I can make this
+            elseif(.not. this%coupling .and. this%R_mix .and. this%Z_mix) then
+               do l = 0, this%l_max
+                  tlpo = 1.0_dp
+                  if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                  i_pow = l + 1
 
-                  t_f_r(ia, 1:2*l+1) = fourier_so3_r(l,a,i_species)%m(-l:l)
-                  t_f_i(ia, 1:2*l+1) = fourier_so3_i(l,a,i_species)%m(-l:l)
-               enddo
+                  do ik = 1, this%K
+                     r_tmp(:) = 0.0_dp
+                     do ix = 1, 3
+                        ir = (ik-1)*3 + ix
+                        do na = 1, 2*l+1
+                           r_tmp(ix) = r_tmp(ix) + dY_r(2, l, n_i)%mm(na,ir)*Y_r(1, l)%mm(na, ik) + dY_i(2, l, n_i)%mm(na,ir)*Y_i(1, l)%mm(na, ik)
+                        enddo
+                     enddo
 
-               !matrix multiplication
-               call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                  t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
-               call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                  t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
-               !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
-               !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
+                     ! either multiply by factor of 2 for symmetric or do other way around for asym
+                     if (this%sym_mix) then
+                        r_tmp(:) = r_tmp(:) * 2.0_dp
+                     else
+                        do ix = 1, 3
+                           ir = (ik-1)*3 + ix
+                           do na = 1, 2*l+1
+                              r_tmp(ix) = r_tmp(ix) + dY_r(1, l, n_i)%mm(na,ir)*Y_r(2, l)%mm(na, ik) + dY_i(1, l, n_i)%mm(na,ir)*Y_i(2, l)%mm(na, ik)
+                           enddo
+                        enddo
+                     endif
 
-               !loop over all terms in power spec with same l, add to the gradient if the neighbour atom matches i_species or j_species
-               i_pow = l+1
-
-               do ia = 1, size(gs_index(1)%mm(:,0))
-                  a = gs_index(1)%mm(ia,2)
-                  i_species = gs_index(1)%mm(ia,1)
-                  ia_rs = i_species*(this%n_max+1)+a+1
-
-                  !set upper bound for the second loop
-                  ub = size(gs_index(2)%mm(:,0))
-                  if (sym_desc) then
-                     ub = ia
-                  endif
-                  do jb = 1, ub
-                     b = gs_index(2)%mm(jb, 2)
-                     j_species = gs_index(2)%mm(jb, 1)
-                     jb_rs = j_species*(this%n_max+1)+b+1
-
-                     if(this%diagonal_radial .and. a /= b) cycle
-
-                     if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*a+1:3*(a+1),jb_rs) + t_g_f_ii(3*a+1:3*(a+1),jb_rs)
-                     if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*b+1:3*(b+1),ia_rs) + t_g_f_ii(3*b+1:3*(b+1),ia_rs)
-
-                     if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
-                     if(ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-                     i_pow = i_pow + this%l_max+1
+                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo
+                     i_pow = i_pow + this%l_max + 1
                   enddo
                enddo
+
+            elseif(.not. this%coupling ) then
+               do l = 0, this%l_max
+                  tlpo = 1.0_dp
+                  if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                  i_pow = l + 1
+
+                  do ik = 1, SIZE(sym_facs)
+                     ia = coupling_inds(ik, 1)
+                     jb = coupling_inds(ik, 2)
+                     ir = (jb-1) * 3
+                     r_tmp = matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ia)) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ia) )
+                     ir = (ia-1)*3
+                     if (sym_desc) then
+                        r_tmp = r_tmp + matmul(transpose(dY_r(2, l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, jb) ) + matmul(transpose(dY_i(2, l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, jb) )
+                     else
+                        r_tmp = r_tmp + matmul(transpose(dY_r(1, l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, jb) ) + matmul(transpose(dY_i(1, l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, jb) )
+                     endif
+                     grad_descriptor_i(i_pow, :) = r_tmp * tlpo * sym_facs(ik)
+                     i_pow = i_pow + this%l_max + 1
+                  enddo
+               enddo
+
+            !original power spectrum gradients as special case to exploit sparsity of dX_r w.r.t the neighbour species
+            else
+               do l = 0, this%l_max
+                  tlpo = 1.0_dp
+                  if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                  !TODO try swapping order here
+                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, dX_r(l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
+                  call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, dX_i(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
+
+                  i_pow = l + 1
+                  do ia = 1, K1
+                     a = rs_index(1,ia)
+                     i_species = rs_index(2,ia)
+                     do jb = 1, ia
+                        b = rs_index(1,jb)
+                        j_species = rs_index(2,jb)
+                        if (this%diagonal_radial .and. a /= b) cycle
+                        if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) then
+                           ic = (a-1) * 3
+                           grad_descriptor_i(i_pow, :) =  grad_descriptor_i(i_pow, :) + Pl_g1(jb, ic+1:ic+3)
+                        endif
+                        if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) then
+                           ic = (b-1) * 3
+                           grad_descriptor_i(i_pow, :) =  grad_descriptor_i(i_pow, :) + Pl_g1(ia, ic+1:ic+3)
+                        endif
+
+                        if(ia /= jb) grad_descriptor_i(i_pow, :) = grad_descriptor_i(i_pow, :) * SQRT_TWO
+                        i_pow = i_pow + this%l_max+1
+                     enddo !jb
+                  enddo !ia
                enddo !l
-
+            endif
+               !normalise the gradients
                grad_descriptor_i(d, 1:3) = 0.0_dp
-
                if(.not. this%global) then
                   if( this%normalise ) then
-                     descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i / norm_descriptor_i
+                     grad_descriptor_i = grad_descriptor_i / norm_descriptor_i
+                     c_tmp = matmul(descriptor_i,grad_descriptor_i) / norm_descriptor_i**2
                      do k = 1, 3
-                        descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) - descriptor_i * dot_product(descriptor_i,grad_descriptor_i(:,k)) / norm_descriptor_i**3
+                        descriptor_out%x(i_desc_i)%grad_data(:,k,n_i) = grad_descriptor_i(:,k) - descriptor_i * c_tmp(k)
                      enddo
                   else
                      descriptor_out%x(i_desc_i)%grad_data(:,:,n_i) = grad_descriptor_i
                   endif
-
                   descriptor_out%x(i_desc_i)%grad_data(:,:,0) = descriptor_out%x(i_desc_i)%grad_data(:,:,0) - descriptor_out%x(i_desc_i)%grad_data(:,:,n_i)
                endif
-            enddo !ni
-	    deallocate(t_f_r, t_f_i)
-	    deallocate(t_g_r, t_g_i)
-	    deallocate(t_g_f_rr, t_g_f_ii)
 
-
+            enddo !n_i
          endif
 
       enddo ! i
 !$omp end parallel do
-
-      !SPEED if(allocated(fourier_so3)) then
-      !SPEED    do i_species = 1, this%n_species
-      !SPEED       do a = lbound(fourier_so3,2), ubound(fourier_so3,2)
-      !SPEED          do l = lbound(fourier_so3,1), ubound(fourier_so3,1)
-      !SPEED             deallocate(fourier_so3(l,a,i_species)%m)
-      !SPEED          enddo
-      !SPEED       enddo
-      !SPEED    enddo
-      !SPEED    deallocate(fourier_so3)
-      !SPEED endif
 
 
 !$omp parallel default(none) shared(this, max_n_neigh) private(i_species, a, l, n_i, ub)
@@ -8086,6 +8631,27 @@ module descriptors_module
             enddo
          enddo
          deallocate(fourier_so3_i)
+      endif
+
+      if (allocated(l_tmp)) deallocate(l_tmp)
+      if (allocated(X_r)) then
+         do l = 0, this%l_max
+            if (allocated(X_r(l)%mm)) deallocate(X_r(l)%mm)
+            if (allocated(X_i(l)%mm)) deallocate(X_i(l)%mm)
+         enddo
+         if (allocated(X_r)) deallocate(X_r)
+         if (allocated(X_i)) deallocate(X_i)
+      endif
+
+      if (allocated(Y_r)) then
+         do k = 1, 2
+            do l = 0, this%l_max
+               if (allocated(Y_r(k, l)%mm)) deallocate(Y_r(k, l)%mm)
+               if (allocated(Y_i(k, l)%mm)) deallocate(Y_i(k, l)%mm)
+            enddo
+         enddo
+         if (allocated(Y_r)) deallocate(Y_r)
+         if (allocated(Y_i)) deallocate(Y_i)
       endif
 
       if(allocated(SphericalY_ij)) then
@@ -8128,55 +8694,168 @@ module descriptors_module
         !SPEED deallocate(grad_fourier_so3)
         if (allocated(grad_fourier_so3_r)) deallocate(grad_fourier_so3_r)
         if (allocated(grad_fourier_so3_i)) deallocate(grad_fourier_so3_i)
-        if (allocated(QR_factor)) deallocate(QR_factor)
+
+
+      if (allocated(dX_r)) then
+         do l = 0, this%l_max
+            do n_i = 1, max_n_neigh
+               if (allocated(dX_r(l, n_i)%mm)) deallocate(dX_r(l, n_i)%mm)
+               if (allocated(dX_i(l, n_i)%mm)) deallocate(dX_i(l, n_i)%mm)
+            enddo
+         enddo
+         if (allocated(dX_r)) deallocate(dX_r)
+         if (allocated(dX_i)) deallocate(dX_i)
+      endif
+
+      if (allocated(dY_R)) then
+         do n_i = 1, max_n_neigh
+            do ik = 1, 2
+               do l = 0, this%l_max
+                  if (allocated(dY_i(ik, l, n_i)%mm)) deallocate(dY_i(ik, l, n_i)%mm)
+                  if (allocated(dY_r(ik, l, n_i)%mm)) deallocate(dY_r(ik, l, n_i)%mm)
+               enddo
+            enddo
+         enddo
+         if (allocated(dY_i)) deallocate(dY_i)
+         if (allocated(dY_r)) deallocate(dY_r)
+      endif
+
+      if (allocated(dT_r)) then
+         do k = 0, 2
+            do l = 0, this%l_max
+               deallocate(dT_r(k, l)%mm, dT_i(k, l)%mm)
+            enddo
+         enddo
+         deallocate(dT_r, dT_i)
+      endif
+
+      if (allocated(Pl_g1)) deallocate(Pl_g1)
+      if (allocated(Pl_g2)) deallocate(Pl_g2)
+      if (allocated(Pl)) deallocate(Pl)
+      if (allocated(QR_factor)) deallocate(QR_factor)
 !$omp end parallel
 
       if(this%global) then
-         allocate(global_fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), global_fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), &
-            descriptor_i(d) )
+         !allocate(global_fourier_so3_r(0:this%l_max,0:this%n_max,0:this%n_species), global_fourier_so3_i(0:this%l_max,0:this%n_max,0:this%n_species), &
+         !Have to reallocate X_r and Y_r
+         allocate(X_r(0:this%l_max), X_i(0:this%l_max))
+         do l = 0, this%l_max
+            allocate(X_r(l)%mm(2*l+1, this%n_species*this%n_max))
+            allocate(X_i(l)%mm(2*l+1, this%n_species*this%n_max))
+         enddo
+
+         allocate(Y_r(2, 0:this%l_max), Y_i(2, 0:this%l_max))
+         do l = 0, this%l_max
+            allocate(Y_r(1, l)%mm(2*l+1, K1))
+            allocate(Y_i(1, l)%mm(2*l+1, K1))
+            allocate(Y_r(2, l)%mm(2*l+1, K2))
+            allocate(Y_i(2, l)%mm(2*l+1, K2))
+         enddo
+
+         if (original) then
+            allocate(Pl_g1(K1, 3*this%n_max))
+         else
+            allocate(Pl_g1(K1, 3*K2), Pl_g2(3*K1, K2))
+         endif
+         allocate(Pl(K1, K2))
+
+         allocate(descriptor_i(d))
 
          i_coeff = 0
-         do ia = 1, (this%n_species+1)*(this%n_max+1)
+         do ia = 1, this%n_species*this%n_max
             a = rs_index(1,ia)
             i_species = rs_index(2,ia)
             do l = 0, this%l_max
-               allocate(global_fourier_so3_r(l,a,i_species)%m(-l:l))
-               allocate(global_fourier_so3_i(l,a,i_species)%m(-l:l))
-               global_fourier_so3_r(l,a,i_species)%m(:) = global_fourier_so3_r_array(i_coeff+1:i_coeff+2*l+1)
-               global_fourier_so3_i(l,a,i_species)%m(:) = global_fourier_so3_i_array(i_coeff+1:i_coeff+2*l+1)
+               !allocate(global_fourier_so3_r(l,a,i_species)%m(-l:l))
+               !allocate(global_fourier_so3_i(l,a,i_species)%m(-l:l))
+               !global_fourier_so3_r(l,a,i_species)%m(:) = global_fourier_so3_r_array(i_coeff+1:i_coeff+2*l+1)
+               !X_r(l)%mm(2*l+1, this%n_species*this%n_max)
+               X_r(l)%mm(:, ia) = global_fourier_so3_r_array(i_coeff+1:i_coeff+2*l+1)
+               X_i(l)%mm(:, ia) = global_fourier_so3_i_array(i_coeff+1:i_coeff+2*l+1)
+               !global_fourier_so3_i(l,a,i_species)%m(:) = global_fourier_so3_i_array(i_coeff+1:i_coeff+2*l+1)
                i_coeff = i_coeff + 2*l+1
             enddo
          enddo
 
-         i_pow = 0
-         do ia = 1, size(gs_index(1)%mm(:,0))
-            a = gs_index(1)%mm(ia,2)
-            i_species = gs_index(1)%mm(ia,1)
+         ! *********** exact duplication of code for main power spec
+         if (this%coupling) then
+            !standard full tensor product coupling between density channels.
+            do l = 0, this%l_max
+               tlpo = 1.0_dp
+               if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+               ! special case for regular power spectrum
+               if (original) then
+                  ! Pl = matmul(tranpose(X_r(l)%mm), X_r(l)%mm)
+                  call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, X_r(l)%mm, 2*l+1, 0.0_dp, Pl, K1)
+                  call dgemm('T', 'N', K1, K1, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, X_i(l)%mm, 2*l+1, 1.0_dp, Pl, K1)
+               ! everything else
+               else
+                  call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_r(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_r(1, l)%mm, 2*l+1)
+                  call dgemm('N', 'N', 2*l+1, K1, this%n_max*this%n_species, 1.0_dp, X_i(l)%mm, 2*l+1, W(1)%mm, this%n_max*this%n_species, 0.0_dp, Y_i(1, l)%mm, 2*l+1)
 
-            !set upper bound for the second loop
-            ub = size(gs_index(2)%mm(:,0))
-            if (sym_desc) then
-               ub = ia
-            endif
-            do jb = 1, ub
-               b = gs_index(2)%mm(jb, 2)
-               j_species = gs_index(2)%mm(jb, 1)
-
-               if(this%diagonal_radial .and. a /= b) cycle
-
-               do l = 0, this%l_max
-                  i_pow = i_pow + 1
-                  !SPEED descriptor_i(i_pow) = real( dot_product(fourier_so3(l,a,i_species)%m, fourier_so3(l,b,j_species)%m) )
-                  descriptor_i(i_pow) = dot_product(global_fourier_so3_r(l,a,i_species)%m, global_fourier_so3_r(l,b,j_species)%m) + dot_product(global_fourier_so3_i(l,a,i_species)%m, global_fourier_so3_i(l,b,j_species)%m)
-                  if(do_two_l_plus_one) descriptor_i(i_pow) = descriptor_i(i_pow) / sqrt(2.0_dp * l + 1.0_dp)
-                  if( ia /= jb .and. sym_desc) then
-                     descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                  !skipping this for regular power spec saves 1e-3
+                  if (sym_desc) then
+                     Y_r(2, l)%mm = Y_r(1, l)%mm
+                     Y_i(2, l)%mm = Y_i(1, l)%mm
+                  else
+                     Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                     Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
                   endif
-               enddo !l
-            enddo !jb
-         enddo !ia
+
+                  !Pl = matmul(transpose(Y_r(1, l)%mm), Y_r(2, l)%mm) + matmul(transpose(Y_i(1, l)%mm), Y_i(2, l)%mm)
+                  call dgemm('T', 'N', K1, K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, Y_r(2, l)%mm, 2*l+1, 0.0_dp, Pl, K1)
+                  call dgemm('T', 'N', K1, K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, Y_i(2, l)%mm, 2*l+1, 1.0_dp, Pl, K1)
+               endif
+
+               ! unpack l-slice
+               i_pow = l + 1
+               do ia = 1, K1
+                  ub = K2
+                  if (sym_desc) then
+                     ub = ia
+                  endif
+                  if (this%diagonal_radial) a = rs_index(1,ia)
+                  do jb = 1, ub
+                     if (this%diagonal_radial) b = rs_index(1,jb)
+                     if (this%diagonal_radial .and. a /= b) cycle
+                     descriptor_i(i_pow) = Pl(ia, jb)
+                     if( ia /= jb .and. sym_desc) descriptor_i(i_pow) = descriptor_i(i_pow) * SQRT_TWO
+                     i_pow = i_pow + this%l_max+1
+                  enddo
+               enddo
+
+            enddo
+            ! deallocate(Pl)
+         else
+            !elementwise coupling between density channels. For use with tensor-reduced compression.
+            do l = 0, this%l_max
+               tlpo = 1.0_dp
+               if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+               Y_r(1, l)%mm = matmul(X_r(l)%mm, W(1)%mm)
+               Y_i(1, l)%mm = matmul(X_i(l)%mm, W(1)%mm)
+               if (this%sym_mix) then
+                  Y_r(2, l)%mm = Y_r(1, l)%mm
+                  Y_i(2, l)%mm = Y_i(1, l)%mm
+               else
+                  Y_r(2, l)%mm = matmul(X_r(l)%mm, W(2)%mm)
+                  Y_i(2, l)%mm = matmul(X_i(l)%mm, W(2)%mm)
+               endif
+
+               i_pow = l + 1
+               do ik = 1, SIZE(sym_facs)
+                  ia = coupling_inds(ik, 1)
+                  jb = coupling_inds(ik, 2)
+                  descriptor_i(i_pow) = (dot_product(Y_r(1, l)%mm(:, ia), Y_r(2, l)%mm(:, jb)) + dot_product(Y_i(1, l)%mm(:, ia), Y_i(2, l)%mm(:, jb))) * sym_facs(ik)
+                  if (do_two_l_plus_one) descriptor_i(i_pow)  = descriptor_i(i_pow) * tlpo
+                  i_pow = i_pow + this%l_max + 1
+               enddo
+
+            enddo
+         endif
+         ! ********** end of code duplication. Avoid with function / subroutine ??
 
 
+         !normalise descriptor, using old block
          descriptor_i(d) = 0.0_dp
          norm_descriptor_i = sqrt(dot_product(descriptor_i,descriptor_i))
          if( norm_descriptor_i .feq. 0.0_dp ) norm_descriptor_i = tiny(1.0_dp)
@@ -8189,21 +8868,13 @@ module descriptors_module
             descriptor_out%x(1)%data(d) = this%covariance_sigma0
          endif
 
-         if(my_do_grad_descriptor) then
-       allocate(t_g_r((this%n_max+1)*3, 2*this%l_max+1), t_g_i((this%n_max+1)*3, 2*this%l_max+1))
-	    allocate(t_f_r((this%n_max+1)*(this%n_species+1), 2*this%l_max+1), t_f_i((this%n_max+1)*(this%n_species+1), 2*this%l_max+1))
-	    allocate(t_g_f_rr((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)), t_g_f_ii((this%n_max+1)*3, (this%n_max+1)*(this%n_species+1)))
-            allocate(grad_descriptor_i(d,3))
 
+         if (my_do_grad_descriptor) then
+            allocate(grad_descriptor_i(d,3))
             i_pair = 0
             do i = 1, at%N
-
-               if(i_desc(i) == 0) then
-                  cycle
-               else
-                  i_desc_i = i_desc(i)
-               endif
-
+               if (i_desc(i) == 0)   cycle
+               i_desc_i = i_desc(i)
                i_pair = i_pair + 1
                i_pair_i = i_pair ! accumulates \frac{ \partial p^{(j)} }{ \partial r_{ji\alpha} }
 
@@ -8227,60 +8898,97 @@ module descriptors_module
                   i_pow = 0
                   grad_descriptor_i = 0.0_dp
 
-                  !global gradient loop
-                  do l=0, this%l_max
-                     do a = 0, this%n_max
-                        do alpha=1, 3
-                           t_g_r(3*a+alpha, 1:2*l+1) = global_grad_fourier_so3_r_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
-                           t_g_i(3*a+alpha, 1:2*l+1) = global_grad_fourier_so3_i_array(i_desc_i)%x(l,a,n_i)%mm(alpha,-l:l)
-                        enddo
-                     enddo
+                  ! beginning of new routines
+                  if (this%coupling .and. (.not. original)) then
+                     do l = 0, this%l_max
+                        ! call dgemm(transA, transB, M, N, K, alpha, A, LDA, B, LDB, beta, C, LDC)
+                        tlpo = 1.0_dp
+                        if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                        call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_r(1, l)%mm, 2*l+1, dYG_r(i_desc_i, 2)%x(l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
+                        call dgemm('T','N', K1, 3 * K2, 2*l+1, tlpo, Y_i(1, l)%mm, 2*l+1, dYG_i(i_desc_i, 2)%x(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
 
-                     do ia = 1, (this%n_species+1)*(this%n_max+1)
-                        a = rs_index(1,ia)
-                        i_species = rs_index(2,ia)
-
-                        t_f_r(ia, 1:2*l+1) = global_fourier_so3_r(l,a,i_species)%m(-l:l)
-                        t_f_i(ia, 1:2*l+1) = global_fourier_so3_i(l,a,i_species)%m(-l:l)
-                     enddo
-
-                     call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                     t_g_r(1,1), size(t_g_r,1), t_f_r(1,1), size(t_f_r,1), 0.0_dp, t_g_f_rr(1,1), size(t_g_f_rr, 1))
-                     call dgemm('N','T',(this%n_max+1)*3, (this%n_max+1)*(this%n_species+1), 2*l+1, 1.0_dp, &
-                     t_g_i(1,1), size(t_g_i,1), t_f_i(1,1), size(t_f_i,1), 0.0_dp, t_g_f_ii(1,1), size(t_g_f_ii, 1))
-                     !t_g_f_rr = matmul(t_g_r,transpose(t_f_r))
-                     !t_g_f_ii = matmul(t_g_i,transpose(t_f_i))
-
-                     i_pow = l+1
-                     do ia = 1, size(gs_index(1)%mm(:,0))
-                        a = gs_index(1)%mm(ia,2)
-                        i_species = gs_index(1)%mm(ia,1)
-                        ia_rs = i_species*(this%n_max+1)+a+1
-
-                        !set upper bound for the second loop
-                        ub = size(gs_index(2)%mm(:,0))
-                        if (sym_desc) then
-                           ub = ia
+                        if (.not. sym_desc) then
+                           Pl_g2 = matmul(transpose(dYG_r(i_desc_i, 1)%x(l, n_i)%mm), Y_r(2,l)%mm) + matmul(transpose(dYG_i(i_desc_i, 1)%x(l, n_i)%mm), Y_i(2,l)%mm)
+                           if(do_two_l_plus_one) Pl_g2 = Pl_g2 / sqrt(2.0_dp * l + 1.0_dp)
                         endif
-                        do jb = 1, ub
-                           b = gs_index(2)%mm(jb, 2)
-                           j_species = gs_index(2)%mm(jb, 1)
-                           jb_rs = j_species*(this%n_max+1)+b+1
 
-                           if(this%diagonal_radial .and. a /= b) cycle
+                        i_pow = l + 1
+                        do ia = 1, K1
+                           ub = K2
+                           if (sym_desc) ub = ia
+                           do jb = 1, ub
+                              ic = (jb-1) * 3
+                              ir = (ia-1) * 3
+                              if (sym_desc) then
+                                 r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g1(jb, ir+1:ir+3)
+                              else
+                                 r_tmp = Pl_g1(ia, ic+1:ic+3) + Pl_g2(ir+1:ir+3, jb)
+                              endif
 
-                           if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*a+1:3*(a+1),jb_rs) + t_g_f_ii(3*a+1:3*(a+1),jb_rs)
-                           if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) + t_g_f_rr(3*b+1:3*(b+1),ia_rs) + t_g_f_ii(3*b+1:3*(b+1),ia_rs)
+                              if(ia /= jb .and. sym_desc ) r_tmp = r_tmp * SQRT_TWO
+                              grad_descriptor_i(i_pow, :) = r_tmp
+                              i_pow = i_pow + this%l_max+1
+                           enddo
+                        enddo
+                     enddo !l
 
-                           if(do_two_l_plus_one) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) / sqrt(2.0_dp * l + 1.0_dp)
-                           if(ia /= jb .and. sym_desc ) grad_descriptor_i(i_pow, 1:3) = grad_descriptor_i(i_pow, 1:3) * SQRT_TWO
-                           i_pow = i_pow + this%l_max+1
+
+                  ! element-wise coupling
+                  elseif(.not. this%coupling ) then
+
+                     do l = 0, this%l_max
+                        tlpo = 1.0_dp
+                        if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                        i_pow = l + 1
+                        !do ik = 1, K1
+                        do ik = 1, SIZE(sym_facs)
+                           ia = coupling_inds(ik, 1)
+                           jb = coupling_inds(ik, 2)
+                           ir = (jb-1) * 3
+                           r_tmp = matmul(transpose(dYG_r(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, ia)) + matmul(transpose(dYG_i(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, ia) )
+                           ir = (ia-1)*3
+                           if (sym_desc) then
+                              r_tmp = r_tmp + matmul(transpose(dYG_r(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(1, l)%mm(:, jb) ) + matmul(transpose(dYG_i(i_desc_i, 2)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(1, l)%mm(:, jb) )
+                           else
+                              r_tmp = r_tmp + matmul(transpose(dYG_r(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_r(2, l)%mm(:, jb) ) + matmul(transpose(dYG_i(i_desc_i, 1)%x(l, n_i)%mm(:, ir+1:ir+3)), Y_i(2, l)%mm(:, jb) )
+                           endif
+                           grad_descriptor_i(i_pow, :) = r_tmp * tlpo * sym_facs(ik)
+                           i_pow = i_pow + this%l_max + 1
                         enddo
                      enddo
 
-                  end do !l
+                  !original power spectrum gradients as special case to exploit sparsity of dX_r w.r.t the neighbour species
+                  else
+                     do l = 0, this%l_max
+                        tlpo = 1.0_dp
+                        if (do_two_l_plus_one) tlpo = 1.0_dp / sqrt(2.0_dp * l + 1.0_dp)
+                        !TODO try swapping order?
+                        call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_r(l)%mm, 2*l+1, dXG_r(i_desc_i)%x(l, n_i)%mm, 2*l+1, 0.0_dp, Pl_g1, K1)
+                        call dgemm('T','N', K1, 3 * this%n_max, 2*l+1, tlpo, X_i(l)%mm, 2*l+1, dXG_i(i_desc_i)%x(l, n_i)%mm, 2*l+1, 1.0_dp, Pl_g1, K1)
 
+                        i_pow = l + 1
+                        do ia = 1, K1
+                           a = rs_index(1,ia)
+                           i_species = rs_index(2,ia)
+                           do jb = 1, ia
+                              b = rs_index(1,jb)
+                              j_species = rs_index(2,jb)
+                              if (this%diagonal_radial .and. a /= b) cycle
+                              if(at%Z(j) == this%species_Z(i_species) .or. this%species_Z(i_species)==0) then
+                                 ic = (a-1) * 3
+                                 grad_descriptor_i(i_pow, :) =  grad_descriptor_i(i_pow, :) + Pl_g1(jb, ic+1:ic+3)
+                              endif
+                              if(at%Z(j) == this%species_Z(j_species) .or. this%species_Z(j_species)==0) then
+                                 ic = (b-1) * 3
+                                 grad_descriptor_i(i_pow, :) =  grad_descriptor_i(i_pow, :) + Pl_g1(ia, ic+1:ic+3)
+                              endif
 
+                              if(ia /= jb) grad_descriptor_i(i_pow, :) = grad_descriptor_i(i_pow, :) * SQRT_TWO
+                              i_pow = i_pow + this%l_max+1
+                           enddo !jb
+                        enddo !ia
+                     enddo !l
+                  endif !various gradient options
 
                   grad_descriptor_i(d, 1:3) = 0.0_dp
                   if( this%normalise ) then
@@ -8293,32 +9001,10 @@ module descriptors_module
                   endif
 
                   descriptor_out%x(1)%grad_data(:,:,i_pair_i) = descriptor_out%x(1)%grad_data(:,:,i_pair_i) - descriptor_out%x(1)%grad_data(:,:,i_pair)
-               enddo ! n/n_i
-
-            enddo ! i
-
+               enddo !n_i
+            enddo !i
             deallocate(grad_descriptor_i)
-            deallocate(t_f_r, t_f_i)
-            deallocate(t_g_r, t_g_i)
-            deallocate(t_g_f_rr, t_g_f_ii)
-         endif ! my_do_grad_descriptor
-
-         do i_species = lbound(global_fourier_so3_r,3), ubound(global_fourier_so3_r,3)
-            do a = lbound(global_fourier_so3_r,2), ubound(global_fourier_so3_r,2)
-               do l = lbound(global_fourier_so3_r,1), ubound(global_fourier_so3_r,1)
-                  deallocate(global_fourier_so3_r(l,a,i_species)%m)
-               enddo
-            enddo
-         enddo
-         deallocate(global_fourier_so3_r)
-         do i_species = lbound(global_fourier_so3_i,3), ubound(global_fourier_so3_i,3)
-            do a = lbound(global_fourier_so3_i,2), ubound(global_fourier_so3_i,2)
-               do l = lbound(global_fourier_so3_i,1), ubound(global_fourier_so3_i,1)
-                  deallocate(global_fourier_so3_i(l,a,i_species)%m)
-               enddo
-            enddo
-         enddo
-         deallocate(global_fourier_so3_i)
+         endif ! do gradients
 
          if(allocated(descriptor_i)) deallocate(descriptor_i)
       endif ! this%global
@@ -8341,6 +9027,7 @@ module descriptors_module
          enddo ! i_desc_i
          deallocate(global_grad_fourier_so3_r_array)
       endif
+
       if(allocated(global_grad_fourier_so3_i_array)) then
          do i_desc_i = lbound(global_grad_fourier_so3_i_array,1), ubound(global_grad_fourier_so3_i_array,1)
             if(allocated(global_grad_fourier_so3_i_array(i_desc_i)%x)) then
@@ -8357,16 +9044,75 @@ module descriptors_module
          deallocate(global_grad_fourier_so3_i_array)
       endif
 
-      if(allocated(rs_index)) deallocate(rs_index)
-      if(allocated(i_desc)) deallocate(i_desc)
-      if (allocated(gs_index)) deallocate(gs_index)
+      !deallocate gradients for standard global soap
+      if (allocated(dXG_r)) then
+         do i_desc_i = lbound(dXG_r,1), ubound(dXG_r,1)
+            if (allocated(dXG_r(i_desc_i)%x)) then
+               do n_i = lbound(dXG_r(i_desc_i)%x,2), ubound(dXG_r(i_desc_i)%x,2)
+                  do l = 0, this%l_max
+                     if (allocated(dXG_r(i_desc_i)%x(l, n_i)%mm)) deallocate(dXG_r(i_desc_i)%x(l, n_i)%mm)
+                     if (allocated(dXG_i(i_desc_i)%x(l, n_i)%mm)) deallocate(dXG_i(i_desc_i)%x(l, n_i)%mm)
+                  enddo !l
+               enddo !n_i
+               deallocate(dXG_r(i_desc_i)%x)
+               deallocate(dXG_i(i_desc_i)%x)
+            endif
+         enddo
+         deallocate(dXG_r, dXG_i)
+      endif
+
+      if (allocated(dYG_r)) then
+         do i_desc_i = lbound(dYG_r,1), ubound(dYG_r,1)
+            do k = 1, 2
+               if (allocated(dYG_r(i_desc_i, k)%x)) then
+                  do n_i = lbound(dYG_r(i_desc_i, k)%x,2), ubound(dYG_r(i_desc_i, k)%x,2)
+                     do l = 0, this%l_max
+                        if (allocated(dYG_r(i_desc_i, k)%x(l, n_i)%mm)) deallocate(dYG_r(i_desc_i, k)%x(l, n_i)%mm)
+                        if (allocated(dYG_i(i_desc_i, k)%x(l, n_i)%mm)) deallocate(dYG_i(i_desc_i, k)%x(l, n_i)%mm)
+                     enddo !l
+                  enddo !n_i
+                  deallocate(dYG_r(i_desc_i, k)%x)
+                  deallocate(dYG_i(i_desc_i, k)%x)
+               endif
+            enddo
+         enddo
+         deallocate(dYG_r, dYG_i)
+      endif
+
+
+      !deallocate density expansion coefficients
+      if (allocated(X_r)) then
+         do l = 0, this%l_max
+            if (allocated(X_r(l)%mm)) deallocate(X_r(l)%mm)
+            if (allocated(X_i(l)%mm)) deallocate(X_i(l)%mm)
+         enddo
+         if (allocated(X_r)) deallocate(X_r)
+         if (allocated(X_i)) deallocate(X_i)
+      endif
+
+      if (allocated(Y_r)) then
+         do k = 1, 2
+            do l = 0, this%l_max
+               if (allocated(Y_r(k, l)%mm)) deallocate(Y_r(k, l)%mm)
+               if (allocated(Y_i(k, l)%mm)) deallocate(Y_i(k, l)%mm)
+            enddo
+         enddo
+         if (allocated(Y_r)) deallocate(Y_r)
+         if (allocated(Y_i)) deallocate(Y_i)
+      endif
+
+      if (allocated(Pl_g1)) deallocate(Pl_g1)
+      if (allocated(Pl_g2)) deallocate(Pl_g2)
+      if (allocated(W)) deallocate(W)
+      if (allocated(Pl)) deallocate(Pl)
+      if (allocated(rs_index)) deallocate(rs_index)
+      if (allocated(i_desc)) deallocate(i_desc)
+      if (allocated(coupling_inds)) deallocate(coupling_inds)
+      if (allocated(sym_facs)) deallocate(sym_facs)
 
       call system_timer('soap_calc')
 
    endsubroutine soap_calc
-
-
-
 
 
    subroutine rdf_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
@@ -10183,9 +10929,11 @@ module descriptors_module
    function soap_dimensions(this,error) result(i)
       type(soap), intent(in) :: this
       integer, optional, intent(out) :: error
-      integer :: i, NS1, NS2
+      integer :: i, K1, K2
       logical :: sym_desc
-      type(int_2d), dimension(:), allocatable :: gs_index
+      type(real_2d), dimension(:), allocatable :: W
+      integer, dimension(:, :), allocatable :: coupling_inds
+      real, dimension(:), allocatable :: sym_facs
 
       INIT_ERROR(error)
 
@@ -10193,22 +10941,33 @@ module descriptors_module
          RAISE_ERROR("soap_dimensions: descriptor object not initialised", error)
       endif
 
-      if(this%diagonal_radial) then
-         i = (this%l_max+1) * this%n_max * this%n_species * (this%n_species+1) / 2 + 1
-      else
-         call form_gs_index(this,gs_index, error)
+      call form_W(this, W, sym_desc, error)
+      K1 = size(W(1)%mm(0,:))
+      K2 = size(W(2)%mm(0,:))
 
-         NS1 = size(gs_index(1)%mm(:,0))
-         NS2 = size(gs_index(2)%mm(:,0))
-
-         if ((this%nu_R == 1) .OR. (this%nu_S == 1)) then
-            i = NS1 * NS2 * (this%l_max + 1) +1
-         else
-            i = NS1 * (NS1+1) * (this%l_max +1) /2 +1
+      if (this%diagonal_radial) then
+         if (this%Z_mix .or. this%R_mix .or. this%nu_R /= 2 .or. this%nu_S /= 2 .or. (.not. this%coupling)) then
+            RAISE_ERROR("soap_dimensions: can't combine diagonal radial with any other compression strategies", error)
          endif
+         i = (this%l_max+1) * this%n_max * this%n_species * (this%n_species+1) / 2 + 1
+      elseif (this%coupling) then
+         if (sym_desc) then
+            i = (this%l_max+1) * (K1 * (K1+1)) /2 + 1
+         else
+            i = (this%l_max+1) * K1 * K2 + 1
+         endif
+      else
+         if (K1 /= K2) then
+            RAISE_ERROR("require K1=K2 to use elementwise coupling", error)
+         endif
+
+         call form_coupling_inds(this, K1, coupling_inds, sym_facs, error)
+         i = SIZE(sym_facs) * (this%l_max + 1) + 1
       endif
 
-      if (allocated(gs_index)) deallocate(gs_index)
+      if (allocated(W)) deallocate(W)
+      if (allocated(coupling_inds)) deallocate(coupling_inds)
+      if (allocated(sym_facs)) deallocate(sym_facs)
    endfunction soap_dimensions
 
 
