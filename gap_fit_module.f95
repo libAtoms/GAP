@@ -1347,13 +1347,6 @@ contains
           if(allocated(xloc)) deallocate(xloc)
        enddo
 
-       if( has_local_property ) then
-          if( n_descriptors /= this%at(n_con)%N ) then
-             RAISE_ERROR("fit_data_from_xyz: local_properties found in configuration, but number of descriptors do not match &
-             & the number of atoms. Check your descriptors.",error)
-          endif
-       endif
-
        if(allocated(force_loc)) deallocate(force_loc)
        if(allocated(local_property_loc)) deallocate(local_property_loc)
 
