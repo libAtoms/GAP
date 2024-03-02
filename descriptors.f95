@@ -469,7 +469,8 @@ module descriptors_module
       character(len=STRING_LENGTH) :: basis, scaling_mode, compress_file, compress_mode
 
       real(dp), dimension(:), allocatable :: atom_sigma_r, atom_sigma_r_scaling, &
-         atom_sigma_t, atom_sigma_t_scaling, amplitude_scaling, central_weight, compress_P_el
+         atom_sigma_t, atom_sigma_t_scaling, amplitude_scaling, central_weight, compress_P_el, &
+         bonding_hard, bonding_soft
       integer, dimension(:), allocatable :: species_Z, alpha_max, compress_P_i, compress_P_j
 
       logical :: initialised = .false., compress = .false.
@@ -3250,7 +3251,8 @@ module descriptors_module
       logical :: is_n_max_set, is_cutoff_set, is_cutoff_transition_width_set, &
                  is_atom_sigma_r_set, is_atom_sigma_t_set, is_atom_sigma_r_scaling_set, &
                  is_atom_sigma_t_scaling_set, is_central_weight_set, is_amplitude_scaling_set, &
-                 is_atom_sigma_set, set_sigma_t_to_r, is_atom_sigma_scaling_set, set_sigma_t_to_r_scaling
+                 is_atom_sigma_set, set_sigma_t_to_r, is_atom_sigma_scaling_set, set_sigma_t_to_r_scaling, &
+                 is_bonding_hard_set, is_bonding_soft_set
       character(len=STRING_LENGTH) :: var_set
 
       is_n_max_set = .false.
@@ -3266,6 +3268,8 @@ module descriptors_module
       is_atom_sigma_t_scaling_set = .false.
       is_central_weight_set = .false.
       is_amplitude_scaling_set = .false.
+      is_bonding_hard_set = .false.
+      is_bonding_soft_set = .false.
 
       INIT_ERROR(error)
 
@@ -3327,6 +3331,8 @@ module descriptors_module
       allocate(this%central_weight(this%n_species))
       allocate(this%alpha_max(this%n_species))
       allocate(this%species_Z(this%n_species))
+      allocate(this%bonding_hard(this%n_species))
+      allocate(this%bonding_soft(this%n_species))
 
 !     central_weight is special because regular SOAP and soap_turbo use the same keyword
       call initialise(params)
@@ -3477,7 +3483,42 @@ module descriptors_module
          call param_register(params, 'central_weight', '//MANDATORY//', this%central_weight, &
             help_string="Weight of central atom in environment")
       end if
-
+!     bonding_hard
+      if( index(args_str,"bonding_hard={") /= 0 )then
+         if( this%n_species == 1 )then
+            call param_register(params, 'bonding_hard', PARAM_MANDATORY, this%bonding_hard(1), &
+               help_string="Hard cutoff for connectivity graph")
+         else
+            call param_register(params, 'bonding_hard', '//MANDATORY//', this%bonding_hard, &
+               help_string="Hard cutoff for connectivity graph")
+         end if
+      else if( index(args_str,"bonding_hard=") /= 0 )then
+         is_bonding_hard_set = .true.
+         call param_register(params, 'bonding_hard', PARAM_MANDATORY, this%bonding_hard(1), &
+            help_string="Hard cutoff for connectivity graph")
+      else
+         is_bonding_hard_set = .true.
+         call param_register(params, 'bonding_hard', "-1.0", this%bonding_hard(1), &
+            help_string="Hard cutoff for connectivity graph")
+      end if
+!     bonding_soft
+      if( index(args_str,"bonding_soft={") /= 0 )then
+         if( this%n_species == 1 )then
+            call param_register(params, 'bonding_soft', PARAM_MANDATORY, this%bonding_soft(1), &
+               help_string="Soft cutoff for connectivity graph")
+         else
+            call param_register(params, 'bonding_soft', '//MANDATORY//', this%bonding_soft, &
+               help_string="Soft cutoff for connectivity graph")
+         end if
+      else if( index(args_str,"bonding_soft=") /= 0 )then
+         is_bonding_soft_set = .true.
+         call param_register(params, 'bonding_soft', PARAM_MANDATORY, this%bonding_soft(1), &
+            help_string="Soft cutoff for connectivity graph")
+      else
+         is_bonding_soft_set = .true.
+         call param_register(params, 'bonding_soft', "-1.0", this%bonding_soft(1), &
+            help_string="Soft cutoff for connectivity graph")
+      end if
 
       if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='soap_turbo_initialise args_str')) then
          RAISE_ERROR("soap_turbo_initialise failed to parse args_str='"//trim(args_str)//"'", error)
@@ -3507,6 +3548,12 @@ module descriptors_module
       end if
       if( set_sigma_t_to_r_scaling )then
          this%atom_sigma_t_scaling = this%atom_sigma_r_scaling
+      end if
+      if( is_bonding_hard_set )then
+         this%bonding_hard = this%bonding_hard(1)
+      end if
+      if( is_bonding_soft_set )then
+         this%bonding_soft = this%bonding_soft(1)
       end if
 
 
@@ -3587,6 +3634,8 @@ module descriptors_module
       if(allocated(this%amplitude_scaling)) deallocate(this%amplitude_scaling)
       if(allocated(this%central_weight)) deallocate(this%central_weight)
       if(allocated(this%species_Z)) deallocate(this%species_Z)
+      if(allocated(this%bonding_hard)) deallocate(this%bonding_hard)
+      if(allocated(this%bonding_soft)) deallocate(this%bonding_soft)
 
       this%initialised = .false.
 
@@ -10467,7 +10516,7 @@ module descriptors_module
             global_scaling, this%atom_sigma_r, this%atom_sigma_r_scaling, &
             this%atom_sigma_t, this%atom_sigma_t_scaling, this%amplitude_scaling, this%radial_enhancement, this%central_weight, &
             this%basis, this%scaling_mode, .false., my_do_grad_descriptor, this%compress, this%compress_P_nonzero, this%compress_P_i, &
-            this%compress_P_j, this%compress_P_el, descriptor_i, grad_descriptor_i)
+            this%compress_P_j, this%compress_P_el, this%bonding_hard, this%bonding_soft, descriptor_i, grad_descriptor_i)
 
          if(my_do_descriptor) then
             descriptor_out%x(i_desc)%data = descriptor_i(:,1)
