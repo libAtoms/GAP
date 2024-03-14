@@ -729,7 +729,7 @@
       type(com_dimer), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_one_string, signature_two_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_one_fields, signature_two_fields
+      character(len=9), dimension(99) :: signature_one_fields, signature_two_fields
       integer, optional, intent(out) :: error
       integer :: i, n_atoms_one, n_atoms_two
 
@@ -803,7 +803,7 @@
       type(general_dimer), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_one_string, signature_two_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_one_fields, signature_two_fields
+      character(len=9), dimension(99) :: signature_one_fields, signature_two_fields
       integer, optional, intent(out) :: error
       integer :: i,j, n_atoms_one, n_atoms_two, dimer_size, start, finish, d
       logical, dimension(:,:), allocatable :: intermolecular
@@ -953,7 +953,7 @@
       type(general_trimer), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_one_string, signature_two_string, signature_three_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_one_fields, signature_two_fields, signature_three_fields
+      character(len=9), dimension(99) :: signature_one_fields, signature_two_fields, signature_three_fields
       integer, optional, intent(out) :: error
       integer :: i,j, n_atoms_one, n_atoms_two, n_atoms_three, trimer_size, start, finish,d
       logical, dimension(:,:), allocatable :: intermolecular
