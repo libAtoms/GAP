@@ -925,7 +925,7 @@ module descriptors_module
             call finalise(this%descriptor_alex,error)
          case(DT_DISTANCE_Nb)
             call finalise(this%descriptor_distance_Nb,error)
-#ifdef DESCRIPTOR_NONCOMMERCIAL
+#ifdef DESCRIPTORS_NONCOMMERCIAL
          case(DT_COM_DIMER)
             call finalise(this%descriptor_com_dimer,error)
          case(DT_MOLECULE_LO_D)
@@ -3690,7 +3690,7 @@ module descriptors_module
                enddo
             enddo
          enddo
-      case(DT_GENERAL_MONOMER,DT_GENERAL_DIMER,DT_WATER_MONOMER,DT_WATER_DIMER,DT_A2_DIMER,DT_AB_DIMER,DT_TRIHIS,DT_BOND_REAL_SPACE,DT_ATOM_REAL_SPACE,DT_AN_MONOMER)
+      case(DT_GENERAL_MONOMER,DT_GENERAL_DIMER,DT_GENERAL_TRIMER,DT_WATER_MONOMER,DT_WATER_DIMER,DT_A2_DIMER,DT_AB_DIMER,DT_TRIHIS,DT_BOND_REAL_SPACE,DT_ATOM_REAL_SPACE,DT_AN_MONOMER)
          allocate(descriptor_str(1))
          descriptor_str(1) = trim(this)
       case(DT_DISTANCE_NB)

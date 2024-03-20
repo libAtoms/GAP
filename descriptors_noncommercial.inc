@@ -673,7 +673,7 @@
       type(general_monomer), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_fields
+      character(len=STRING_LENGTH_SHORT), dimension(99) :: signature_fields
       integer, optional, intent(out) :: error
       integer :: i,n_atoms,j
 
@@ -729,7 +729,7 @@
       type(com_dimer), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_one_string, signature_two_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_one_fields, signature_two_fields
+      character(len=STRING_LENGTH_SHORT), dimension(99) :: signature_one_fields, signature_two_fields
       integer, optional, intent(out) :: error
       integer :: i, n_atoms_one, n_atoms_two
 
@@ -803,7 +803,7 @@
       type(general_dimer), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_one_string, signature_two_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_one_fields, signature_two_fields
+      character(len=STRING_LENGTH_SHORT), dimension(99) :: signature_one_fields, signature_two_fields
       integer, optional, intent(out) :: error
       integer :: i,j, n_atoms_one, n_atoms_two, dimer_size, start, finish, d
       logical, dimension(:,:), allocatable :: intermolecular
@@ -953,7 +953,7 @@
       type(general_trimer), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_one_string, signature_two_string, signature_three_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_one_fields, signature_two_fields, signature_three_fields
+      character(len=STRING_LENGTH_SHORT), dimension(99) :: signature_one_fields, signature_two_fields, signature_three_fields
       integer, optional, intent(out) :: error
       integer :: i,j, n_atoms_one, n_atoms_two, n_atoms_three, trimer_size, start, finish,d
       logical, dimension(:,:), allocatable :: intermolecular
@@ -1126,7 +1126,8 @@
       type(molecule_lo_d), intent(inout) :: this
       character(len=*), intent(in) :: args_str
       character(len=STRING_LENGTH) :: signature_string, atoms_template_string, symmetry_string, symmetry_property_name, append_file, append_string
-      character(len=STRING_LENGTH), dimension(99) :: signature_fields, symmetry_rows, row_fields, append_rows,template_rows
+      character(len=STRING_LENGTH), dimension(99) ::  append_rows,template_rows !symmetry_rows
+      character(len=STRING_LENGTH_SHORT), dimension(99) :: signature_fields, row_fields
       integer, optional, intent(out) :: error
       integer :: i,n_atoms,j,n_symm_rows, current_depth, start, finish, i_component, atom_j, N_atom_pairs, atom_k,n_append_rows, old_size, n_perms,n_template_rows
       integer, dimension(:,:), allocatable :: equivalents_input, bonds_to_append, tmp_permutations
