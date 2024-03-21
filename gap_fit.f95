@@ -46,38 +46,48 @@ program gap_fit_program
 
   call system_initialise(verbosity=PRINT_NORMAL, enable_timing=.false.)
   call gap_fit_init_mpi_scalapack(main_gap_fit)
-
+    print*, "  gf 1"
   call gap_fit_parse_command_line(main_gap_fit)
   call gap_fit_parse_gap_str(main_gap_fit)
+  print*, "  gf 2"
 
   call gap_fit_read_core_param_file(main_gap_fit)
+  print*, "  gf 3"
 
   call add_template_string(main_gap_fit) ! if descriptor requires a template xyz file and this is provided, write to a string and add to descriptor_str
+  print*, "  gf 4"
 
   call read_descriptors(main_gap_fit) ! initialises descriptors from the descriptor_str and sets max_cutoff according to that.
   call read_fit_xyz(main_gap_fit)   ! reads in xyz into an array of atoms objects. sets cutoff and does calc_connect on each frame
   call print('XYZ file read')
+  print*, "  gf 5"
 
   call gap_fit_init_task_manager(main_gap_fit)
 
   call get_species_xyz(main_gap_fit) ! counts the number of species present in the xyz file.
   call add_multispecies_gaps(main_gap_fit)
+  print*, "  gf 6"
 
   call get_n_sparseX_for_files(main_gap_fit)
   call parse_config_type_sigma(main_gap_fit)
   call parse_config_type_n_sparseX(main_gap_fit)
+  print*, "  gf 7"
 
   if(any(main_gap_fit%add_species)) then ! descriptor_str might have changed. reinitialises descriptors from the descriptor_str and sets max_cutoff according to that.
-     call read_descriptors(main_gap_fit)
+    print*, "  gf 7.5"
+    call read_descriptors(main_gap_fit)
+    print*, "  gf 7.6"
   endif
   call print('Multispecies support added where requested')
 
+  print*, "  gf 8"
   call fit_n_from_xyz(main_gap_fit) ! counts number of energies, forces, virials. computes number of descriptors and gradients.
   call gap_fit_distribute_tasks(main_gap_fit)
   if (main_gap_fit%task_manager%n_workers > 1) call fit_n_from_xyz(main_gap_fit)
   call gap_fit_set_mpi_blocksizes(main_gap_fit)
   call gap_fit_estimate_memory(main_gap_fit)
 
+  print*, "  gf 9"
   if (main_gap_fit%dryrun) then
      call print('Exit before major allocations because dryrun is true.')
      call system_finalise()
@@ -85,6 +95,7 @@ program gap_fit_program
   end if
 
   call set_baselines(main_gap_fit) ! sets e0 etc.
+  print*, "  gf 10"
 
   call fit_data_from_xyz(main_gap_fit) ! converts atomic neighbourhoods (bond neighbourhoods etc.) do descriptors, and feeds those to the GP
   call print('Cartesian coordinates transformed to descriptors')
@@ -98,6 +109,7 @@ program gap_fit_program
      stop
   end if
 
+  print*, "  gf 11"
   call enable_timing()
   call system_timer('GP sparsify')
 
@@ -105,9 +117,11 @@ program gap_fit_program
   call gap_fit_print_linear_system_dump_file(main_gap_fit)
   call gpSparse_fit(main_gap_fit%gp_sp, main_gap_fit%my_gp, main_gap_fit%task_manager, main_gap_fit%condition_number_norm)
 
+  print*, "  gf 12"
   if (gap_fit_is_root(main_gap_fit)) call gap_fit_print_xml(main_gap_fit, main_gap_fit%gp_file, main_gap_fit%sparseX_separate_file)
 
   call system_timer('GP sparsify')
   call system_finalise()
+  print*, "  gf 13"
 
 end program gap_fit_program

@@ -100,6 +100,18 @@
    endtype general_trimer
 
 
+   type water_trimer
+      type(permutation_data_type) :: permutation_data
+      integer, dimension(3) :: signature = [8,1,1]
+      real(dp) :: cutoff, cutoff_transition_width, monomer_cutoff
+      logical :: atom_ordercheck = .false., internal_swaps_only =.true., use_smooth_cutoff
+      logical :: initialised = .false., strict
+      real(dp) :: power,dist_shift
+      integer, dimension(36,2):: component_atoms
+      logical, dimension(36) :: is_intermolecular, cutoff_contributor
+   endtype water_trimer
+
+
    type molecule_lo_d
       type(permutation_data_type) :: permutation_data
       type(Atoms) :: template_atoms
