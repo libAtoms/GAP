@@ -3178,40 +3178,50 @@
    
    
    subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error) !//////////////////////////////////////////////////////////////////////////////////
-
      type(water_trimer), intent(in) :: this
      type(atoms), intent(in) :: at
      type(descriptor_data), intent(out) :: descriptor_out
      logical, intent(in), optional :: do_descriptor, do_grad_descriptor!, use_smooth_cutoff
      character(len=*), intent(in), optional :: args_str
      integer, optional, intent(out) :: error
+     integer, parameter :: monomer_one_size = 3, monomer_two_size = 3, monomer_three_size = 3, dimer_size = 6, trimer_size = 9, d = 36 
      real(dp) :: r_one_two
-
      type(Dictionary) :: params
      character(STRING_LENGTH) :: atom_mask_name
      logical :: has_atom_mask_name
      logical, dimension(:), pointer :: atom_mask_pointer
-
      logical :: my_do_descriptor, my_do_grad_descriptor, one_two_identical, one_three_identical, two_three_identical, &
-          use_smooth_cutoff, done_this_monomer, done_this_dimer
-
-     integer :: d, n_descriptors, n_cross, dimer_size, trimer_size, &
-        i, j, k, n, m, i_atomic, j_atomic, start, finish, i_desc,this_diff,triplet_pos, &
-        n_index
-     integer :: monomer_one_size, monomer_two_size, monomer_three_size, n_monomer_one, n_monomer_two, n_monomer_three, n_products, contributor_loc
+            use_smooth_cutoff, done_this_monomer, done_this_dimer
+     integer :: n_descriptors, n_cross, &
+            i, j, k, n, m, i_atomic, j_atomic, start, finish, i_desc,this_diff,triplet_pos, n_index
+     integer :: n_monomer_one, n_monomer_two, n_monomer_three, n_products, contributor_loc
      integer, dimension(1) :: unit_array
      real(dp) :: temp_dist
      real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
      real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
      real(dp) :: dist_one_two, dist_one_three, dist_two_three, cut12, cut13, cut23, dcut12, dcut13, dcut23
-     real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
-     real(dp), dimension(:,:), allocatable :: interatomic_distances,diffs_one,diffs_two,diffs_three,triplets_diffs
-     real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
+    !  real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
+     real(dp), dimension(:,:), allocatable :: triplets_diffs !interatomic_distances,diffs_one,diffs_two,diffs_three,
+    !  real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
      integer, dimension(3) :: temp_shift, shift_one_two,shift_one_three
-     integer, dimension(:), allocatable :: atomic_index_dimer, atomic_index_trimer, atomic_index_one, atomic_index_two, atomic_index_three,triplets_diffs_map
+     integer, dimension(:), allocatable :: triplets_diffs_map !atomic_index_dimer, atomic_index_trimer, atomic_index_one, atomic_index_two, atomic_index_three, 
      integer, dimension(:,:), allocatable :: monomer_one_index, monomer_triplets , monomer_two_index, monomer_three_index
-     logical, dimension(:), allocatable :: associated_to_monomer
+    !  logical, dimension(:), allocatable :: associated_to_monomer
      logical :: double_count
+     real(dp) :: dist_vec(d)
+     real(dp) :: primitive_cutoffs(d)
+     real(dp) :: primitive_cutoff_grads(d)
+     integer :: atomic_index_one(monomer_one_size)
+     integer :: atomic_index_two(monomer_two_size)
+     integer :: atomic_index_three(monomer_three_size)
+     integer :: atomic_index_dimer(dimer_size)
+     integer :: atomic_index_trimer(trimer_size)
+     real(dp) :: interatomic_vectors(trimer_size,trimer_size,3)
+     real(dp) :: interatomic_distances(trimer_size,trimer_size)
+     logical :: associated_to_monomer(at%N)
+     real(dp) :: diffs_one(3,monomer_one_size)
+     real(dp) :: diffs_two(3,monomer_two_size)
+     real(dp) :: diffs_three(3,monomer_three_size)
 
      INIT_ERROR(error)
      
@@ -3227,11 +3237,6 @@
      my_do_descriptor = optional_default(.false., do_descriptor)
      my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
 
-     monomer_one_size = 3
-     monomer_two_size = 3
-     monomer_three_size = 3
-     dimer_size = 6
-     trimer_size = 9
 
      if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
 
@@ -3261,25 +3266,9 @@
 
      endif
 
-     d = 36 !water_trimer_dimensions(this,error)
+     !water_trimer_dimensions(this,error)
     !  print*, "water_trimer_dimensions(this,error) =",d
 
-     allocate(dist_vec(d))
-     allocate(primitive_cutoffs(d))
-     allocate(primitive_cutoff_grads(d))
-
-     allocate(atomic_index_one(monomer_one_size))
-     allocate(atomic_index_two(monomer_two_size))
-     allocate(atomic_index_three(monomer_three_size))
-     allocate(atomic_index_dimer(dimer_size))
-     allocate(atomic_index_trimer(trimer_size))
-
-     allocate(interatomic_vectors(trimer_size,trimer_size,3))
-     allocate(interatomic_distances(trimer_size,trimer_size))
-     allocate(associated_to_monomer(at%N))
-     allocate(diffs_one(3,monomer_one_size))
-     allocate(diffs_two(3,monomer_two_size))
-     allocate(diffs_three(3,monomer_three_size))
 
      interatomic_vectors = 0.0_dp
      interatomic_distances = 0.0_dp
@@ -3631,22 +3620,22 @@
      if (allocated(triplets_diffs)) deallocate(triplets_diffs)
      if (allocated(triplets_diffs_map)) deallocate(triplets_diffs_map)
 
-     deallocate(dist_vec)
-     deallocate(primitive_cutoffs)
-     deallocate(primitive_cutoff_grads)
+    !  deallocate(dist_vec)
+    !  deallocate(primitive_cutoffs)
+    !  deallocate(primitive_cutoff_grads)
 
-     deallocate(atomic_index_dimer)
-     deallocate(atomic_index_trimer)
-     deallocate(atomic_index_one)
-     deallocate(atomic_index_two)
-     deallocate(atomic_index_three)
-     deallocate(diffs_one)
-     deallocate(diffs_two)
-     deallocate(diffs_three)
+    !  deallocate(atomic_index_dimer)
+    !  deallocate(atomic_index_trimer)
+    !  deallocate(atomic_index_one)
+    !  deallocate(atomic_index_two)
+    !  deallocate(atomic_index_three)
+    !  deallocate(diffs_one)
+    !  deallocate(diffs_two)
+    !  deallocate(diffs_three)
 
-     deallocate(interatomic_vectors)
-     deallocate(interatomic_distances)
-     deallocate(associated_to_monomer)
+    !  deallocate(interatomic_vectors)
+    !  deallocate(interatomic_distances)
+    !  deallocate(associated_to_monomer)
 
 
      call system_timer('water_trimer_calc')
