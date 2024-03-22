@@ -680,7 +680,7 @@ module descriptors_module
          is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, is_soap, &
          is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_water_trimer, is_rdf, is_as_distance_2b, &
          is_molecule_lo_d, is_alex, is_com_dimer, is_distance_Nb, is_soap_express, is_soap_turbo
-
+      integer n_true
       INIT_ERROR(error)
 
       call initialise(params)
@@ -721,12 +721,13 @@ module descriptors_module
          RAISE_ERROR("descriptor_initialise failed to parse args_str='"//trim(args_str)//"'", error)
       endif
       call finalise(params)
-
-      if (count( (/is_bispectrum_so4, is_bispectrum_so3, is_behler, is_distance_2b, is_coordination, is_angle_3b, is_co_angle_3b, is_co_distance_2b, &
+      
+      n_true = count( (/is_bispectrum_so4, is_bispectrum_so3, is_behler, is_distance_2b, is_coordination, is_angle_3b, is_co_angle_3b, is_co_distance_2b, &
       is_cosnx, is_trihis, is_water_monomer, is_water_dimer, is_A2_dimer, is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, &
       is_soap, is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_water_trimer, is_rdf, is_as_distance_2b, is_molecule_lo_d, is_alex, is_com_dimer, &
-      is_distance_Nb, is_soap_express, is_soap_turbo /) ) /= 1) then
-         RAISE_ERROR("descriptor_initialise found too few or too many IP Model types args_str='"//trim(args_str)//"'", error)
+      is_distance_Nb, is_soap_express, is_soap_turbo /) ) 
+      if (n_true/= 1) then
+         RAISE_ERROR("descriptor_initialise found "//n_true//" IP Model types args_str='"//trim(args_str)//"'", error)
       endif
 
       get_descriptor_type = DT_NONE

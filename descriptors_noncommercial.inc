@@ -3187,11 +3187,8 @@
      integer, parameter :: monomer_one_size = 3, monomer_two_size = 3, monomer_three_size = 3, dimer_size = 6, trimer_size = 9, d = 36 
      real(dp) :: r_one_two
      type(Dictionary) :: params
-     character(STRING_LENGTH) :: atom_mask_name
-     logical :: has_atom_mask_name
-     logical, dimension(:), pointer :: atom_mask_pointer
      logical :: my_do_descriptor, my_do_grad_descriptor, one_two_identical, one_three_identical, two_three_identical, &
-            use_smooth_cutoff, done_this_monomer, done_this_dimer
+            use_smooth_cutoff, done_this_dimer !done_this_monomer, 
      integer :: n_descriptors, n_cross, &
             i, j, k, n, m, i_atomic, j_atomic, start, finish, i_desc,this_diff,triplet_pos, n_index
      integer :: n_monomer_one, n_monomer_two, n_monomer_three, n_products, contributor_loc
@@ -3222,7 +3219,7 @@
      real(dp) :: diffs_one(3,monomer_one_size)
      real(dp) :: diffs_two(3,monomer_two_size)
      real(dp) :: diffs_three(3,monomer_three_size)
-
+     integer n_mon_trip
      INIT_ERROR(error)
      
     !  print*, "Entered water_trimer_calc"
@@ -3242,37 +3239,13 @@
 
      call finalise(descriptor_out)
 
-     atom_mask_pointer => null()
-     if(present(args_str)) then
-        call initialise(params)
-        
-        call param_register(params, 'atom_mask_name', 'NONE', atom_mask_name, has_value_target=has_atom_mask_name, &
-        help_string="Name of a logical property in the atoms object. For atoms where this property is true descriptors are " // &
-        "calculated.")
-
-        if (.not. param_read_line(params,args_str,ignore_unknown=.true.,task='water_trimer_calc args_str')) then
-           RAISE_ERROR("water_trimer_calc failed to parse args_str='"//trim(args_str)//"'", error)
-        endif
-        
-        call finalise(params)
-
-        if( has_atom_mask_name ) then
-           if (.not. assign_pointer(at, trim(atom_mask_name), atom_mask_pointer)) then
-              RAISE_ERROR("water_trimer_calc did not find "//trim(atom_mask_name)//" property in the atoms object.", error)
-           endif
-        else
-           atom_mask_pointer => null()
-        endif
-
-     endif
-
      !water_trimer_dimensions(this,error)
     !  print*, "water_trimer_dimensions(this,error) =",d
 
 
-     interatomic_vectors = 0.0_dp
-     interatomic_distances = 0.0_dp
-     associated_to_monomer=.false. ! can't be false atom_ordercheck=F
+     interatomic_vectors = 0
+     interatomic_distances = 0
+     associated_to_monomer=.false. 
 
      call find_general_monomer(at,monomer_one_index,&
           this%signature,associated_to_monomer,&
@@ -3291,13 +3264,22 @@
      n_monomer_one = size(monomer_one_index,2) !, monomer_two_index, monomer_three_index
      n_monomer_two = size(monomer_two_index,2)
      n_monomer_three = size(monomer_three_index,2)
-     print*, "  wt calc: found:", n_monomer_one, n_monomer_two, n_monomer_three
 
     call system_timer('water_trimer_calc: find_monomer_triplets')
     call find_monomer_triplets(at,monomer_triplets,triplets_diffs,triplets_diffs_map,&
             monomer_one_index,monomer_two_index,monomer_three_index,&
             ! this%one_two_identical,this%one_three_identical,this%two_three_identical,&
             .true.,.true.,.true.,this%cutoff,error)
+    
+     n_descriptors = size(triplets_diffs_map)
+     n_mon_trip = size(monomer_triplets,2)
+     
+     if (n_descriptors /= n_mon_trip) then 
+        RAISE_ERROR("water_triplets_calc: #diffs="//n_descriptors//" and #tiplets="//n_mon_trip//", make sure box is orthogonal and > 2*cutoff ",error)
+     endif
+     
+     print*, "  wt calc: found #mono="//n_monomer_one//" #trip="//n_mon_trip
+     
      call system_timer('water_trimer_calc: find_monomer_triplets')
      call print("monomer_triplets("//size(monomer_triplets,1)//", "//size(monomer_triplets,2)//")", PRINT_NERD)
      call print("triplets_diffs("//size(triplets_diffs,1)//", "//size(triplets_diffs,2)//")", PRINT_NERD)
@@ -3306,7 +3288,6 @@
      !call print("monomer_triplets",PRINT_NERD)
      !call print(monomer_triplets,PRINT_NERD)
 
-     n_descriptors = size(triplets_diffs_map)
      n_index = 9 !size(this%signature_one) + size(this%signature_two) + size(this%signature_three)
 
      call print("ready to construct "//n_descriptors //" descriptors",PRINT_NERD)
@@ -3335,26 +3316,19 @@
         endif
      enddo
 
-      has_descriptors: if (n_descriptors > 0) then ! only loop over monomers if we actually found any trimers
-         i_desc = 0
-         loop_monomer_one: do i = 1, n_monomer_one
-            if (.not. any(monomer_triplets(1,:) .eq. i)) cycle
-            done_this_monomer = .false.
+    !   has_descriptors: if (n_descriptors > 0) then ! only loop over monomers if we actually found any trimers
+        
+    the_loop : do i_desc = 1, n_descriptors
+            i = monomer_triplets(1,i_desc)
+            j = monomer_triplets(2,i_desc)
+            k = monomer_triplets(3,i_desc)
+        !  loop_monomer_one: do i = 1, n_monomer_one
+            ! if (.not. any(monomer_triplets(1,:) .eq. i)) cycle
+            ! done_this_monomer = .false.
             !get indices of monomer and calc internal distances
             atomic_index_one = monomer_one_index(:,i) !store the indices of atoms in this monomer
-
-            if(associated(atom_mask_pointer)) then
-               if(.not. any(atom_mask_pointer(atomic_index_one))) then
-                  cycle
-               else
-                  if(.not. all(atom_mask_pointer(atomic_index_one))) then
-                     RAISE_ERROR("water_trimer_calc: atom mask has to encompass either all or none of the atoms of monomer one",error)
-                  endif
-               endif
-            endif
-
             mean_pos_one = calc_mean_pos(at,atomic_index_one)
-
+            
             !calc atomic positions and shifts relative to mean pos for monomer one, and also distances wrt atom 1
             do i_atomic=1,monomer_one_size
                diffs_one(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_one(i_atomic)),mean_pos_one)
@@ -3376,12 +3350,12 @@
             end do
 
             ! Loop through monomers paired with this one to make dimers
-            loop_monomer_pairs: do
-               unit_array = maxloc(monomer_triplets(2,:), monomer_triplets(1,:) .eq. i) ! find a monomer paired with i
-               if (all(unit_array .eq. 0)) exit
+            ! loop_monomer_pairs: do
+            !    unit_array = maxloc(monomer_triplets(2,:), monomer_triplets(1,:) .eq. i) ! find a monomer paired with i
+            !    if (all(unit_array .eq. 0)) exit
 
                !get indices of monomer two
-               j = monomer_triplets(2,unit_array(1))
+            !    j = monomer_triplets(2,unit_array(1))
                atomic_index_two = monomer_two_index(:,j) 
                atomic_index_dimer=(/atomic_index_one,atomic_index_two/)
 
@@ -3408,15 +3382,15 @@
                end do
 
                !! Now make trimers based on this dimer
-               loop_triplets: do
-                  unit_array = maxloc(monomer_triplets(3,:), monomer_triplets(1,:) .eq. i .and. monomer_triplets(2,:) .eq. j ) ! look for  a triplet
-                  if (all(unit_array .eq. 0)) exit
-                  print*, "   wt calc: found triplet!"
-                  triplet_pos=unit_array(1)
+            !    loop_triplets: do
+            !       unit_array = maxloc(monomer_triplets(3,:), monomer_triplets(1,:) .eq. i .and. monomer_triplets(2,:) .eq. j ) ! look for  a triplet
+            !       if (all(unit_array .eq. 0)) exit
+            !       print*, "   wt calc: found triplet!"
+            !       triplet_pos=unit_array(1)
 
-                  !get indices of monomer three
-                  k = monomer_triplets(3,triplet_pos)
-                  monomer_triplets(:,triplet_pos) = 0 ! make sure this triplet isn't found again
+            !       !get indices of monomer three
+            !       k = monomer_triplets(3,triplet_pos)
+            !       monomer_triplets(:,triplet_pos) = 0 ! make sure this triplet isn't found again
                   atomic_index_three = monomer_three_index(:,k) !monomer_three_index
                   atomic_index_trimer=(/atomic_index_dimer,atomic_index_three/)
                   mean_pos_three = calc_mean_pos(at,atomic_index_three)
@@ -3441,17 +3415,19 @@
                   end do
 
                   ! Loop over all trimers which can be created from these three monomers, i.e. with different periodic images
-                  loop_trimers: do
-                     unit_array = maxloc(triplets_diffs_map, triplets_diffs_map .eq. triplet_pos)
-                     this_diff = unit_array(1)
-                     if (this_diff == 0) exit
-
-                     i_desc = i_desc + 1
-
+                !   loop_trimers: do
+                !      unit_array = maxloc(triplets_diffs_map, triplets_diffs_map .eq. triplet_pos)
+                !      this_diff = unit_array(1)
+                !      if (this_diff == 0) exit
+                       
+                !      i_desc = i_desc + 1
+                     
+                     this_diff = i_desc
+                     
                      diff_one_two = triplets_diffs(1:3,this_diff)
                      diff_one_three = triplets_diffs(4:6,this_diff)
                      diff_two_three = diff_one_three - diff_one_two
-                     triplets_diffs_map(this_diff)=0 ! make sure this shifted triplet isn't found again
+                    !  triplets_diffs_map(this_diff)=0 ! make sure this shifted triplet isn't found again
                      dist_one_two = norm(diff_one_two)
                      dist_one_three = norm(diff_one_three)
                      dist_two_three = norm(diff_two_three)
@@ -3607,11 +3583,12 @@
 
                      end if calc_grad_descriptor
 
-                  end do loop_trimers
-               end do loop_triplets
-            end do loop_monomer_pairs
-         end do loop_monomer_one
-      end if has_descriptors ! (n_descriptors > 0) ... still need to deallocate if no trimers were found:
+                !   end do loop_trimers
+            !    end do loop_triplets
+            ! end do loop_monomer_pairs
+        !  end do loop_monomer_one
+    enddo the_loop
+    !   end if has_descriptors ! (n_descriptors > 0) ... still need to deallocate if no trimers were found:
 
      deallocate(monomer_one_index)
      deallocate(monomer_two_index)
@@ -3620,22 +3597,6 @@
      if (allocated(triplets_diffs)) deallocate(triplets_diffs)
      if (allocated(triplets_diffs_map)) deallocate(triplets_diffs_map)
 
-    !  deallocate(dist_vec)
-    !  deallocate(primitive_cutoffs)
-    !  deallocate(primitive_cutoff_grads)
-
-    !  deallocate(atomic_index_dimer)
-    !  deallocate(atomic_index_trimer)
-    !  deallocate(atomic_index_one)
-    !  deallocate(atomic_index_two)
-    !  deallocate(atomic_index_three)
-    !  deallocate(diffs_one)
-    !  deallocate(diffs_two)
-    !  deallocate(diffs_three)
-
-    !  deallocate(interatomic_vectors)
-    !  deallocate(interatomic_distances)
-    !  deallocate(associated_to_monomer)
 
 
      call system_timer('water_trimer_calc')
