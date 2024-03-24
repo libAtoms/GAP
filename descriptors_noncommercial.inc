@@ -2684,7 +2684,7 @@
      integer :: d, n_descriptors, n_cross, dimer_size, trimer_size, &
         i, j, k, n, m, i_atomic, j_atomic, start, finish, i_desc,this_diff,triplet_pos, &
         n_index
-     integer :: monomer_one_size, monomer_two_size, monomer_three_size, n_monomer_one, n_monomer_two, n_monomer_three, n_products, contributor_loc
+     integer :: monomer_one_size, monomer_two_size, monomer_three_size, n_monomer_one, n_monomer_two, n_monomer_three, n_products!, contributor_loc
      integer, dimension(1) :: unit_array
      real(dp) :: temp_dist
      real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
@@ -3184,23 +3184,23 @@
      logical, intent(in), optional :: do_descriptor, do_grad_descriptor!, use_smooth_cutoff
      character(len=*), intent(in), optional :: args_str
      integer, optional, intent(out) :: error
-     integer, parameter :: monomer_one_size = 3, monomer_two_size = 3, monomer_three_size = 3, dimer_size = 6, trimer_size = 9, d = 36 
-     real(dp) :: r_one_two
-     type(Dictionary) :: params
-     logical :: my_do_descriptor, my_do_grad_descriptor, one_two_identical, one_three_identical, two_three_identical, &
-            use_smooth_cutoff, done_this_dimer !done_this_monomer, 
-     integer :: n_descriptors, n_cross, &
-            i, j, k, n, m, i_atomic, j_atomic, start, finish, i_desc,this_diff,triplet_pos, n_index
-     integer :: n_monomer_one, n_monomer_two, n_monomer_three, n_products, contributor_loc
-     integer, dimension(1) :: unit_array
-     real(dp) :: temp_dist
+     integer, parameter :: monomer_one_size = 3, monomer_two_size = 3, monomer_three_size = 3, dimer_size = 6, trimer_size = 9, d = 36 , n_index = 9 
+    !  real(dp) :: r_one_two
+    !  type(Dictionary) :: params
+     logical :: my_do_descriptor, my_do_grad_descriptor, use_smooth_cutoff, done_this_dimer 
+     !done_this_monomer, one_two_identical, one_three_identical, two_three_identical, 
+     integer :: n_descriptors, i, j, k, m !n, n_cross, 
+     integer :: i_atomic, j_atomic, start, finish, i_desc,this_diff!, n_index !triplet_pos,
+     integer :: n_monomer_one, n_monomer_two, n_monomer_three, n_products!, contributor_loc
+    !  integer, dimension(1) :: unit_array
+    !  real(dp) :: temp_dist
      real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
-     real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
-     real(dp) :: dist_one_two, dist_one_three, dist_two_three, cut12, cut13, cut23, dcut12, dcut13, dcut23
+    !  real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
+     real(dp) :: dist_one_two, dist_one_three, dist_two_three!, cut12, cut13, cut23, dcut12, dcut13, dcut23
     !  real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
      real(dp), dimension(:,:), allocatable :: triplets_diffs !interatomic_distances,diffs_one,diffs_two,diffs_three,
     !  real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
-     integer, dimension(3) :: temp_shift, shift_one_two,shift_one_three
+    !  integer, dimension(3) :: temp_shift!, shift_one_two,shift_one_three
      integer, dimension(:), allocatable :: triplets_diffs_map !atomic_index_dimer, atomic_index_trimer, atomic_index_one, atomic_index_two, atomic_index_three, 
      integer, dimension(:,:), allocatable :: monomer_one_index, monomer_triplets , monomer_two_index, monomer_three_index
     !  logical, dimension(:), allocatable :: associated_to_monomer
@@ -3288,7 +3288,7 @@
      !call print("monomer_triplets",PRINT_NERD)
      !call print(monomer_triplets,PRINT_NERD)
 
-     n_index = 9 !size(this%signature_one) + size(this%signature_two) + size(this%signature_three)
+     !size(this%signature_one) + size(this%signature_two) + size(this%signature_three)
 
      call print("ready to construct "//n_descriptors //" descriptors",PRINT_NERD)
      allocate(descriptor_out%x(n_descriptors))
@@ -3327,7 +3327,15 @@
             ! done_this_monomer = .false.
             !get indices of monomer and calc internal distances
             atomic_index_one = monomer_one_index(:,i) !store the indices of atoms in this monomer
+            atomic_index_two = monomer_two_index(:,j) 
+            atomic_index_three = monomer_three_index(:,k)
+            
+            atomic_index_dimer=(/atomic_index_one,atomic_index_two/)
+            atomic_index_trimer=(/atomic_index_dimer,atomic_index_three/)
+            
             mean_pos_one = calc_mean_pos(at,atomic_index_one)
+            mean_pos_two = calc_mean_pos(at,atomic_index_two)
+            mean_pos_three = calc_mean_pos(at,atomic_index_three)
             
             !calc atomic positions and shifts relative to mean pos for monomer one, and also distances wrt atom 1
             do i_atomic=1,monomer_one_size
@@ -3356,10 +3364,7 @@
 
                !get indices of monomer two
             !    j = monomer_triplets(2,unit_array(1))
-               atomic_index_two = monomer_two_index(:,j) 
-               atomic_index_dimer=(/atomic_index_one,atomic_index_two/)
 
-               mean_pos_two = calc_mean_pos(at,atomic_index_two)
 
                ! calc distances and shifts wrt to mean pos this monomer, and distances wrt its first atom
                do i_atomic=1,monomer_two_size
@@ -3391,9 +3396,6 @@
             !       !get indices of monomer three
             !       k = monomer_triplets(3,triplet_pos)
             !       monomer_triplets(:,triplet_pos) = 0 ! make sure this triplet isn't found again
-                  atomic_index_three = monomer_three_index(:,k) !monomer_three_index
-                  atomic_index_trimer=(/atomic_index_dimer,atomic_index_three/)
-                  mean_pos_three = calc_mean_pos(at,atomic_index_three)
                   ! calc distances and shifts wrt to mean pos this monomer, and distances wrt its first atom
                   do i_atomic=1,monomer_three_size
                      diffs_three(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_three(i_atomic)),mean_pos_three)
@@ -3518,7 +3520,7 @@
                         call print("TRIM  9",PRINT_NERD)
                         call print('TRIM  Lattice="10.0000000       0.00000000       0.00000000       0.00000000      10.0000000       0.00000000       0.00000000       0.00000000      10.00000" Properties=Z:I:1:pos:R:3',PRINT_NERD)
                         do i_atomic=1,trimer_size
-                        call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
+                            call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
                         end do
 
                         !build the grad_data matrix
