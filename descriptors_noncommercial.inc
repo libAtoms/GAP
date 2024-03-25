@@ -3232,7 +3232,7 @@
      endif
 
      my_do_descriptor = optional_default(.false., do_descriptor)
-     my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
+     my_do_grad_descriptor = .true. !optional_default(.false., do_grad_descriptor) ! fix!!!
 
 
      if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
@@ -3337,6 +3337,143 @@
             mean_pos_two = calc_mean_pos(at,atomic_index_two)
             mean_pos_three = calc_mean_pos(at,atomic_index_three)
             
+            
+            this_diff = i_desc
+                     
+            diff_one_two = triplets_diffs(1:3,this_diff)
+            diff_one_three = triplets_diffs(4:6,this_diff)
+            diff_two_three = diff_one_three - diff_one_two
+           !  triplets_diffs_map(this_diff)=0 ! make sure this shifted triplet isn't found again
+            dist_one_two = norm(diff_one_two)
+            dist_one_three = norm(diff_one_three)
+            dist_two_three = norm(diff_two_three)
+            
+            
+            do i_atomic=1,3
+               diffs_one(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_one(i_atomic)),mean_pos_one)
+               diffs_two(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_two(i_atomic)),mean_pos_two)
+               diffs_three(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_three(i_atomic)),mean_pos_three)
+            end do
+            
+            
+            block 
+                real(dp) a0, shft, pow, cut
+                real(dp), dimension(3,9) :: pos, gcuts
+                real(dp), dimension(3) :: a3, b3 , cuts
+                real(dp), dimension(36) :: desc0, rlen
+                real(dp), dimension(3,36) :: rvec2, rvec
+                ! real(dp), dimension(3,9,36) :: gdesc0
+                real(dp), dimension(36,3,9) :: gdesc0
+                integer ii, jj, ij
+                do i_atomic=1,3
+                    pos(:,i_atomic) = mean_pos_one - diffs_one(:,i_atomic)
+                    pos(:,3+i_atomic) = mean_pos_one + diff_one_two - diffs_two(:,i_atomic)
+                    pos(:,6+i_atomic) = mean_pos_one + diff_one_three - diffs_three(:,i_atomic)
+                end do
+                ! ij = 0
+                ! do jj = 1,9
+                !     do ii = jj+1, 9
+                !         ij = ij + 1
+                !         a3 = pos(:,ii)-pos(:,jj)
+                !         rvec(:,ij) = a3
+                !         rlen(ij) = norm(a3)
+                !     enddo
+                ! enddo
+                shft  = this%dist_shift
+                pow   = this%power
+                gdesc0 = 0
+                gcuts = 0
+                cuts = 0
+                do ij = 1, 36
+                    jj = this%component_atoms(ij,1)
+                    ii = this%component_atoms(ij,2)
+                    a3 = pos(:,ii)-pos(:,jj)
+                    a0 = norm(a3)
+                    rvec(:,ij) = a3
+                    rlen(ij) = a0
+                    desc0(ij) = (a0 + shft) ** pow
+                    
+                    b3 = - this%power * (a0+shft)**(pow-1.0_dp)  * a3 / a0
+                    gdesc0(ij,:,jj) = b3
+                    gdesc0(ij,:,ii) = -b3
+                    
+                enddo
+                
+                block 
+                    real(dp), dimension(3) :: oo12, oo13, oo23
+                    real(dp), dimension(3) :: gcut1, gcut2, gcut3
+                    real(dp) :: o12, o13, o23
+                    real(dp) :: cut12, cut13, cut23
+                    real(dp) :: dcut12, dcut13, dcut23
+                    oo12 = pos(:,4)-pos(:,1)
+                    oo13 = pos(:,7)-pos(:,1)
+                    oo23 = pos(:,7)-pos(:,4)
+                    o12 = norm(oo12)
+                    o13 = norm(oo13)
+                    o23 = norm(oo23)
+                    cut12 = coordination_function(o12,this%cutoff,this%cutoff_transition_width)
+                    cut13 = coordination_function(o13,this%cutoff,this%cutoff_transition_width)
+                    cut23 = coordination_function(o23,this%cutoff,this%cutoff_transition_width)
+                    cut = (cut12*cut13 + cut12*cut23 + cut13*cut23) / 3
+                    
+                
+                    dcut12 = dcoordination_function(o12, this%cutoff, this%cutoff_transition_width)
+                    dcut13 = dcoordination_function(o13, this%cutoff, this%cutoff_transition_width)
+                    dcut23 = dcoordination_function(o23, this%cutoff, this%cutoff_transition_width)
+                    gcut1 = (- oo12 / o12 * dcut12 * (cut13+cut23) - oo13 / o13 * dcut13 * (cut12+cut23)) / 3.0_dp
+                    gcut2 = (  oo12 / o12 * dcut12 * (cut13+cut23) - oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
+                    gcut3 = (  oo13 / o13 * dcut13 * (cut12+cut23) + oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
+                    gcuts = 0 
+                    gcuts(:,1) = gcut1
+                    gcuts(:,4) = gcut2
+                    gcuts(:,7) = gcut3
+                endblock
+                
+                        !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
+                        !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
+                        !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
+                        !    dcut12 = dcoordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
+                        !    dcut13 = dcoordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
+                        !    dcut23 = dcoordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
+                        !    !descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
+                        !    grad_cut_one = (- diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
+                        !                    - diff_one_three / dist_one_three * dcut13 * (cut12+cut23)) / 3.0_dp
+                        !    grad_cut_two = (  diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
+                        !                    - diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
+                        !    grad_cut_three = (diff_one_three / dist_one_three * dcut13 * (cut12+cut23) &
+                        !                    + diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
+                
+                
+                
+                ! roo = rlen(this%cutoff_contributor)
+                ! cuts = 
+                
+                ! do k=1,d
+                !     if (this%cutoff_contributor(k)) then
+                !         primitive_cutoffs(k) = coordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
+                !     end if
+                ! end do
+                
+                ! do k=1,d
+                !     descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
+                !          = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) &
+                !              * interatomic_vectors(i_atomic,j_atomic,:) &
+                !              / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
+                !  end do
+         
+                
+                !##########################################################################################################################################################
+                !##########################################################################################################################################################
+                !##########################################################################################################################################################
+                
+                
+                
+                
+                
+            ! print'(a,*(f10.5))', "rlen0 = ",rlen 
+                ! print'(a,*(f10.5))', "rvec0 = ",rvec 
+            
+            
             !calc atomic positions and shifts relative to mean pos for monomer one, and also distances wrt atom 1
             do i_atomic=1,monomer_one_size
                diffs_one(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_one(i_atomic)),mean_pos_one)
@@ -3424,15 +3561,6 @@
                        
                 !      i_desc = i_desc + 1
                      
-                     this_diff = i_desc
-                     
-                     diff_one_two = triplets_diffs(1:3,this_diff)
-                     diff_one_three = triplets_diffs(4:6,this_diff)
-                     diff_two_three = diff_one_three - diff_one_two
-                    !  triplets_diffs_map(this_diff)=0 ! make sure this shifted triplet isn't found again
-                     dist_one_two = norm(diff_one_two)
-                     dist_one_three = norm(diff_one_three)
-                     dist_two_three = norm(diff_two_three)
 
                      ! calculate intermolecular distances, monomers one and two
                      do i_atomic=1,monomer_one_size
@@ -3467,18 +3595,40 @@
                         finish=finish + trimer_size-i_atomic-1
                      end do
                      call print( "list of distances: "//dist_vec,PRINT_NERD)
-
+                     
+                     
+                        ij = 0
+                        do ii = 1,9
+                            do jj = ii+1, 9
+                                ij = ij + 1
+                                rvec2(:,ij) = interatomic_vectors(ii,jj,:)
+                            enddo
+                        enddo
+                        print'(a,*(f10.5))', "rlen d = ",dist_vec-rlen
+                        print'(a,*(f10.5))', "rvec d = ",rvec2-rvec 
+                                  
+                    
+                     
+                     
                      calc_descriptor: if(my_do_descriptor) then
                         descriptor_out%x(i_desc)%has_data = .true.
                         descriptor_out%x(i_desc)%data = (dist_vec+this%dist_shift)**this%power
                         descriptor_out%x(i_desc)%ci(:) = atomic_index_trimer
-
+                        
+                        print'(a,*(f10.5))', "desc d = ",desc0-descriptor_out%x(i_desc)%data
+                        
+                        
+                        
+                        
+                        
                         ! cutoff_type: if (this%mpifind) then
+                        !    ! Using average position for cutoff
                         !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
                         !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
                         !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
                         !    descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
                         ! else
+                           ! Using heavy atoms for cutoff
                            descriptor_out%x(i_desc)%covariance_cutoff = 0.0_dp
 
                            primitive_cutoffs=1.0_dp
@@ -3502,7 +3652,13 @@
                            ! normalise
                            descriptor_out%x(i_desc)%covariance_cutoff =  descriptor_out%x(i_desc)%covariance_cutoff / n_products
                         ! end if cutoff_type
+                           
+                           
+                           print'(a,*(f10.5))', "cut d = ", cut, descriptor_out%x(i_desc)%covariance_cutoff, cut - descriptor_out%x(i_desc)%covariance_cutoff
+                           
                      end if calc_descriptor
+                     
+                     
 
                      calc_grad_descriptor: if(my_do_grad_descriptor) then !calc grads and update
 
@@ -3528,11 +3684,23 @@
                         do k=1,d
                            i_atomic = this%component_atoms(k,1)
                            j_atomic = this%component_atoms(k,2)
-                           descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) * interatomic_vectors(i_atomic,j_atomic,:) / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
+                           descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
+                                = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) &
+                                    * interatomic_vectors(i_atomic,j_atomic,:) &
+                                    / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
                            descriptor_out%x(i_desc)%grad_data(k,:,j_atomic) = -descriptor_out%x(i_desc)%grad_data(k,:,i_atomic)        ! descriptor wrt j_atomic
                         end do
-
+                        
+                        
+                        print'(a,*(f10.5))', "gdesc d = ",gdesc0-descriptor_out%x(i_desc)%grad_data
+                        
+                        
+                        
+                        
+                        
+                        
                         ! cutoff_type_grad: if (this%mpifind) then
+                        !    !! Using the average position of all atoms in molecule
                         !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
                         !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
                         !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
@@ -3556,14 +3724,18 @@
                         !       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,dimer_size+i_atomic) = grad_cut_three / real(monomer_three_size,dp)
                         !    end do
                         ! else
+                        
+                           ! Using only the heavy atoms for the cutoff. 
                            primitive_cutoff_grads=0.0_dp
                            do k=1,d
                               if (this%cutoff_contributor(k)) then
                                 primitive_cutoff_grads(k) = dcoordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
                               end if
                            end do
-
+                           
+                           ! For each atom, for each heavy-atomc pairs it is part of, accumulate cutoff gradients
                            do i_atomic=1,trimer_size
+                            ! if (signatures(i_atom)/=1)then !? Jonatan
                              do k=1,d
                                 if (this%cutoff_contributor(k) ) then
                                   do m=k+1,d
@@ -3582,8 +3754,27 @@
                            !normalisation factor
                            descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) / n_products
                         ! end if cutoff_type_grad
+                           
+                           
+                           
+                           print'(a,*(f10.5))', "gcuts 0 = ",gcuts
+                           print'(a,*(f10.5))', "gcuts 1 = ",descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
+                           print'(a,*(f10.5))', "gcuts d = ",gcuts - descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
+                           
+                        
+                        
+                           !##########################################################################################################################################################
+                           !##########################################################################################################################################################
+                           !##########################################################################################################################################################
+                           stop "testing"
+                              
+                           
 
                      end if calc_grad_descriptor
+                     endblock
+                     
+                     stop "testing 2"
+
 
                 !   end do loop_trimers
             !    end do loop_triplets
