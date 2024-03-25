@@ -238,6 +238,7 @@ endsubroutine water_trimer_sizes
 
  
 subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error) !//////////////////////////////////////////////////////////////////////////////////
+    use find_water_triplets_mod, only: find_triplets_lars
     type(water_trimer), intent(in) :: this
     type(atoms), intent(in) :: at
     type(descriptor_data), intent(out) :: descriptor_out
@@ -246,12 +247,14 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     integer, optional, intent(out) :: error
     logical :: my_do_descriptor, my_do_grad_descriptor
     integer :: n_descriptors, i, i_desc, n_mon_trip
-    integer :: n_monomer1, n_monomer2, n_monomer3
+    integer :: n_monomer1, n_monomer2, n_monomer3, n_mono, n_atom
     real(dp), dimension(:,:), allocatable :: triplets_diffs
     integer, dimension(:), allocatable :: triplets_diffs_map 
-    integer, dimension(:,:), allocatable :: imonomers1 ,imonomers2, imonomers3, itriplets
-    logical :: associated_to_monomer(at%N)
+    integer, dimension(:,:), allocatable :: itriplets
+    logical :: associated_to_monomer(at%N), ok_ohh, ok_boxsize, ok_ortho
     integer, parameter :: trimer_size = 9, nd = 36
+    integer, dimension(3,at%N/3) :: imonomers
+    real(dp) box(3)
     INIT_ERROR(error)
     
     !  print*, "Entered water_trimer_calc"
@@ -271,32 +274,57 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     
     associated_to_monomer=.false. 
     
-    call find_general_monomer(at,imonomers1,&
-            this%signature,associated_to_monomer,&
-            this%monomer_cutoff,.false.,error) !this%atom_ordercheck=false
-    ! Allocation on assignment
-    block 
-        integer s1,s2
-        s1 = size(imonomers1,1)
-        s2 = size(imonomers1,2)
-        allocate(imonomers2(s1,s2))
-        allocate(imonomers3(s1,s2))
-        imonomers2   = imonomers1
-        imonomers3 = imonomers1
-    endblock
+    box = [(at%lattice(i,i), i=1,3)]
+    ok_ohh = all(at%Z(1::3) == 8) .and. all(at%Z(2::3) == 1) .and. all(at%Z(3::3) == 1)
+    ok_ortho = at%is_orthorhombic
+    ok_boxsize = all(box > 2*this%cutoff)
     
-    n_monomer1 = size(imonomers1,2) !, imonomers2, imonomers3
-    n_monomer2 = size(imonomers2,2)
-    n_monomer3 = size(imonomers3,2)
+        
+    if (.not.all([ok_ohh,ok_ortho,ok_boxsize]))then
+        RAISE_ERROR("water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ortho//" large_enough="//ok_boxsize, error)
+    endif
     
-    call system_timer('water_trimer_calc: find_monomer_triplets')
-    
+    if (.true.)then 
+        n_atom = at%N
+        n_mono = n_atom/3
+        imonomers = reshape([(i,i=1,n_atom)],[3,n_mono])
+        call find_triplets_lars(at%pos,n_mono,at%lattice,this%cutoff,itriplets,triplets_diffs,triplets_diffs_map)
+        ! print'(a,i0,x,i0,a,i0,x,i0)', "shape = ",s1,s2," expecting: ",3,at%N/3
+        print'(*(i0,x))', imonomers
+        print'(*(i0,x))', imonomers(:,2)
+    else
+        block 
+            integer, dimension(:,:), allocatable :: imonomers1 ,imonomers2, imonomers3
+            integer s1,s2
+            
+            call find_general_monomer(at,imonomers1,this%signature,associated_to_monomer,this%monomer_cutoff,.false.,error) !this%atom_ordercheck=false
+            ! Allocation on assignment? -fno-realloc-lhs...
+            s1 = size(imonomers1,1)
+            s2 = size(imonomers1,2)
+            print'(a,i0,x,i0,a,i0,x,i0)', "shape = ",s1,s2," expecting: ",3,at%N/3
+            print'(*(i0,x))', imonomers1
+            print'(*(i0,x))', imonomers1(:,2)
+            allocate(imonomers2(s1,s2))
+            allocate(imonomers3(s1,s2))
+            imonomers2   = imonomers1
+            imonomers3 = imonomers1
+        
+        
+            call system_timer('water_trimer_calc: find_monomer_triplets')
+            
+            
+            call find_monomer_triplets(at,itriplets,triplets_diffs,triplets_diffs_map,&
+                    imonomers1,imonomers2,imonomers3,&
+                    ! this%one_two_identical,this%one_three_identical,this%two_three_identical,&
+                    .true.,.true.,.true.,this%cutoff,error)
+            
+            
+            imonomers = imonomers1
+            ! print'(*(l,x))', imonomers1==imonomers2
+            ! print'(*(l,x))', imonomers1==imonomers3
+        endblock
+    endif
     print'(a,*(f10.5))', "at%lattice = ",at%lattice
-    
-    call find_monomer_triplets(at,itriplets,triplets_diffs,triplets_diffs_map,&
-            imonomers1,imonomers2,imonomers3,&
-            ! this%one_two_identical,this%one_three_identical,this%two_three_identical,&
-            .true.,.true.,.true.,this%cutoff,error)
     
     n_descriptors = size(triplets_diffs_map)
     n_mon_trip = size(itriplets,2)
@@ -305,7 +333,7 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
         RAISE_ERROR("water_triplets_calc: #diffs="//n_descriptors//" and #tiplets="//n_mon_trip//", make sure box is orthogonal and > 2*cutoff ",error)
     endif
     
-    print*, "  wt calc: found #mono="//n_monomer1//" #trip="//n_mon_trip
+    print*, "  wt calc: found #mono="//n_mono//" #trip="//n_mon_trip
     
     call system_timer('water_trimer_calc: find_monomer_triplets')
     call print("itriplets("//size(itriplets,1)//", "//size(itriplets,2)//")", PRINT_NERD)
@@ -367,9 +395,9 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
             i2 = itriplets(2,i_desc)
             i3 = itriplets(3,i_desc)
             
-            iatoms1 = imonomers1(:,i1) !store the indices of atoms in this monomer
-            iatmos2 = imonomers2(:,i2) 
-            iatoms3 = imonomers3(:,i3)
+            iatoms1 = imonomers(:,i1) !store the indices of atoms in this monomer
+            iatmos2 = imonomers(:,i2) 
+            iatoms3 = imonomers(:,i3)
             
             iatoms123=(/iatoms1,iatmos2,iatoms3/)
             
@@ -480,9 +508,6 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
         
     enddo the_loop
     
-    deallocate(imonomers1)
-    deallocate(imonomers2)
-    deallocate(imonomers3)
     if (allocated(itriplets)) deallocate(itriplets)
     if (allocated(triplets_diffs)) deallocate(triplets_diffs)
     if (allocated(triplets_diffs_map)) deallocate(triplets_diffs_map)
