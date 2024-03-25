@@ -3196,7 +3196,7 @@
     !  real(dp) :: temp_dist
      real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
     !  real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
-     real(dp) :: dist_one_two, dist_one_three, dist_two_three!, cut12, cut13, cut23, dcut12, dcut13, dcut23
+    !  real(dp) :: dist_one_two, dist_one_three, dist_two_three!, cut12, cut13, cut23, dcut12, dcut13, dcut23
     !  real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
      real(dp), dimension(:,:), allocatable :: triplets_diffs !interatomic_distances,diffs_one,diffs_two,diffs_three,
     !  real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
@@ -3344,9 +3344,9 @@
             diff_one_three = triplets_diffs(4:6,this_diff)
             diff_two_three = diff_one_three - diff_one_two
            !  triplets_diffs_map(this_diff)=0 ! make sure this shifted triplet isn't found again
-            dist_one_two = norm(diff_one_two)
-            dist_one_three = norm(diff_one_three)
-            dist_two_three = norm(diff_two_three)
+            ! dist_one_two = norm(diff_one_two)
+            ! dist_one_three = norm(diff_one_three)
+            ! dist_two_three = norm(diff_two_three)
             
             
             do i_atomic=1,3
@@ -3423,6 +3423,7 @@
                     gcut1 = (- oo12 / o12 * dcut12 * (cut13+cut23) - oo13 / o13 * dcut13 * (cut12+cut23)) / 3.0_dp
                     gcut2 = (  oo12 / o12 * dcut12 * (cut13+cut23) - oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
                     gcut3 = (  oo13 / o13 * dcut13 * (cut12+cut23) + oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
+                    
                     gcuts = 0 
                     gcuts(:,1) = gcut1
                     gcuts(:,4) = gcut2
@@ -3692,7 +3693,7 @@
                         end do
                         
                         
-                        print'(a,*(f10.5))', "gdesc d = ",gdesc0-descriptor_out%x(i_desc)%grad_data
+                        print'(a,*(f10.5))', "gdesc d = ",gdesc0(:,1,1)-descriptor_out%x(i_desc)%grad_data(:,1,1)
                         
                         
                         
@@ -3757,8 +3758,8 @@
                            
                            
                            
-                           print'(a,*(f10.5))', "gcuts 0 = ",gcuts
-                           print'(a,*(f10.5))', "gcuts 1 = ",descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
+                        !    print'(a,*(f10.5))', "gcuts 0 = ",gcuts
+                        !    print'(a,*(f10.5))', "gcuts 1 = ",descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
                            print'(a,*(f10.5))', "gcuts d = ",gcuts - descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
                            
                         
