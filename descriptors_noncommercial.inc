@@ -2709,7 +2709,7 @@
      endif
 
      my_do_descriptor = optional_default(.false., do_descriptor)
-     my_do_grad_descriptor = optional_default(.false., do_grad_descriptor)
+     my_do_grad_descriptor = .true.!optional_default(.false., do_grad_descriptor)
 
      monomer_one_size =size(this%signature_one)
      monomer_two_size =size(this%signature_two)
@@ -3133,6 +3133,12 @@
                         end if cutoff_type_grad
 
                      end if calc_grad_descriptor
+                     write(13,'(a,*(f10.5))') "  desc = ", descriptor_out%x(i_desc)%data
+                     write(13,'(a,*(f10.5))') "g desc = ", descriptor_out%x(i_desc)%grad_data
+                     write(13,'(a,*(f10.5))') "   cut = ", descriptor_out%x(i_desc)%covariance_cutoff
+                     write(13,'(a,*(f10.5))') "g  cut = ", descriptor_out%x(i_desc)%grad_covariance_cutoff
+                     stop "testing"
+                
 
                   end do loop_trimers
                end do loop_triplets
@@ -3170,632 +3176,638 @@
    endsubroutine general_trimer_calc
 
 
+
+
+
+#include "fast_water_trimer.inc"
+
+
+
+
+
+
+
+
    
-   
-   
-   
-   
-   
-   
-   subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error) !//////////////////////////////////////////////////////////////////////////////////
-     type(water_trimer), intent(in) :: this
-     type(atoms), intent(in) :: at
-     type(descriptor_data), intent(out) :: descriptor_out
-     logical, intent(in), optional :: do_descriptor, do_grad_descriptor!, use_smooth_cutoff
-     character(len=*), intent(in), optional :: args_str
-     integer, optional, intent(out) :: error
-     integer, parameter :: monomer_one_size = 3, monomer_two_size = 3, monomer_three_size = 3, dimer_size = 6, trimer_size = 9, d = 36 , n_index = 9 
-    !  real(dp) :: r_one_two
-    !  type(Dictionary) :: params
-     logical :: my_do_descriptor, my_do_grad_descriptor, use_smooth_cutoff, done_this_dimer 
-     !done_this_monomer, one_two_identical, one_three_identical, two_three_identical, 
-     integer :: n_descriptors, i, j, k, m !n, n_cross, 
-     integer :: i_atomic, j_atomic, start, finish, i_desc,this_diff!, n_index !triplet_pos,
-     integer :: n_monomer_one, n_monomer_two, n_monomer_three, n_products!, contributor_loc
-    !  integer, dimension(1) :: unit_array
-    !  real(dp) :: temp_dist
-     real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
-    !  real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
-    !  real(dp) :: dist_one_two, dist_one_three, dist_two_three!, cut12, cut13, cut23, dcut12, dcut13, dcut23
-    !  real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
-     real(dp), dimension(:,:), allocatable :: triplets_diffs !interatomic_distances,diffs_one,diffs_two,diffs_three,
-    !  real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
-    !  integer, dimension(3) :: temp_shift!, shift_one_two,shift_one_three
-     integer, dimension(:), allocatable :: triplets_diffs_map !atomic_index_dimer, atomic_index_trimer, atomic_index_one, atomic_index_two, atomic_index_three, 
-     integer, dimension(:,:), allocatable :: monomer_one_index, monomer_triplets , monomer_two_index, monomer_three_index
-    !  logical, dimension(:), allocatable :: associated_to_monomer
-     logical :: double_count
-     real(dp) :: dist_vec(d)
-     real(dp) :: primitive_cutoffs(d)
-     real(dp) :: primitive_cutoff_grads(d)
-     integer :: atomic_index_one(monomer_one_size)
-     integer :: atomic_index_two(monomer_two_size)
-     integer :: atomic_index_three(monomer_three_size)
-     integer :: atomic_index_dimer(dimer_size)
-     integer :: atomic_index_trimer(trimer_size)
-     real(dp) :: interatomic_vectors(trimer_size,trimer_size,3)
-     real(dp) :: interatomic_distances(trimer_size,trimer_size)
-     logical :: associated_to_monomer(at%N)
-     real(dp) :: diffs_one(3,monomer_one_size)
-     real(dp) :: diffs_two(3,monomer_two_size)
-     real(dp) :: diffs_three(3,monomer_three_size)
-     integer n_mon_trip
-     INIT_ERROR(error)
+!    subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error) !//////////////////////////////////////////////////////////////////////////////////
+!      type(water_trimer), intent(in) :: this
+!      type(atoms), intent(in) :: at
+!      type(descriptor_data), intent(out) :: descriptor_out
+!      logical, intent(in), optional :: do_descriptor, do_grad_descriptor!, use_smooth_cutoff
+!      character(len=*), intent(in), optional :: args_str
+!      integer, optional, intent(out) :: error
+!      integer, parameter :: monomer_one_size = 3, monomer_two_size = 3, monomer_three_size = 3, dimer_size = 6, trimer_size = 9, d = 36 , n_index = 9 
+!     !  real(dp) :: r_one_two
+!     !  type(Dictionary) :: params
+!      logical :: my_do_descriptor, my_do_grad_descriptor, use_smooth_cutoff, done_this_dimer 
+!      !done_this_monomer, one_two_identical, one_three_identical, two_three_identical, 
+!      integer :: n_descriptors, i, j, k, m !n, n_cross, 
+!      integer :: i_atomic, j_atomic, start, finish, i_desc,this_diff!, n_index !triplet_pos,
+!      integer :: n_monomer_one, n_monomer_two, n_monomer_three, n_products!, contributor_loc
+!     !  integer, dimension(1) :: unit_array
+!     !  real(dp) :: temp_dist
+!      real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
+!     !  real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
+!     !  real(dp) :: dist_one_two, dist_one_three, dist_two_three!, cut12, cut13, cut23, dcut12, dcut13, dcut23
+!     !  real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
+!      real(dp), dimension(:,:), allocatable :: triplets_diffs !interatomic_distances,diffs_one,diffs_two,diffs_three,
+!     !  real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
+!     !  integer, dimension(3) :: temp_shift!, shift_one_two,shift_one_three
+!      integer, dimension(:), allocatable :: triplets_diffs_map !atomic_index_dimer, atomic_index_trimer, atomic_index_one, atomic_index_two, atomic_index_three, 
+!      integer, dimension(:,:), allocatable :: monomer_one_index, monomer_triplets , monomer_two_index, monomer_three_index
+!     !  logical, dimension(:), allocatable :: associated_to_monomer
+!      logical :: double_count
+!      real(dp) :: dist_vec(d)
+!      real(dp) :: primitive_cutoffs(d)
+!      real(dp) :: primitive_cutoff_grads(d)
+!      integer :: atomic_index_one(monomer_one_size)
+!      integer :: atomic_index_two(monomer_two_size)
+!      integer :: atomic_index_three(monomer_three_size)
+!      integer :: atomic_index_dimer(dimer_size)
+!      integer :: atomic_index_trimer(trimer_size)
+!      real(dp) :: interatomic_vectors(trimer_size,trimer_size,3)
+!      real(dp) :: interatomic_distances(trimer_size,trimer_size)
+!      logical :: associated_to_monomer(at%N)
+!      real(dp) :: diffs_one(3,monomer_one_size)
+!      real(dp) :: diffs_two(3,monomer_two_size)
+!      real(dp) :: diffs_three(3,monomer_three_size)
+!      integer n_mon_trip
+!      INIT_ERROR(error)
      
-    !  print*, "Entered water_trimer_calc"
-     use_smooth_cutoff = .false.
-     double_count=.false.
-     call system_timer('water_trimer_calc')
+!     !  print*, "Entered water_trimer_calc"
+!      use_smooth_cutoff = .false.
+!      double_count=.false.
+!      call system_timer('water_trimer_calc')
 
-     if(.not. this%initialised) then
-        RAISE_ERROR("water_trimer_calc: descriptor object not initialised", error)
-     endif
+!      if(.not. this%initialised) then
+!         RAISE_ERROR("water_trimer_calc: descriptor object not initialised", error)
+!      endif
 
-     my_do_descriptor = optional_default(.false., do_descriptor)
-     my_do_grad_descriptor = .true. !optional_default(.false., do_grad_descriptor) ! fix!!!
-
-
-     if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
-
-     call finalise(descriptor_out)
-
-     !water_trimer_dimensions(this,error)
-    !  print*, "water_trimer_dimensions(this,error) =",d
+!      my_do_descriptor = optional_default(.false., do_descriptor)
+!      my_do_grad_descriptor = .true. !optional_default(.false., do_grad_descriptor) ! fix!!!
 
 
-     interatomic_vectors = 0
-     interatomic_distances = 0
-     associated_to_monomer=.false. 
+!      if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
 
-     call find_general_monomer(at,monomer_one_index,&
-          this%signature,associated_to_monomer,&
-          this%monomer_cutoff,.false.,error) !this%atom_ordercheck=false
-    ! Allocation on assignment
-    block 
-        integer s1,s2
-        s1 = size(monomer_one_index,1)
-        s2 = size(monomer_one_index,2)
-        allocate(monomer_two_index(s1,s2))
-        allocate(monomer_three_index(s1,s2))
-        monomer_two_index   = monomer_one_index
-        monomer_three_index = monomer_one_index
-    endblock
+!      call finalise(descriptor_out)
+
+!      !water_trimer_dimensions(this,error)
+!     !  print*, "water_trimer_dimensions(this,error) =",d
+
+
+!      interatomic_vectors = 0
+!      interatomic_distances = 0
+!      associated_to_monomer=.false. 
+
+!      call find_general_monomer(at,monomer_one_index,&
+!           this%signature,associated_to_monomer,&
+!           this%monomer_cutoff,.false.,error) !this%atom_ordercheck=false
+!     ! Allocation on assignment
+!     block 
+!         integer s1,s2
+!         s1 = size(monomer_one_index,1)
+!         s2 = size(monomer_one_index,2)
+!         allocate(monomer_two_index(s1,s2))
+!         allocate(monomer_three_index(s1,s2))
+!         monomer_two_index   = monomer_one_index
+!         monomer_three_index = monomer_one_index
+!     endblock
         
-     n_monomer_one = size(monomer_one_index,2) !, monomer_two_index, monomer_three_index
-     n_monomer_two = size(monomer_two_index,2)
-     n_monomer_three = size(monomer_three_index,2)
+!      n_monomer_one = size(monomer_one_index,2) !, monomer_two_index, monomer_three_index
+!      n_monomer_two = size(monomer_two_index,2)
+!      n_monomer_three = size(monomer_three_index,2)
 
-    call system_timer('water_trimer_calc: find_monomer_triplets')
-    call find_monomer_triplets(at,monomer_triplets,triplets_diffs,triplets_diffs_map,&
-            monomer_one_index,monomer_two_index,monomer_three_index,&
-            ! this%one_two_identical,this%one_three_identical,this%two_three_identical,&
-            .true.,.true.,.true.,this%cutoff,error)
+!     call system_timer('water_trimer_calc: find_monomer_triplets')
+!     call find_monomer_triplets(at,monomer_triplets,triplets_diffs,triplets_diffs_map,&
+!             monomer_one_index,monomer_two_index,monomer_three_index,&
+!             ! this%one_two_identical,this%one_three_identical,this%two_three_identical,&
+!             .true.,.true.,.true.,this%cutoff,error)
     
-     n_descriptors = size(triplets_diffs_map)
-     n_mon_trip = size(monomer_triplets,2)
+!      n_descriptors = size(triplets_diffs_map)
+!      n_mon_trip = size(monomer_triplets,2)
      
-     if (n_descriptors /= n_mon_trip) then 
-        RAISE_ERROR("water_triplets_calc: #diffs="//n_descriptors//" and #tiplets="//n_mon_trip//", make sure box is orthogonal and > 2*cutoff ",error)
-     endif
+!      if (n_descriptors /= n_mon_trip) then 
+!         RAISE_ERROR("water_triplets_calc: #diffs="//n_descriptors//" and #tiplets="//n_mon_trip//", make sure box is orthogonal and > 2*cutoff ",error)
+!      endif
      
-     print*, "  wt calc: found #mono="//n_monomer_one//" #trip="//n_mon_trip
+!      print*, "  wt calc: found #mono="//n_monomer_one//" #trip="//n_mon_trip
      
-     call system_timer('water_trimer_calc: find_monomer_triplets')
-     call print("monomer_triplets("//size(monomer_triplets,1)//", "//size(monomer_triplets,2)//")", PRINT_NERD)
-     call print("triplets_diffs("//size(triplets_diffs,1)//", "//size(triplets_diffs,2)//")", PRINT_NERD)
-     call print("triplets_diffs_map("//size(triplets_diffs_map)//")", PRINT_NERD)
+!      call system_timer('water_trimer_calc: find_monomer_triplets')
+!      call print("monomer_triplets("//size(monomer_triplets,1)//", "//size(monomer_triplets,2)//")", PRINT_NERD)
+!      call print("triplets_diffs("//size(triplets_diffs,1)//", "//size(triplets_diffs,2)//")", PRINT_NERD)
+!      call print("triplets_diffs_map("//size(triplets_diffs_map)//")", PRINT_NERD)
 
-     !call print("monomer_triplets",PRINT_NERD)
-     !call print(monomer_triplets,PRINT_NERD)
+!      !call print("monomer_triplets",PRINT_NERD)
+!      !call print(monomer_triplets,PRINT_NERD)
 
-     !size(this%signature_one) + size(this%signature_two) + size(this%signature_three)
+!      !size(this%signature_one) + size(this%signature_two) + size(this%signature_three)
 
-     call print("ready to construct "//n_descriptors //" descriptors",PRINT_NERD)
-     allocate(descriptor_out%x(n_descriptors))
-     do i = 1, n_descriptors
-        if(my_do_descriptor) then
-           allocate(descriptor_out%x(i)%data(d))
-           allocate(descriptor_out%x(i)%ci(n_index))
-           descriptor_out%x(i)%data = 0.0_dp
-           descriptor_out%x(i)%ci = 0
-           descriptor_out%x(i)%has_data = .false.
-           descriptor_out%x(i)%covariance_cutoff = 1.0_dp
-        endif
-        if(my_do_grad_descriptor) then
-           allocate(descriptor_out%x(i)%grad_data(d,3,trimer_size))
-           allocate(descriptor_out%x(i)%ii(trimer_size))
-           allocate(descriptor_out%x(i)%pos(3,trimer_size))
-           allocate(descriptor_out%x(i)%has_grad_data(trimer_size))
-           descriptor_out%x(i)%grad_data = 0.0_dp
-           descriptor_out%x(i)%ii = 0
-           descriptor_out%x(i)%pos = 0.0_dp
-           descriptor_out%x(i)%has_grad_data = .false.
+!      call print("ready to construct "//n_descriptors //" descriptors",PRINT_NERD)
+!      allocate(descriptor_out%x(n_descriptors))
+!      do i = 1, n_descriptors
+!         if(my_do_descriptor) then
+!            allocate(descriptor_out%x(i)%data(d))
+!            allocate(descriptor_out%x(i)%ci(n_index))
+!            descriptor_out%x(i)%data = 0.0_dp
+!            descriptor_out%x(i)%ci = 0
+!            descriptor_out%x(i)%has_data = .false.
+!            descriptor_out%x(i)%covariance_cutoff = 1.0_dp
+!         endif
+!         if(my_do_grad_descriptor) then
+!            allocate(descriptor_out%x(i)%grad_data(d,3,trimer_size))
+!            allocate(descriptor_out%x(i)%ii(trimer_size))
+!            allocate(descriptor_out%x(i)%pos(3,trimer_size))
+!            allocate(descriptor_out%x(i)%has_grad_data(trimer_size))
+!            descriptor_out%x(i)%grad_data = 0.0_dp
+!            descriptor_out%x(i)%ii = 0
+!            descriptor_out%x(i)%pos = 0.0_dp
+!            descriptor_out%x(i)%has_grad_data = .false.
 
-           allocate(descriptor_out%x(i)%grad_covariance_cutoff(3,trimer_size))
-           descriptor_out%x(i)%grad_covariance_cutoff = 0.0_dp
-        endif
-     enddo
+!            allocate(descriptor_out%x(i)%grad_covariance_cutoff(3,trimer_size))
+!            descriptor_out%x(i)%grad_covariance_cutoff = 0.0_dp
+!         endif
+!      enddo
 
-    !   has_descriptors: if (n_descriptors > 0) then ! only loop over monomers if we actually found any trimers
+!     !   has_descriptors: if (n_descriptors > 0) then ! only loop over monomers if we actually found any trimers
         
-    the_loop : do i_desc = 1, n_descriptors
-            i = monomer_triplets(1,i_desc)
-            j = monomer_triplets(2,i_desc)
-            k = monomer_triplets(3,i_desc)
-        !  loop_monomer_one: do i = 1, n_monomer_one
-            ! if (.not. any(monomer_triplets(1,:) .eq. i)) cycle
-            ! done_this_monomer = .false.
-            !get indices of monomer and calc internal distances
-            atomic_index_one = monomer_one_index(:,i) !store the indices of atoms in this monomer
-            atomic_index_two = monomer_two_index(:,j) 
-            atomic_index_three = monomer_three_index(:,k)
+!     the_loop : do i_desc = 1, n_descriptors
+!             i = monomer_triplets(1,i_desc)
+!             j = monomer_triplets(2,i_desc)
+!             k = monomer_triplets(3,i_desc)
+!         !  loop_monomer_one: do i = 1, n_monomer_one
+!             ! if (.not. any(monomer_triplets(1,:) .eq. i)) cycle
+!             ! done_this_monomer = .false.
+!             !get indices of monomer and calc internal distances
+!             atomic_index_one = monomer_one_index(:,i) !store the indices of atoms in this monomer
+!             atomic_index_two = monomer_two_index(:,j) 
+!             atomic_index_three = monomer_three_index(:,k)
             
-            atomic_index_dimer=(/atomic_index_one,atomic_index_two/)
-            atomic_index_trimer=(/atomic_index_dimer,atomic_index_three/)
+!             atomic_index_dimer=(/atomic_index_one,atomic_index_two/)
+!             atomic_index_trimer=(/atomic_index_dimer,atomic_index_three/)
             
-            mean_pos_one = calc_mean_pos(at,atomic_index_one)
-            mean_pos_two = calc_mean_pos(at,atomic_index_two)
-            mean_pos_three = calc_mean_pos(at,atomic_index_three)
+!             mean_pos_one = calc_mean_pos(at,atomic_index_one)
+!             mean_pos_two = calc_mean_pos(at,atomic_index_two)
+!             mean_pos_three = calc_mean_pos(at,atomic_index_three)
             
             
-            this_diff = i_desc
+!             this_diff = i_desc
                      
-            diff_one_two = triplets_diffs(1:3,this_diff)
-            diff_one_three = triplets_diffs(4:6,this_diff)
-            diff_two_three = diff_one_three - diff_one_two
-           !  triplets_diffs_map(this_diff)=0 ! make sure this shifted triplet isn't found again
-            ! dist_one_two = norm(diff_one_two)
-            ! dist_one_three = norm(diff_one_three)
-            ! dist_two_three = norm(diff_two_three)
+!             diff_one_two = triplets_diffs(1:3,this_diff)
+!             diff_one_three = triplets_diffs(4:6,this_diff)
+!             diff_two_three = diff_one_three - diff_one_two
+!            !  triplets_diffs_map(this_diff)=0 ! make sure this shifted triplet isn't found again
+!             ! dist_one_two = norm(diff_one_two)
+!             ! dist_one_three = norm(diff_one_three)
+!             ! dist_two_three = norm(diff_two_three)
             
             
-            do i_atomic=1,3
-               diffs_one(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_one(i_atomic)),mean_pos_one)
-               diffs_two(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_two(i_atomic)),mean_pos_two)
-               diffs_three(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_three(i_atomic)),mean_pos_three)
-            end do
+!             do i_atomic=1,3
+!                diffs_one(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_one(i_atomic)),mean_pos_one)
+!                diffs_two(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_two(i_atomic)),mean_pos_two)
+!                diffs_three(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_three(i_atomic)),mean_pos_three)
+!             end do
             
             
-            block 
-                real(dp) a0, shft, pow, cut
-                real(dp), dimension(3,9) :: pos, gcuts
-                real(dp), dimension(3) :: a3, b3 , cuts
-                real(dp), dimension(36) :: desc0, rlen
-                real(dp), dimension(3,36) :: rvec2, rvec
-                ! real(dp), dimension(3,9,36) :: gdesc0
-                real(dp), dimension(36,3,9) :: gdesc0
-                integer ii, jj, ij
-                do i_atomic=1,3
-                    pos(:,i_atomic) = mean_pos_one - diffs_one(:,i_atomic)
-                    pos(:,3+i_atomic) = mean_pos_one + diff_one_two - diffs_two(:,i_atomic)
-                    pos(:,6+i_atomic) = mean_pos_one + diff_one_three - diffs_three(:,i_atomic)
-                end do
-                ! ij = 0
-                ! do jj = 1,9
-                !     do ii = jj+1, 9
-                !         ij = ij + 1
-                !         a3 = pos(:,ii)-pos(:,jj)
-                !         rvec(:,ij) = a3
-                !         rlen(ij) = norm(a3)
-                !     enddo
-                ! enddo
-                shft  = this%dist_shift
-                pow   = this%power
-                gdesc0 = 0
-                gcuts = 0
-                cuts = 0
-                do ij = 1, 36
-                    jj = this%component_atoms(ij,1)
-                    ii = this%component_atoms(ij,2)
-                    a3 = pos(:,ii)-pos(:,jj)
-                    a0 = norm(a3)
-                    rvec(:,ij) = a3
-                    rlen(ij) = a0
-                    desc0(ij) = (a0 + shft) ** pow
+!             block 
+!                 real(dp) a0, shft, pow, cut
+!                 real(dp), dimension(3,9) :: pos, gcuts
+!                 real(dp), dimension(3) :: a3, b3 , cuts
+!                 real(dp), dimension(36) :: desc0, rlen
+!                 real(dp), dimension(3,36) :: rvec2, rvec
+!                 ! real(dp), dimension(3,9,36) :: gdesc0
+!                 real(dp), dimension(36,3,9) :: gdesc0
+!                 integer ii, jj, ij
+!                 do i_atomic=1,3
+!                     pos(:,i_atomic) = mean_pos_one - diffs_one(:,i_atomic)
+!                     pos(:,3+i_atomic) = mean_pos_one + diff_one_two - diffs_two(:,i_atomic)
+!                     pos(:,6+i_atomic) = mean_pos_one + diff_one_three - diffs_three(:,i_atomic)
+!                 end do
+!                 ! ij = 0
+!                 ! do jj = 1,9
+!                 !     do ii = jj+1, 9
+!                 !         ij = ij + 1
+!                 !         a3 = pos(:,ii)-pos(:,jj)
+!                 !         rvec(:,ij) = a3
+!                 !         rlen(ij) = norm(a3)
+!                 !     enddo
+!                 ! enddo
+!                 shft  = this%dist_shift
+!                 pow   = this%power
+!                 gdesc0 = 0
+!                 gcuts = 0
+!                 cuts = 0
+!                 do ij = 1, 36
+!                     jj = this%component_atoms(ij,1)
+!                     ii = this%component_atoms(ij,2)
+!                     a3 = pos(:,ii)-pos(:,jj)
+!                     a0 = norm(a3)
+!                     rvec(:,ij) = a3
+!                     rlen(ij) = a0
+!                     desc0(ij) = (a0 + shft) ** pow
                     
-                    b3 = - this%power * (a0+shft)**(pow-1.0_dp)  * a3 / a0
-                    gdesc0(ij,:,jj) = b3
-                    gdesc0(ij,:,ii) = -b3
+!                     b3 = - this%power * (a0+shft)**(pow-1.0_dp)  * a3 / a0
+!                     gdesc0(ij,:,jj) = b3
+!                     gdesc0(ij,:,ii) = -b3
                     
-                enddo
+!                 enddo
                 
-                block 
-                    real(dp), dimension(3) :: oo12, oo13, oo23
-                    real(dp), dimension(3) :: gcut1, gcut2, gcut3
-                    real(dp) :: o12, o13, o23
-                    real(dp) :: cut12, cut13, cut23
-                    real(dp) :: dcut12, dcut13, dcut23
-                    oo12 = pos(:,4)-pos(:,1)
-                    oo13 = pos(:,7)-pos(:,1)
-                    oo23 = pos(:,7)-pos(:,4)
-                    o12 = norm(oo12)
-                    o13 = norm(oo13)
-                    o23 = norm(oo23)
-                    cut12 = coordination_function(o12,this%cutoff,this%cutoff_transition_width)
-                    cut13 = coordination_function(o13,this%cutoff,this%cutoff_transition_width)
-                    cut23 = coordination_function(o23,this%cutoff,this%cutoff_transition_width)
-                    cut = (cut12*cut13 + cut12*cut23 + cut13*cut23) / 3
+!                 block 
+!                     real(dp), dimension(3) :: oo12, oo13, oo23
+!                     real(dp), dimension(3) :: gcut1, gcut2, gcut3
+!                     real(dp) :: o12, o13, o23
+!                     real(dp) :: cut12, cut13, cut23
+!                     real(dp) :: dcut12, dcut13, dcut23
+!                     oo12 = pos(:,4)-pos(:,1)
+!                     oo13 = pos(:,7)-pos(:,1)
+!                     oo23 = pos(:,7)-pos(:,4)
+!                     o12 = norm(oo12)
+!                     o13 = norm(oo13)
+!                     o23 = norm(oo23)
+!                     cut12 = coordination_function(o12,this%cutoff,this%cutoff_transition_width)
+!                     cut13 = coordination_function(o13,this%cutoff,this%cutoff_transition_width)
+!                     cut23 = coordination_function(o23,this%cutoff,this%cutoff_transition_width)
+!                     cut = (cut12*cut13 + cut12*cut23 + cut13*cut23) / 3
                     
                 
-                    dcut12 = dcoordination_function(o12, this%cutoff, this%cutoff_transition_width)
-                    dcut13 = dcoordination_function(o13, this%cutoff, this%cutoff_transition_width)
-                    dcut23 = dcoordination_function(o23, this%cutoff, this%cutoff_transition_width)
-                    gcut1 = (- oo12 / o12 * dcut12 * (cut13+cut23) - oo13 / o13 * dcut13 * (cut12+cut23)) / 3.0_dp
-                    gcut2 = (  oo12 / o12 * dcut12 * (cut13+cut23) - oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
-                    gcut3 = (  oo13 / o13 * dcut13 * (cut12+cut23) + oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
+!                     dcut12 = dcoordination_function(o12, this%cutoff, this%cutoff_transition_width)
+!                     dcut13 = dcoordination_function(o13, this%cutoff, this%cutoff_transition_width)
+!                     dcut23 = dcoordination_function(o23, this%cutoff, this%cutoff_transition_width)
+!                     gcut1 = (- oo12 / o12 * dcut12 * (cut13+cut23) - oo13 / o13 * dcut13 * (cut12+cut23)) / 3.0_dp
+!                     gcut2 = (  oo12 / o12 * dcut12 * (cut13+cut23) - oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
+!                     gcut3 = (  oo13 / o13 * dcut13 * (cut12+cut23) + oo23 / o23 * dcut23 * (cut12+cut13)) / 3.0_dp
                     
-                    gcuts = 0 
-                    gcuts(:,1) = gcut1
-                    gcuts(:,4) = gcut2
-                    gcuts(:,7) = gcut3
-                endblock
+!                     gcuts = 0 
+!                     gcuts(:,1) = gcut1
+!                     gcuts(:,4) = gcut2
+!                     gcuts(:,7) = gcut3
+!                 endblock
                 
-                        !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
-                        !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
-                        !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
-                        !    dcut12 = dcoordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
-                        !    dcut13 = dcoordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
-                        !    dcut23 = dcoordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
-                        !    !descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
-                        !    grad_cut_one = (- diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
-                        !                    - diff_one_three / dist_one_three * dcut13 * (cut12+cut23)) / 3.0_dp
-                        !    grad_cut_two = (  diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
-                        !                    - diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
-                        !    grad_cut_three = (diff_one_three / dist_one_three * dcut13 * (cut12+cut23) &
-                        !                    + diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
+!                         !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
+!                         !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
+!                         !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
+!                         !    dcut12 = dcoordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
+!                         !    dcut13 = dcoordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
+!                         !    dcut23 = dcoordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
+!                         !    !descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
+!                         !    grad_cut_one = (- diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
+!                         !                    - diff_one_three / dist_one_three * dcut13 * (cut12+cut23)) / 3.0_dp
+!                         !    grad_cut_two = (  diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
+!                         !                    - diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
+!                         !    grad_cut_three = (diff_one_three / dist_one_three * dcut13 * (cut12+cut23) &
+!                         !                    + diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
                 
                 
                 
-                ! roo = rlen(this%cutoff_contributor)
-                ! cuts = 
+!                 ! roo = rlen(this%cutoff_contributor)
+!                 ! cuts = 
                 
-                ! do k=1,d
-                !     if (this%cutoff_contributor(k)) then
-                !         primitive_cutoffs(k) = coordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
-                !     end if
-                ! end do
+!                 ! do k=1,d
+!                 !     if (this%cutoff_contributor(k)) then
+!                 !         primitive_cutoffs(k) = coordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
+!                 !     end if
+!                 ! end do
                 
-                ! do k=1,d
-                !     descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
-                !          = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) &
-                !              * interatomic_vectors(i_atomic,j_atomic,:) &
-                !              / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
-                !  end do
+!                 ! do k=1,d
+!                 !     descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
+!                 !          = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) &
+!                 !              * interatomic_vectors(i_atomic,j_atomic,:) &
+!                 !              / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
+!                 !  end do
          
                 
-                !##########################################################################################################################################################
-                !##########################################################################################################################################################
-                !##########################################################################################################################################################
+!                 !##########################################################################################################################################################
+!                 !##########################################################################################################################################################
+!                 !##########################################################################################################################################################
                 
                 
                 
                 
                 
-            ! print'(a,*(f10.5))', "rlen0 = ",rlen 
-                ! print'(a,*(f10.5))', "rvec0 = ",rvec 
+!             ! print'(a,*(f10.5))', "rlen0 = ",rlen 
+!                 ! print'(a,*(f10.5))', "rvec0 = ",rvec 
             
             
-            !calc atomic positions and shifts relative to mean pos for monomer one, and also distances wrt atom 1
-            do i_atomic=1,monomer_one_size
-               diffs_one(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_one(i_atomic)),mean_pos_one)
-               interatomic_vectors(1,i_atomic,:) = diff_min_image(at,atomic_index_one(1),atomic_index_one(i_atomic))
-            end do
+!             !calc atomic positions and shifts relative to mean pos for monomer one, and also distances wrt atom 1
+!             do i_atomic=1,monomer_one_size
+!                diffs_one(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_one(i_atomic)),mean_pos_one)
+!                interatomic_vectors(1,i_atomic,:) = diff_min_image(at,atomic_index_one(1),atomic_index_one(i_atomic))
+!             end do
 
-            !find other relative positions through vector addition
-            do j_atomic=2,monomer_one_size
-               do i_atomic=2,j_atomic-1
-                  interatomic_vectors(i_atomic,j_atomic,:) = interatomic_vectors(1,j_atomic,:) -interatomic_vectors(1,i_atomic,:)
-               end do
-            end do
+!             !find other relative positions through vector addition
+!             do j_atomic=2,monomer_one_size
+!                do i_atomic=2,j_atomic-1
+!                   interatomic_vectors(i_atomic,j_atomic,:) = interatomic_vectors(1,j_atomic,:) -interatomic_vectors(1,i_atomic,:)
+!                end do
+!             end do
 
-            !Now convert vectors to scalar distances
-            do i_atomic=1,monomer_one_size
-               do j_atomic=i_atomic+1,monomer_one_size
-                  interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
-               end do
-            end do
+!             !Now convert vectors to scalar distances
+!             do i_atomic=1,monomer_one_size
+!                do j_atomic=i_atomic+1,monomer_one_size
+!                   interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
+!                end do
+!             end do
 
-            ! Loop through monomers paired with this one to make dimers
-            ! loop_monomer_pairs: do
-            !    unit_array = maxloc(monomer_triplets(2,:), monomer_triplets(1,:) .eq. i) ! find a monomer paired with i
-            !    if (all(unit_array .eq. 0)) exit
+!             ! Loop through monomers paired with this one to make dimers
+!             ! loop_monomer_pairs: do
+!             !    unit_array = maxloc(monomer_triplets(2,:), monomer_triplets(1,:) .eq. i) ! find a monomer paired with i
+!             !    if (all(unit_array .eq. 0)) exit
 
-               !get indices of monomer two
-            !    j = monomer_triplets(2,unit_array(1))
+!                !get indices of monomer two
+!             !    j = monomer_triplets(2,unit_array(1))
 
 
-               ! calc distances and shifts wrt to mean pos this monomer, and distances wrt its first atom
-               do i_atomic=1,monomer_two_size
-                  diffs_two(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_two(i_atomic)),mean_pos_two)
-                  interatomic_vectors(monomer_one_size+1,monomer_one_size+i_atomic,:) = diff_min_image(at,atomic_index_two(1),atomic_index_two(i_atomic))
-               end do
+!                ! calc distances and shifts wrt to mean pos this monomer, and distances wrt its first atom
+!                do i_atomic=1,monomer_two_size
+!                   diffs_two(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_two(i_atomic)),mean_pos_two)
+!                   interatomic_vectors(monomer_one_size+1,monomer_one_size+i_atomic,:) = diff_min_image(at,atomic_index_two(1),atomic_index_two(i_atomic))
+!                end do
 
-               !find other relative positions through vector addition
-               do j_atomic=monomer_one_size+2,dimer_size
-                  do i_atomic=monomer_one_size+2,j_atomic-1
-                     interatomic_vectors(i_atomic,j_atomic,:) = interatomic_vectors(monomer_one_size+1,j_atomic,:) - interatomic_vectors(monomer_one_size+1,i_atomic,:)
-                  end do
-               end do
+!                !find other relative positions through vector addition
+!                do j_atomic=monomer_one_size+2,dimer_size
+!                   do i_atomic=monomer_one_size+2,j_atomic-1
+!                      interatomic_vectors(i_atomic,j_atomic,:) = interatomic_vectors(monomer_one_size+1,j_atomic,:) - interatomic_vectors(monomer_one_size+1,i_atomic,:)
+!                   end do
+!                end do
 
-               !And convert vectors to scalar distances
-               do i_atomic=monomer_one_size+1,dimer_size
-                  do j_atomic=i_atomic+1,dimer_size
-                     interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
-                  end do
-               end do
+!                !And convert vectors to scalar distances
+!                do i_atomic=monomer_one_size+1,dimer_size
+!                   do j_atomic=i_atomic+1,dimer_size
+!                      interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
+!                   end do
+!                end do
 
-               !! Now make trimers based on this dimer
-            !    loop_triplets: do
-            !       unit_array = maxloc(monomer_triplets(3,:), monomer_triplets(1,:) .eq. i .and. monomer_triplets(2,:) .eq. j ) ! look for  a triplet
-            !       if (all(unit_array .eq. 0)) exit
-            !       print*, "   wt calc: found triplet!"
-            !       triplet_pos=unit_array(1)
+!                !! Now make trimers based on this dimer
+!             !    loop_triplets: do
+!             !       unit_array = maxloc(monomer_triplets(3,:), monomer_triplets(1,:) .eq. i .and. monomer_triplets(2,:) .eq. j ) ! look for  a triplet
+!             !       if (all(unit_array .eq. 0)) exit
+!             !       print*, "   wt calc: found triplet!"
+!             !       triplet_pos=unit_array(1)
 
-            !       !get indices of monomer three
-            !       k = monomer_triplets(3,triplet_pos)
-            !       monomer_triplets(:,triplet_pos) = 0 ! make sure this triplet isn't found again
-                  ! calc distances and shifts wrt to mean pos this monomer, and distances wrt its first atom
-                  do i_atomic=1,monomer_three_size
-                     diffs_three(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_three(i_atomic)),mean_pos_three)
-                     interatomic_vectors(dimer_size+1,dimer_size+i_atomic,:) = diff_min_image(at,atomic_index_three(1),atomic_index_three(i_atomic))
-                  end do
+!             !       !get indices of monomer three
+!             !       k = monomer_triplets(3,triplet_pos)
+!             !       monomer_triplets(:,triplet_pos) = 0 ! make sure this triplet isn't found again
+!                   ! calc distances and shifts wrt to mean pos this monomer, and distances wrt its first atom
+!                   do i_atomic=1,monomer_three_size
+!                      diffs_three(:,i_atomic) = diff_min_image(at,at%pos(:,atomic_index_three(i_atomic)),mean_pos_three)
+!                      interatomic_vectors(dimer_size+1,dimer_size+i_atomic,:) = diff_min_image(at,atomic_index_three(1),atomic_index_three(i_atomic))
+!                   end do
 
-                  !find other relative positions through vector addition
-                  do j_atomic=dimer_size+2,trimer_size
-                     do i_atomic=dimer_size+2,j_atomic-1
-                        interatomic_vectors(i_atomic,j_atomic,:) = interatomic_vectors(dimer_size+1,j_atomic,:) -interatomic_vectors(dimer_size+1,i_atomic,:)
-                     end do
-                  end do
+!                   !find other relative positions through vector addition
+!                   do j_atomic=dimer_size+2,trimer_size
+!                      do i_atomic=dimer_size+2,j_atomic-1
+!                         interatomic_vectors(i_atomic,j_atomic,:) = interatomic_vectors(dimer_size+1,j_atomic,:) -interatomic_vectors(dimer_size+1,i_atomic,:)
+!                      end do
+!                   end do
 
-                  !Now convert vectors to scalar distances
-                  do i_atomic=dimer_size+1,trimer_size
-                     do j_atomic=i_atomic+1,trimer_size
-                        interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
-                     end do
-                  end do
+!                   !Now convert vectors to scalar distances
+!                   do i_atomic=dimer_size+1,trimer_size
+!                      do j_atomic=i_atomic+1,trimer_size
+!                         interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
+!                      end do
+!                   end do
 
-                  ! Loop over all trimers which can be created from these three monomers, i.e. with different periodic images
-                !   loop_trimers: do
-                !      unit_array = maxloc(triplets_diffs_map, triplets_diffs_map .eq. triplet_pos)
-                !      this_diff = unit_array(1)
-                !      if (this_diff == 0) exit
+!                   ! Loop over all trimers which can be created from these three monomers, i.e. with different periodic images
+!                 !   loop_trimers: do
+!                 !      unit_array = maxloc(triplets_diffs_map, triplets_diffs_map .eq. triplet_pos)
+!                 !      this_diff = unit_array(1)
+!                 !      if (this_diff == 0) exit
                        
-                !      i_desc = i_desc + 1
+!                 !      i_desc = i_desc + 1
                      
 
-                     ! calculate intermolecular distances, monomers one and two
-                     do i_atomic=1,monomer_one_size
-                        do j_atomic = monomer_one_size+1,dimer_size
-                           interatomic_vectors(i_atomic,j_atomic,:) = diffs_one(:,i_atomic) + diff_one_two - diffs_two(:,j_atomic-monomer_one_size)
-                           interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
-                        end do
-                     end do
+!                      ! calculate intermolecular distances, monomers one and two
+!                      do i_atomic=1,monomer_one_size
+!                         do j_atomic = monomer_one_size+1,dimer_size
+!                            interatomic_vectors(i_atomic,j_atomic,:) = diffs_one(:,i_atomic) + diff_one_two - diffs_two(:,j_atomic-monomer_one_size)
+!                            interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
+!                         end do
+!                      end do
 
-                     ! calculate intermolecular distances, monomers one and three
-                     do i_atomic=1,monomer_one_size
-                        do j_atomic = dimer_size+1,trimer_size
-                           interatomic_vectors(i_atomic,j_atomic,:) = diffs_one(:,i_atomic) + diff_one_three - diffs_three(:,j_atomic-dimer_size)
-                           interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
-                        end do
-                     end do
+!                      ! calculate intermolecular distances, monomers one and three
+!                      do i_atomic=1,monomer_one_size
+!                         do j_atomic = dimer_size+1,trimer_size
+!                            interatomic_vectors(i_atomic,j_atomic,:) = diffs_one(:,i_atomic) + diff_one_three - diffs_three(:,j_atomic-dimer_size)
+!                            interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
+!                         end do
+!                      end do
 
-                     ! calculate intermolecular distances, monomers two and three
-                     do i_atomic=monomer_one_size+1,dimer_size
-                        do j_atomic = dimer_size+1,trimer_size
-                           interatomic_vectors(i_atomic,j_atomic,:) = diffs_two(:,i_atomic-monomer_one_size) + diff_two_three - diffs_three(:,j_atomic-dimer_size)
-                           interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
-                        end do
-                     end do
+!                      ! calculate intermolecular distances, monomers two and three
+!                      do i_atomic=monomer_one_size+1,dimer_size
+!                         do j_atomic = dimer_size+1,trimer_size
+!                            interatomic_vectors(i_atomic,j_atomic,:) = diffs_two(:,i_atomic-monomer_one_size) + diff_two_three - diffs_three(:,j_atomic-dimer_size)
+!                            interatomic_distances(i_atomic,j_atomic) = norm(interatomic_vectors(i_atomic,j_atomic,:))
+!                         end do
+!                      end do
 
-                     !Now take the whole matrix of scalar distances and combine into 1D array
-                     start = 1
-                     finish=trimer_size-1
-                     do i_atomic=1,trimer_size-1
-                        dist_vec(start:finish) = interatomic_distances(i_atomic,i_atomic+1:trimer_size)
-                        start = finish+1
-                        finish=finish + trimer_size-i_atomic-1
-                     end do
-                     call print( "list of distances: "//dist_vec,PRINT_NERD)
+!                      !Now take the whole matrix of scalar distances and combine into 1D array
+!                      start = 1
+!                      finish=trimer_size-1
+!                      do i_atomic=1,trimer_size-1
+!                         dist_vec(start:finish) = interatomic_distances(i_atomic,i_atomic+1:trimer_size)
+!                         start = finish+1
+!                         finish=finish + trimer_size-i_atomic-1
+!                      end do
+!                      call print( "list of distances: "//dist_vec,PRINT_NERD)
                      
                      
-                        ij = 0
-                        do ii = 1,9
-                            do jj = ii+1, 9
-                                ij = ij + 1
-                                rvec2(:,ij) = interatomic_vectors(ii,jj,:)
-                            enddo
-                        enddo
-                        print'(a,*(f10.5))', "rlen d = ",dist_vec-rlen
-                        print'(a,*(f10.5))', "rvec d = ",rvec2-rvec 
+!                         ij = 0
+!                         do ii = 1,9
+!                             do jj = ii+1, 9
+!                                 ij = ij + 1
+!                                 rvec2(:,ij) = interatomic_vectors(ii,jj,:)
+!                             enddo
+!                         enddo
+!                         print'(a,*(f10.5))', "rlen d = ",dist_vec-rlen
+!                         print'(a,*(f10.5))', "rvec d = ",rvec2-rvec 
                                   
                     
                      
                      
-                     calc_descriptor: if(my_do_descriptor) then
-                        descriptor_out%x(i_desc)%has_data = .true.
-                        descriptor_out%x(i_desc)%data = (dist_vec+this%dist_shift)**this%power
-                        descriptor_out%x(i_desc)%ci(:) = atomic_index_trimer
+!                      calc_descriptor: if(my_do_descriptor) then
+!                         descriptor_out%x(i_desc)%has_data = .true.
+!                         descriptor_out%x(i_desc)%data = (dist_vec+this%dist_shift)**this%power
+!                         descriptor_out%x(i_desc)%ci(:) = atomic_index_trimer
                         
-                        print'(a,*(f10.5))', "desc d = ",desc0-descriptor_out%x(i_desc)%data
-                        
-                        
+!                         print'(a,*(f10.5))', "desc d = ",desc0-descriptor_out%x(i_desc)%data
                         
                         
                         
-                        ! cutoff_type: if (this%mpifind) then
-                        !    ! Using average position for cutoff
-                        !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
-                        !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
-                        !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
-                        !    descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
-                        ! else
-                           ! Using heavy atoms for cutoff
-                           descriptor_out%x(i_desc)%covariance_cutoff = 0.0_dp
+                        
+                        
+!                         ! cutoff_type: if (this%mpifind) then
+!                         !    ! Using average position for cutoff
+!                         !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
+!                         !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
+!                         !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
+!                         !    descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
+!                         ! else
+!                            ! Using heavy atoms for cutoff
+!                            descriptor_out%x(i_desc)%covariance_cutoff = 0.0_dp
 
-                           primitive_cutoffs=1.0_dp
+!                            primitive_cutoffs=1.0_dp
 
-                           do k=1,d
-                              if (this%cutoff_contributor(k)) then
-                                 primitive_cutoffs(k) = coordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
-                              end if
-                           end do
-                           n_products=0
-                           do k=1,d
-                              if (this%cutoff_contributor(k)) then
-                                 do m=k+1,d
-                                    if (this%cutoff_contributor(m)) then
-                                       n_products=n_products+1
-                                       descriptor_out%x(i_desc)%covariance_cutoff =  descriptor_out%x(i_desc)%covariance_cutoff + primitive_cutoffs(k)*primitive_cutoffs(m)
-                                    end if
-                                 end do
-                              end if
-                           end do
-                           ! normalise
-                           descriptor_out%x(i_desc)%covariance_cutoff =  descriptor_out%x(i_desc)%covariance_cutoff / n_products
-                        ! end if cutoff_type
+!                            do k=1,d
+!                               if (this%cutoff_contributor(k)) then
+!                                  primitive_cutoffs(k) = coordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
+!                               end if
+!                            end do
+!                            n_products=0
+!                            do k=1,d
+!                               if (this%cutoff_contributor(k)) then
+!                                  do m=k+1,d
+!                                     if (this%cutoff_contributor(m)) then
+!                                        n_products=n_products+1
+!                                        descriptor_out%x(i_desc)%covariance_cutoff =  descriptor_out%x(i_desc)%covariance_cutoff + primitive_cutoffs(k)*primitive_cutoffs(m)
+!                                     end if
+!                                  end do
+!                               end if
+!                            end do
+!                            ! normalise
+!                            descriptor_out%x(i_desc)%covariance_cutoff =  descriptor_out%x(i_desc)%covariance_cutoff / n_products
+!                         ! end if cutoff_type
                            
                            
-                           print'(a,*(f10.5))', "cut d = ", cut, descriptor_out%x(i_desc)%covariance_cutoff, cut - descriptor_out%x(i_desc)%covariance_cutoff
+!                            print'(a,*(f10.5))', "cut d = ", cut, descriptor_out%x(i_desc)%covariance_cutoff, cut - descriptor_out%x(i_desc)%covariance_cutoff
                            
-                     end if calc_descriptor
+!                      end if calc_descriptor
                      
                      
 
-                     calc_grad_descriptor: if(my_do_grad_descriptor) then !calc grads and update
+!                      calc_grad_descriptor: if(my_do_grad_descriptor) then !calc grads and update
 
-                        descriptor_out%x(i_desc)%ii(:) = atomic_index_trimer
-                        do i_atomic=1,monomer_one_size
-                           descriptor_out%x(i_desc)%pos(:,i_atomic) = mean_pos_one - diffs_one(:,i_atomic)
-                        end do
-                        do i_atomic=1,monomer_two_size
-                           descriptor_out%x(i_desc)%pos(:,monomer_one_size+i_atomic) = mean_pos_one + diff_one_two - diffs_two(:,i_atomic)
-                        end do
-                        do i_atomic=1,monomer_three_size
-                           descriptor_out%x(i_desc)%pos(:,dimer_size+i_atomic) = mean_pos_one + diff_one_three - diffs_three(:,i_atomic)
-                        end do
+!                         descriptor_out%x(i_desc)%ii(:) = atomic_index_trimer
+!                         do i_atomic=1,monomer_one_size
+!                            descriptor_out%x(i_desc)%pos(:,i_atomic) = mean_pos_one - diffs_one(:,i_atomic)
+!                         end do
+!                         do i_atomic=1,monomer_two_size
+!                            descriptor_out%x(i_desc)%pos(:,monomer_one_size+i_atomic) = mean_pos_one + diff_one_two - diffs_two(:,i_atomic)
+!                         end do
+!                         do i_atomic=1,monomer_three_size
+!                            descriptor_out%x(i_desc)%pos(:,dimer_size+i_atomic) = mean_pos_one + diff_one_three - diffs_three(:,i_atomic)
+!                         end do
 
-                        call print("TRIM  9",PRINT_NERD)
-                        call print('TRIM  Lattice="10.0000000       0.00000000       0.00000000       0.00000000      10.0000000       0.00000000       0.00000000       0.00000000      10.00000" Properties=Z:I:1:pos:R:3',PRINT_NERD)
-                        do i_atomic=1,trimer_size
-                            call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
-                        end do
+!                         call print("TRIM  9",PRINT_NERD)
+!                         call print('TRIM  Lattice="10.0000000       0.00000000       0.00000000       0.00000000      10.0000000       0.00000000       0.00000000       0.00000000      10.00000" Properties=Z:I:1:pos:R:3',PRINT_NERD)
+!                         do i_atomic=1,trimer_size
+!                             call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
+!                         end do
 
-                        !build the grad_data matrix
-                        descriptor_out%x(i_desc)%has_grad_data(:) = .true.
-                        do k=1,d
-                           i_atomic = this%component_atoms(k,1)
-                           j_atomic = this%component_atoms(k,2)
-                           descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
-                                = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) &
-                                    * interatomic_vectors(i_atomic,j_atomic,:) &
-                                    / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
-                           descriptor_out%x(i_desc)%grad_data(k,:,j_atomic) = -descriptor_out%x(i_desc)%grad_data(k,:,i_atomic)        ! descriptor wrt j_atomic
-                        end do
+!                         !build the grad_data matrix
+!                         descriptor_out%x(i_desc)%has_grad_data(:) = .true.
+!                         do k=1,d
+!                            i_atomic = this%component_atoms(k,1)
+!                            j_atomic = this%component_atoms(k,2)
+!                            descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
+!                                 = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) &
+!                                     * interatomic_vectors(i_atomic,j_atomic,:) &
+!                                     / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
+!                            descriptor_out%x(i_desc)%grad_data(k,:,j_atomic) = -descriptor_out%x(i_desc)%grad_data(k,:,i_atomic)        ! descriptor wrt j_atomic
+!                         end do
                         
                         
-                        print'(a,*(f10.5))', "gdesc d = ",gdesc0(:,1,1)-descriptor_out%x(i_desc)%grad_data(:,1,1)
-                        
-                        
-                        
+!                         print'(a,*(f10.5))', "gdesc d = ",gdesc0(:,1,1)-descriptor_out%x(i_desc)%grad_data(:,1,1)
                         
                         
                         
-                        ! cutoff_type_grad: if (this%mpifind) then
-                        !    !! Using the average position of all atoms in molecule
-                        !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
-                        !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
-                        !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
-                        !    dcut12 = dcoordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
-                        !    dcut13 = dcoordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
-                        !    dcut23 = dcoordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
-                        !    !descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
-                        !    grad_cut_one = (- diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
-                        !                    - diff_one_three / dist_one_three * dcut13 * (cut12+cut23)) / 3.0_dp
-                        !    grad_cut_two = (  diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
-                        !                    - diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
-                        !    grad_cut_three = (diff_one_three / dist_one_three * dcut13 * (cut12+cut23) &
-                        !                    + diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
-                        !    do i_atomic=1,monomer_one_size
-                        !       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) = grad_cut_one / real(monomer_one_size,dp)
-                        !    end do
-                        !    do i_atomic=1,monomer_two_size
-                        !       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,monomer_one_size+i_atomic) = grad_cut_two / real(monomer_two_size,dp)
-                        !    end do
-                        !    do i_atomic=1,monomer_three_size
-                        !       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,dimer_size+i_atomic) = grad_cut_three / real(monomer_three_size,dp)
-                        !    end do
-                        ! else
                         
-                           ! Using only the heavy atoms for the cutoff. 
-                           primitive_cutoff_grads=0.0_dp
-                           do k=1,d
-                              if (this%cutoff_contributor(k)) then
-                                primitive_cutoff_grads(k) = dcoordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
-                              end if
-                           end do
+                        
+                        
+!                         ! cutoff_type_grad: if (this%mpifind) then
+!                         !    !! Using the average position of all atoms in molecule
+!                         !    cut12 = coordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
+!                         !    cut13 = coordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
+!                         !    cut23 = coordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
+!                         !    dcut12 = dcoordination_function(dist_one_two, this%cutoff, this%cutoff_transition_width)
+!                         !    dcut13 = dcoordination_function(dist_one_three, this%cutoff, this%cutoff_transition_width)
+!                         !    dcut23 = dcoordination_function(dist_two_three, this%cutoff, this%cutoff_transition_width)
+!                         !    !descriptor_out%x(i_desc)%covariance_cutoff = (cut12*cut13 + cut12*cut23 + cut13*cut23)/3.0_dp
+!                         !    grad_cut_one = (- diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
+!                         !                    - diff_one_three / dist_one_three * dcut13 * (cut12+cut23)) / 3.0_dp
+!                         !    grad_cut_two = (  diff_one_two / dist_one_two * dcut12 * (cut13+cut23) &
+!                         !                    - diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
+!                         !    grad_cut_three = (diff_one_three / dist_one_three * dcut13 * (cut12+cut23) &
+!                         !                    + diff_two_three / dist_two_three * dcut23 * (cut12+cut13)) / 3.0_dp
+!                         !    do i_atomic=1,monomer_one_size
+!                         !       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) = grad_cut_one / real(monomer_one_size,dp)
+!                         !    end do
+!                         !    do i_atomic=1,monomer_two_size
+!                         !       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,monomer_one_size+i_atomic) = grad_cut_two / real(monomer_two_size,dp)
+!                         !    end do
+!                         !    do i_atomic=1,monomer_three_size
+!                         !       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,dimer_size+i_atomic) = grad_cut_three / real(monomer_three_size,dp)
+!                         !    end do
+!                         ! else
+                        
+!                            ! Using only the heavy atoms for the cutoff. 
+!                            primitive_cutoff_grads=0.0_dp
+!                            do k=1,d
+!                               if (this%cutoff_contributor(k)) then
+!                                 primitive_cutoff_grads(k) = dcoordination_function(dist_vec(k),this%cutoff,this%cutoff_transition_width)
+!                               end if
+!                            end do
                            
-                           ! For each atom, for each heavy-atomc pairs it is part of, accumulate cutoff gradients
-                           do i_atomic=1,trimer_size
-                            ! if (signatures(i_atom)/=1)then !? Jonatan
-                             do k=1,d
-                                if (this%cutoff_contributor(k) ) then
-                                  do m=k+1,d
-                                    if (this%cutoff_contributor(m)) then
-                                      if (any(this%component_atoms(k,:) == i_atomic) .or. any(this%component_atoms(m,:) == i_atomic)) then
-                                      descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) &
-                                        + primitive_cutoffs(m)*primitive_cutoff_grads(k)*descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
-                                        + primitive_cutoffs(k)*primitive_cutoff_grads(m)*descriptor_out%x(i_desc)%grad_data(m,:,i_atomic)
-                                      end if
-                                    end if
-                                  end do
-                                end if
-                             end do
-                           end do
+!                            ! For each atom, for each heavy-atomc pairs it is part of, accumulate cutoff gradients
+!                            do i_atomic=1,trimer_size
+!                             ! if (signatures(i_atom)/=1)then !? Jonatan
+!                              do k=1,d
+!                                 if (this%cutoff_contributor(k) ) then
+!                                   do m=k+1,d
+!                                     if (this%cutoff_contributor(m)) then
+!                                       if (any(this%component_atoms(k,:) == i_atomic) .or. any(this%component_atoms(m,:) == i_atomic)) then
+!                                       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) &
+!                                         + primitive_cutoffs(m)*primitive_cutoff_grads(k)*descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
+!                                         + primitive_cutoffs(k)*primitive_cutoff_grads(m)*descriptor_out%x(i_desc)%grad_data(m,:,i_atomic)
+!                                       end if
+!                                     end if
+!                                   end do
+!                                 end if
+!                              end do
+!                            end do
 
-                           !normalisation factor
-                           descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) / n_products
-                        ! end if cutoff_type_grad
+!                            !normalisation factor
+!                            descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) / n_products
+!                         ! end if cutoff_type_grad
                            
                            
                            
-                        !    print'(a,*(f10.5))', "gcuts 0 = ",gcuts
-                        !    print'(a,*(f10.5))', "gcuts 1 = ",descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
-                           print'(a,*(f10.5))', "gcuts d = ",gcuts - descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
+!                         !    print'(a,*(f10.5))', "gcuts 0 = ",gcuts
+!                         !    print'(a,*(f10.5))', "gcuts 1 = ",descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
+!                            print'(a,*(f10.5))', "gcuts d = ",gcuts - descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:)
                            
                         
                         
-                           !##########################################################################################################################################################
-                           !##########################################################################################################################################################
-                           !##########################################################################################################################################################
-                           stop "testing"
+!                            !##########################################################################################################################################################
+!                            !##########################################################################################################################################################
+!                            !##########################################################################################################################################################
+!                            stop "testing"
                               
                            
 
-                     end if calc_grad_descriptor
-                     endblock
+!                      end if calc_grad_descriptor
+!                      endblock
                      
-                     stop "testing 2"
+!                      stop "testing 2"
 
 
-                !   end do loop_trimers
-            !    end do loop_triplets
-            ! end do loop_monomer_pairs
-        !  end do loop_monomer_one
-    enddo the_loop
-    !   end if has_descriptors ! (n_descriptors > 0) ... still need to deallocate if no trimers were found:
+!                 !   end do loop_trimers
+!             !    end do loop_triplets
+!             ! end do loop_monomer_pairs
+!         !  end do loop_monomer_one
+!     enddo the_loop
+!     !   end if has_descriptors ! (n_descriptors > 0) ... still need to deallocate if no trimers were found:
 
-     deallocate(monomer_one_index)
-     deallocate(monomer_two_index)
-     deallocate(monomer_three_index)
-     if (allocated(monomer_triplets)) deallocate(monomer_triplets)
-     if (allocated(triplets_diffs)) deallocate(triplets_diffs)
-     if (allocated(triplets_diffs_map)) deallocate(triplets_diffs_map)
+!      deallocate(monomer_one_index)
+!      deallocate(monomer_two_index)
+!      deallocate(monomer_three_index)
+!      if (allocated(monomer_triplets)) deallocate(monomer_triplets)
+!      if (allocated(triplets_diffs)) deallocate(triplets_diffs)
+!      if (allocated(triplets_diffs_map)) deallocate(triplets_diffs_map)
 
 
 
-     call system_timer('water_trimer_calc')
+!      call system_timer('water_trimer_calc')
 
-   endsubroutine water_trimer_calc !////////////////////////////////////////////////////////////////////////////////////////////////////////////
+!    endsubroutine water_trimer_calc !////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
