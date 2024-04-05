@@ -3022,13 +3022,16 @@
                            !normalisation factor
                            descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) / n_products
                         end if cutoff_type_grad
-
+                        
                      end if calc_grad_descriptor
-                     write(13,'(a,*(f10.5))') "  desc = ", descriptor_out%x(i_desc)%data
-                     write(13,'(a,*(f10.5))') "g desc = ", descriptor_out%x(i_desc)%grad_data
-                     write(13,'(a,*(f10.5))') "   cut = ", descriptor_out%x(i_desc)%covariance_cutoff
-                     write(13,'(a,*(f10.5))') "g  cut = ", descriptor_out%x(i_desc)%grad_covariance_cutoff
-                     stop "testing"
+                     
+                     if (.false.) then ! to compare with water_trimer
+                        write(13,'(a,*(f10.5))') "  desc = ", descriptor_out%x(i_desc)%data
+                        write(13,'(a,*(f10.5))') "g desc = ", descriptor_out%x(i_desc)%grad_data
+                        write(13,'(a,*(f10.5))') "   cut = ", descriptor_out%x(i_desc)%covariance_cutoff
+                        write(13,'(a,*(f10.5))') "g  cut = ", descriptor_out%x(i_desc)%grad_covariance_cutoff
+                        stop "testing"
+                     endif
                 
 
                   end do loop_trimers

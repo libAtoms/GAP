@@ -195,6 +195,7 @@ endfunction water_trimer_cutoff
  
 
 subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
+    use find_water_triplets_mod, only: find_triplets_lars
     type(water_trimer), intent(in) :: this
     type(atoms), intent(in) :: at
     integer, intent(out) :: n_descriptors, n_cross
@@ -205,7 +206,7 @@ subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
     integer, dimension(:), allocatable ::  triplets_diffs_map
     integer, dimension(:,:), allocatable :: monomer_one_index, monomer_triplets
     real(dp), dimension(:,:), allocatable :: triplets_diffs
-    logical, dimension(:), allocatable :: associated_to_monomer
+    ! logical, dimension(:), allocatable :: associated_to_monomer
     
     INIT_ERROR(error)
     
@@ -213,24 +214,57 @@ subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
         RAISE_ERROR("water_trimer_sizes: descriptor object not initialised", error)
     endif
     
-    allocate(associated_to_monomer(at%N))
-    associated_to_monomer=.false.
+    ! allocate(associated_to_monomer(at%N))
+    ! associated_to_monomer=.false.
     
-    call find_general_monomer(at,monomer_one_index,&
-            this%signature,associated_to_monomer,&
-            this%monomer_cutoff,.false.,error) !this%atom_ordercheck
+    block ! Check that the criteria are fullfilled
+        real(dp) box(3), lattice(3,3)
+        logical :: ok_ohh, ok_box, ok_ort
+        integer :: n_mono, n_atom, i
+        
+        lattice = at%lattice
+        
+        forall (i=1:3) box(i) = lattice(i,i) 
+        
+        ! If no Lattice is given: in quip the box is set to something random but big enough, in quippy to 0. 
+        if (all(box<1)) box = 1000 ! If box is 0 (<1) set it to very big
+        forall (i=1:3) lattice(i,i) = box(i)
+        
+        ok_ohh = all(at%Z(1::3) == 8) .and. all(at%Z(2::3) == 1) .and. all(at%Z(3::3) == 1)
+        ok_ort = at%is_orthorhombic
+        ok_box = all(box > 2*this%cutoff)
+        
+        if (.not.all([ok_ohh,ok_ort,ok_box]))then
+            STOP  __FILE__//":"//__LINE__//": water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box//" this box="//box
+            ! RAISE_ERROR("water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
+        endif
+        
+        n_atom = at%N
+        n_mono = n_atom/3
+        ! imonomers = reshape([(i,i=1,n_atom)],[3,n_mono])
+        call find_triplets_lars(at%pos,n_mono,lattice,this%cutoff,monomer_triplets,triplets_diffs,triplets_diffs_map)
+        n_descriptors = size(triplets_diffs_map)
+        
+        ! print*, "  wt calc: found #mono="//n_mono//" #trip="//n_descriptors
+        ! print'(a,*(f10.5))', "lattice = ",lattice
+        ! print'(a,*(f10.5))', "at%lattice = ",at%lattice
+    endblock
     
-    call find_monomer_triplets(at,monomer_triplets,triplets_diffs,triplets_diffs_map,&
-        monomer_one_index,monomer_one_index,monomer_one_index,&
-        !   this%one_two_identical,this%one_three_identical,this%two_three_identical,&
-        .true.,.true.,.true., this%cutoff,error)
+    ! call find_general_monomer(at,monomer_one_index,&
+    !         this%signature,associated_to_monomer,&
+    !         this%monomer_cutoff,.false.,error) !this%atom_ordercheck
+    
+    ! call find_monomer_triplets(at,monomer_triplets,triplets_diffs,triplets_diffs_map,&
+    !     monomer_one_index,monomer_one_index,monomer_one_index,&
+    !     !   this%one_two_identical,this%one_three_identical,this%two_three_identical,&
+    !     .true.,.true.,.true., this%cutoff,error)
     n_descriptors = size(triplets_diffs_map)
     n_cross=n_descriptors * 9
     
-    deallocate(monomer_one_index)
+    ! deallocate(monomer_one_index)
     if(allocated(monomer_triplets)) deallocate(monomer_triplets)
     if(allocated(triplets_diffs)) deallocate(triplets_diffs)
-    deallocate(associated_to_monomer)
+    ! deallocate(associated_to_monomer)
     
     if( present(n_index) ) n_index = 9
     
@@ -269,27 +303,36 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     call finalise(descriptor_out)
     
     block ! Check that the criteria are fullfilled
-        real(dp) box(3)
+        real(dp) box(3), lattice(3,3)
         logical :: ok_ohh, ok_box, ok_ort
-        box = [(at%lattice(i,i), i=1,3)]
+        integer :: n_mono, n_atom
+        
+        lattice = at%lattice
+        
+        forall (i=1:3) box(i) = lattice(i,i) 
+        
+        ! If no Lattice is given: in quip the box is set to something random but big enough, in quippy to 0. 
+        if (all(box<1)) box = 1000 ! If box is 0 (<1) set it to very big
+        forall (i=1:3) lattice(i,i) = box(i)
+        
         ok_ohh = all(at%Z(1::3) == 8) .and. all(at%Z(2::3) == 1) .and. all(at%Z(3::3) == 1)
         ok_ort = at%is_orthorhombic
         ok_box = all(box > 2*this%cutoff)
         
         if (.not.all([ok_ohh,ok_ort,ok_box]))then
-            RAISE_ERROR("water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
+            STOP  __FILE__//":"//__LINE__//": water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box//" this box="//box
+            ! RAISE_ERROR("water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
         endif
-    endblock 
-    
-    block ! Use fast triplet finder
-        integer :: n_mono, n_atom
+        
         n_atom = at%N
         n_mono = n_atom/3
         imonomers = reshape([(i,i=1,n_atom)],[3,n_mono])
-        call find_triplets_lars(at%pos,n_mono,at%lattice,this%cutoff,itriplets,triplets_diffs,triplets_diffs_map)
+        call find_triplets_lars(at%pos,n_mono,lattice,this%cutoff,itriplets,triplets_diffs,triplets_diffs_map)
         n_descriptors = size(triplets_diffs_map)
-        print*, "  wt calc: found #mono="//n_mono//" #trip="//n_descriptors
-        print'(a,*(f10.5))', "at%lattice = ",at%lattice
+        
+        ! print*, "  wt calc: found #mono="//n_mono//" #trip="//n_descriptors
+        ! print'(a,*(f10.5))', "lattice = ",lattice
+        ! print'(a,*(f10.5))', "at%lattice = ",at%lattice
     endblock 
     
     
@@ -327,6 +370,7 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     
     ! Loop through trimers
     ! Could do OpenMP here but that's done externally for the training... Hmm but SOAP has it right?
+    ! Blocks are in place, so making functions or openMP is easy. 
     the_loop : do i_desc = 1, n_descriptors
             
         block 
@@ -459,12 +503,13 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
             end if 
             
         endblock
-        write(12,'(a,*(f10.5))') "  desc = ", descriptor_out%x(i_desc)%data
-        write(12,'(a,*(f10.5))') "g desc = ", descriptor_out%x(i_desc)%grad_data
-        write(12,'(a,*(f10.5))') "   cut = ", descriptor_out%x(i_desc)%covariance_cutoff
-        write(12,'(a,*(f10.5))') "g  cut = ", descriptor_out%x(i_desc)%grad_covariance_cutoff
-        stop "testing"
-        
+        if (.false.) then ! to compare with general trimer
+            write(12,'(a,*(f10.5))') "  desc = ", descriptor_out%x(i_desc)%data
+            write(12,'(a,*(f10.5))') "g desc = ", descriptor_out%x(i_desc)%grad_data
+            write(12,'(a,*(f10.5))') "   cut = ", descriptor_out%x(i_desc)%covariance_cutoff
+            write(12,'(a,*(f10.5))') "g  cut = ", descriptor_out%x(i_desc)%grad_covariance_cutoff
+            stop "testing"
+        endif
     enddo the_loop
     
     if (allocated(itriplets)) deallocate(itriplets)

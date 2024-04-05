@@ -82,9 +82,11 @@ program gap_fit_program
 
   print*, "  gf 8"
   call fit_n_from_xyz(main_gap_fit) ! counts number of energies, forces, virials. computes number of descriptors and gradients.
+  print*, "  gf 8.1"
   call gap_fit_distribute_tasks(main_gap_fit)
   if (main_gap_fit%task_manager%n_workers > 1) call fit_n_from_xyz(main_gap_fit)
   call gap_fit_set_mpi_blocksizes(main_gap_fit)
+  print*, "  gf 8.2"
   call gap_fit_estimate_memory(main_gap_fit)
 
   print*, "  gf 9"
