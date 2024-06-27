@@ -55,7 +55,7 @@ SOAP_TURBO_F95_FILES = soap_turbo_functions soap_turbo_radial soap_turbo_angular
 SOAP_TURBO_F95_SOURCES =  ${addsuffix .f90, ${SOAP_TURBO_F95_FILES}}
 SOAP_TURBO_F95_OBJS =  ${addsuffix .o, ${SOAP_TURBO_F95_FILES}}
 
-GAP1_F95_FILES += find_water_triplets_mod descriptors gp_predict descriptors_wrapper clustering 
+GAP1_F95_FILES += find_water_triplets_noncommercial descriptors gp_predict descriptors_wrapper clustering 
 GAP1_F95_SOURCES = ${addsuffix .f95, ${GAP1_F95_FILES}}
 GAP1_F95_OBJS = ${addsuffix .o, ${GAP1_F95_FILES}}
 

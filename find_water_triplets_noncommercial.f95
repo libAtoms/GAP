@@ -1,4 +1,44 @@
-module find_water_triplets_mod
+! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+! HND X
+! HND X   GAP (Gaussian Approximation Potental)
+! HND X   
+! HND X
+! HND X   Portions of GAP were written by Albert Bartok-Partay, Gabor Csanyi, 
+! HND X   Copyright 2006-2021.
+! HND X
+! HND X   Portions of GAP were written by Noam Bernstein as part of
+! HND X   his employment for the U.S. Government, and are not subject
+! HND X   to copyright in the USA.
+! HND X
+! HND X   GAP is published and distributed under the
+! HND X      Academic Software License v1.0 (ASL)
+! HND X
+! HND X   GAP is distributed in the hope that it will be useful for non-commercial
+! HND X   academic research, but WITHOUT ANY WARRANTY; without even the implied 
+! HND X   warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+! HND X   ASL for more details.
+! HND X
+! HND X   You should have received a copy of the ASL along with this program
+! HND X   (e.g. in a LICENSE.md file); if not, you can write to the original licensors,
+! HND X   Gabor Csanyi or Albert Bartok-Partay. The ASL is also published at
+! HND X   http://github.com/gabor1/ASL
+! HND X
+! HND X   When using this software, please cite the following reference:
+! HND X
+! HND X   A. P. Bartok et al Physical Review Letters vol 104 p136403 (2010)
+! HND X
+! HND X   When using the SOAP kernel or its variants, please additionally cite:
+! HND X
+! HND X   A. P. Bartok et al Physical Review B vol 87 p184115 (2013)
+! HND X
+! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+!!!!!!!!
+!!! This file was written by Jonatan Öström (@sujona, jonatan.ostrom@gmail.com) and Lars G.M. Pettersson, Stockholm University
+!!! Here are implementations of water-trimer search routines, that work only for orthogonal unit cells with the shortest dimension longer than 2 x (3-body cutoff)
+!!!!!!!!
+
+module find_water_triplets
     ! use backend
     implicit none
     integer, parameter :: dp = kind(0d0)
@@ -10,8 +50,9 @@ module find_water_triplets_mod
     
 contains
 
+! ////////////////////////////////////////////////
 ! Dynamic insert in allocatable array
-! insert(a,i,x) does a(i) = x but reallocates a to length 2*i if the length < i
+! insert(a,i,x) does a(i) = x but reallocates a to length 2*i if len(a) < i
 
 subroutine insert_i1(array,ii,val)
     integer, intent(inout), allocatable :: array(:)
@@ -51,7 +92,8 @@ subroutine insert_r2(array,ii,val)
     array(:,ii) = val
 end
 
-
+! ////////////////////////////////////////////////
+! Utilitity routines
 
 subroutine min_img(XO,NO,i1,i2,box,lsq,x12,s12)
     real(dp), intent(in)    :: XO(3,NO), box(3)
@@ -94,8 +136,27 @@ subroutine average_position(NW,XW,XC,XO)
     enddo
 end
 
-subroutine tripletsw(XW,NW,box,rcut,n_trip)
-    ! Brute force
+function wall_time() result(tt)
+    integer count,count_rate
+    real(dp) tt
+    call system_clock(count,count_rate)
+    tt  = dble(count)/count_rate
+end
+subroutine take(tt,text) 
+    real(dp), intent(inout) :: tt
+    real(dp) :: old
+    character(*), intent(in) :: text
+    old = tt
+    tt = wall_time()
+    print'(f6.3,a)',tt-old,"s "//text
+end
+
+
+! ////////////////////////////////////////////////
+! Finding triplets
+
+subroutine find_triplets_brute_force(XW,NW,box,rcut,n_trip)
+    ! find water triplets with brute force
     integer, intent(in) :: NW
     real(dp), intent(in) :: XW(3,NW*3), box(3), rcut
     integer, intent(out) :: n_trip
@@ -160,22 +221,8 @@ subroutine find_pairs_jona(XW,NO,box,rcut,n_pair,id2, sh2, dx2)
     
 end
 
-function wall_time() result(tt)
-    integer count,count_rate
-    real(dp) tt
-    call system_clock(count,count_rate)
-    tt  = dble(count)/count_rate
-end
-subroutine take(tt,text) 
-    real(dp), intent(inout) :: tt
-    real(dp) :: old
-    character(*), intent(in) :: text
-    old = tt
-    tt = wall_time()
-    print'(f6.3,a)',tt-old,"s "//text
-end
-
 subroutine find_triplets_jona(XW,NO,box,rcut,n_trip,id3,sh3,dx3)
+    ! Finds water triplets using a full pair list
     integer , intent(in)    :: NO
     real(dp), intent(in)    :: XW(3,NO*3), box(3), rcut
     integer , intent(out)   :: n_trip
@@ -280,6 +327,7 @@ subroutine find_triplets_jona(XW,NO,box,rcut,n_trip,id3,sh3,dx3)
 end
 
 subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
+    ! Finds water triplets using a pair list of only unique pairs
     integer, intent(in) :: NO
     real(dp),  intent(in) :: rcut, lattice(3,3), XW(3,3*NO)
     real(dp),  intent(out), allocatable :: dx3(:,:)
@@ -401,7 +449,8 @@ subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
     enddo
 end
 
-
+! ////////////////////////////////////////////////
+! Printing
 
 subroutine print_pairs_or_triplets(idx,shift,diff,NO)
     real(dp), allocatable,dimension(:,:), intent(inout) :: diff

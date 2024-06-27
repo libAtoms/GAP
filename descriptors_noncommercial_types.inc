@@ -101,6 +101,8 @@
 
 
    type water_trimer
+      !!! 3-body water descriptor
+      !!! -- Jonatan Öström, @sujona, jonatan.ostrom@gmail.com
       type(permutation_data_type) :: permutation_data
       integer, dimension(3) :: signature = [8,1,1]
       real(dp) :: cutoff, cutoff_transition_width, monomer_cutoff
