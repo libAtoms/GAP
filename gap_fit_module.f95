@@ -741,24 +741,18 @@ contains
     integer :: i
 
     this%max_cutoff = 0.0_dp
-    print*, "   read_descriptors 1"
     if(allocated(this%my_descriptor)) then
-        print*, "   read_descriptors 1.1"
         do i = 1, size(this%my_descriptor)
           call finalise(this%my_descriptor(i))
        enddo
-       print*, "   read_descriptors 1.2"
        deallocate(this%my_descriptor)
     endif
-    print*, "   read_descriptors 2"
 
     allocate(this%my_descriptor(this%n_coordinate))
-    print*, "   read_descriptors 3"
     do i = 1, this%n_coordinate
        call initialise(this%my_descriptor(i),this%gap_str(i))
        if( this%max_cutoff < cutoff(this%my_descriptor(i)) ) this%max_cutoff = cutoff(this%my_descriptor(i))
     enddo
-    print*, "   read_descriptors 4"
 
   endsubroutine read_descriptors
 

@@ -3023,15 +3023,6 @@
                         
                      end if calc_grad_descriptor
                      
-                     if (.false.) then ! to compare with water_trimer
-                        write(13,'(a,*(f10.5))') "  desc = ", descriptor_out%x(i_desc)%data
-                        write(13,'(a,*(f10.5))') "g desc = ", descriptor_out%x(i_desc)%grad_data
-                        write(13,'(a,*(f10.5))') "   cut = ", descriptor_out%x(i_desc)%covariance_cutoff
-                        write(13,'(a,*(f10.5))') "g  cut = ", descriptor_out%x(i_desc)%grad_covariance_cutoff
-                        stop "testing"
-                     endif
-                
-
                   end do loop_trimers
                end do loop_triplets
             end do loop_monomer_pairs
@@ -4866,8 +4857,6 @@ subroutine water_trimer_initialise(this,args_str,error)
     logical :: intermolecular(9,9), ordercheck
     type(Dictionary) :: params
     
-    print*, "water_trimer_initialize!"
-
 
     INIT_ERROR(error)
 
@@ -4945,14 +4934,12 @@ subroutine water_trimer_initialise(this,args_str,error)
     end do
 
     this%initialised = .true.
-    print*, "water trimer initialisED!"
 endsubroutine water_trimer_initialise
 
 
 subroutine water_trimer_finalise(this,error)
     type(water_trimer), intent(inout) :: this
     integer, optional, intent(out) :: error
-    print*, "  wt finilize!"
     INIT_ERROR(error)
     if(.not. this%initialised) return
     this%cutoff = 0.0_dp
@@ -4963,7 +4950,6 @@ subroutine water_trimer_finalise(this,error)
     this%power = 1.0_dp
     this%dist_shift = 0.0_dp
     this%initialised = .false.
-    print*, "  wt finalizED!"
 endsubroutine water_trimer_finalise
 
 
@@ -5023,8 +5009,6 @@ subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
         RAISE_ERROR("water_trimer_sizes: descriptor object not initialised", error)
     endif
     
-    ! allocate(associated_to_monomer(at%N))
-    ! associated_to_monomer=.false.
     
     block ! Check that the criteria are fullfilled
         real(dp) box(3), lattice(3,3)
@@ -5044,36 +5028,22 @@ subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
         ok_box = all(box > 2*this%cutoff)
         
         if (.not.all([ok_ohh,ok_ort,ok_box]))then
-            STOP  __FILE__//":"//__LINE__//": water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box//" this box="//box
-            ! RAISE_ERROR("water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
+            RAISE_ERROR("water_trimer_calc inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
         endif
         
         n_atom = at%N
         n_mono = n_atom/3
-        ! imonomers = reshape([(i,i=1,n_atom)],[3,n_mono])
+        
         call find_triplets_lars(at%pos,n_mono,lattice,this%cutoff,monomer_triplets,triplets_diffs,triplets_diffs_map)
         n_descriptors = size(triplets_diffs_map)
         
-        ! print*, "  wt calc: found #mono="//n_mono//" #trip="//n_descriptors
-        ! print'(a,*(f10.5))', "lattice = ",lattice
-        ! print'(a,*(f10.5))', "at%lattice = ",at%lattice
     endblock
     
-    ! call find_general_monomer(at,monomer_one_index,&
-    !         this%signature,associated_to_monomer,&
-    !         this%monomer_cutoff,.false.,error) !this%atom_ordercheck
-    
-    ! call find_monomer_triplets(at,monomer_triplets,triplets_diffs,triplets_diffs_map,&
-    !     monomer_one_index,monomer_one_index,monomer_one_index,&
-    !     !   this%one_two_identical,this%one_three_identical,this%two_three_identical,&
-    !     .true.,.true.,.true., this%cutoff,error)
     n_descriptors = size(triplets_diffs_map)
     n_cross=n_descriptors * 9
     
-    ! deallocate(monomer_one_index)
     if(allocated(monomer_triplets)) deallocate(monomer_triplets)
     if(allocated(triplets_diffs)) deallocate(triplets_diffs)
-    ! deallocate(associated_to_monomer)
     
     if( present(n_index) ) n_index = 9
     
@@ -5097,7 +5067,6 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     integer, dimension(3,at%N/3) :: imonomers
     INIT_ERROR(error)
     
-    !  print*, "Entered water_trimer_calc"
     call system_timer('water_trimer_calc')
     
     if(.not. this%initialised) then
@@ -5139,9 +5108,6 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
         call find_triplets_lars(at%pos,n_mono,lattice,this%cutoff,itriplets,triplets_diffs,triplets_diffs_map)
         n_descriptors = size(triplets_diffs_map)
         
-        ! print*, "  wt calc: found #mono="//n_mono//" #trip="//n_descriptors
-        ! print'(a,*(f10.5))', "lattice = ",lattice
-        ! print'(a,*(f10.5))', "at%lattice = ",at%lattice
     endblock 
     
     
