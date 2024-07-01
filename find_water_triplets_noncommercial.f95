@@ -326,24 +326,25 @@ subroutine find_triplets_jona(XW,NO,box,rcut,n_trip,id3,sh3,dx3)
     
 end
 
-subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
+subroutine find_triplets_lars(XW,NO,box,rcut,id3,dx3,n_trip)!sh3,
     ! Finds water triplets using a pair list of only unique pairs
     integer, intent(in) :: NO
-    real(dp),  intent(in) :: rcut, lattice(3,3), XW(3,3*NO)
+    real(dp),  intent(in) :: rcut, box(3), XW(3,3*NO)
     real(dp),  intent(out), allocatable :: dx3(:,:)
-    integer, intent(out), allocatable :: id3(:,:), map3(:)!sh3(:,:)
+    integer, intent(out), allocatable :: id3(:,:)!, ma p3(:)!sh3(:,:)
+    integer, intent(out) :: n_trip
+    ! internal
     integer i0, i1, ii, jj, jl, kk, kl, jn, j0, k0
-    integer n_pair, n_trip, num(NO), ioff(NO)
-    integer, allocatable :: sh2(:,:), neighbor(:)
+    integer n_pair, num(NO), ioff(NO)
+    integer, allocatable :: neighbor(:) !sh2(:,:), 
     real(dp) , allocatable :: dx2(:,:)
     real(dp)  rcut2, dd, oij(3)
     real(dp)  XC(3,NO), XO(3,NO)
-    real(dp),  dimension(3) :: cij,cik, box
-    integer, dimension(3) :: sij,sik
+    real(dp),  dimension(3) :: cij,cik
+    integer, dimension(3) :: sij!,sik
     
-    box = [(lattice(ii,ii),ii=1,3)]
     allocate(id3(3,0),dx3(6,0))!,sh3(6,0)
-    allocate(neighbor(0),sh2(3,0),dx2(3,0))
+    allocate(neighbor(0),dx2(3,0)) !sh2(3,0),
     
     call average_position(NO,XW,XC,XO)
     
@@ -364,7 +365,7 @@ subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
             num(ii) = num(ii) + 1
             n_pair = n_pair + 1
             call insert(neighbor, n_pair, jj)
-            call insert(sh2, n_pair, sij)
+            ! call insert(sh2, n_pair, sij)
             call insert(dx2, n_pair, cij)
         enddo
         ioff(ii+1) = n_pair
@@ -387,12 +388,12 @@ subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
         i1 = ioff(ii+1)
         do jl = 1, num(ii) - 1
             jj = neighbor(i0 + jl)
-            sij = sh2(:,i0 + jl)
+            ! sij = sh2(:,i0 + jl)
             cij = dx2(:,i0 + jl)
             do kl = jl + 1, num(ii)
                 kk = neighbor(i0 + kl)
                 n_trip = n_trip + 1
-                sik = sh2(:,i0 + kl)
+                ! sik = sh2(:,i0 + kl)
                 cik = dx2(:,i0 + kl)
                 
                 call insert(id3, n_trip, [ii,jj,kk])
@@ -405,14 +406,14 @@ subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
         do jl = 1, num(ii)
             jj = neighbor(i0 + jl)
             j0 = ioff(jj)
-            sij = sh2(:,i0 + jl)
+            ! sij = sh2(:,i0 + jl)
             cij = dx2(:,i0 + jl)
             do kl = 1, num(jj) !(1)
                 kk = neighbor(j0 + kl)   !(2)
                 if (any(neighbor(i0+1:i1)==kk)) cycle
                 n_trip = n_trip + 1
                 
-                sik = sh2(:,i0 + jl) + sh2(:,j0 + kl)
+                ! sik = sh2(:,i0 + jl) + sh2(:,j0 + kl)
                 cik = dx2(:,i0 + jl) + dx2(:,j0 + kl)
                 
                 call insert(id3, n_trip, [ii,jj,kk])
@@ -428,7 +429,7 @@ subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
                     if (any(kk==neighbor(i0+1:i1))) cycle ! exclude k->N(i)
                     n_trip = n_trip + 1
                     
-                    sik = sh2(:,i0 + jl) - sh2(:,k0 + jn)
+                    ! sik = sh2(:,i0 + jl) - sh2(:,k0 + jn)
                     cik = dx2(:,i0 + jl) - dx2(:,k0 + jn)
                     
                     ! insert in i<k<j order
@@ -443,10 +444,10 @@ subroutine find_triplets_lars(XW,NO,lattice,rcut,id3,dx3,map3)!sh3,
     id3 = id3(:,:n_trip)
     ! sh3 = sh3(:,:n_trip)
     dx3 = dx3(:,:n_trip)
-    allocate(map3(n_trip))
-    do ii = 1,n_trip
-        map3(ii) = ii
-    enddo
+    ! allocate(map3(n_trip))
+    ! do ii = 1,n_trip
+    !     map3(ii) = ii
+    ! enddo
 end
 
 ! ////////////////////////////////////////////////

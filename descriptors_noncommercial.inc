@@ -4998,10 +4998,9 @@ subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
     integer, intent(out), optional :: n_index
     integer, optional, intent(out) :: error
     
-    integer, dimension(:), allocatable ::  triplets_diffs_map
     integer, dimension(:,:), allocatable :: monomer_one_index, monomer_triplets
     real(dp), dimension(:,:), allocatable :: triplets_diffs
-    ! logical, dimension(:), allocatable :: associated_to_monomer
+    real(dp) box(3)
     
     INIT_ERROR(error)
     
@@ -5009,38 +5008,10 @@ subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
         RAISE_ERROR("water_trimer_sizes: descriptor object not initialised", error)
     endif
     
+    call water_trimer_system_check(this,at,box,error)
+    call find_triplets_lars(at%pos,at%N/3,box,this%cutoff,monomer_triplets,triplets_diffs,n_descriptors)
     
-    block ! Check that the criteria are fullfilled
-        real(dp) box(3), lattice(3,3)
-        logical :: ok_ohh, ok_box, ok_ort
-        integer :: n_mono, n_atom, i
-        
-        lattice = at%lattice
-        
-        forall (i=1:3) box(i) = lattice(i,i) 
-        
-        ! If no Lattice is given: in quip the box is set to something random but big enough, in quippy to 0. 
-        if (all(box<1)) box = 1000 ! If box is 0 (<1) set it to very big
-        forall (i=1:3) lattice(i,i) = box(i)
-        
-        ok_ohh = all(at%Z(1::3) == 8) .and. all(at%Z(2::3) == 1) .and. all(at%Z(3::3) == 1)
-        ok_ort = at%is_orthorhombic
-        ok_box = all(box > 2*this%cutoff)
-        
-        if (.not.all([ok_ohh,ok_ort,ok_box]))then
-            RAISE_ERROR("water_trimer_calc inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
-        endif
-        
-        n_atom = at%N
-        n_mono = n_atom/3
-        
-        call find_triplets_lars(at%pos,n_mono,lattice,this%cutoff,monomer_triplets,triplets_diffs,triplets_diffs_map)
-        n_descriptors = size(triplets_diffs_map)
-        
-    endblock
-    
-    n_descriptors = size(triplets_diffs_map)
-    n_cross=n_descriptors * 9
+    n_cross = n_descriptors * 9
     
     if(allocated(monomer_triplets)) deallocate(monomer_triplets)
     if(allocated(triplets_diffs)) deallocate(triplets_diffs)
@@ -5049,7 +5020,43 @@ subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
     
 endsubroutine water_trimer_sizes
 
- 
+subroutine water_trimer_system_check(this,at,box,error)
+    type(water_trimer), intent(in) :: this
+    type(atoms), intent(in) :: at
+    real(dp), intent(out) :: box(3)
+    integer, optional, intent(inout) :: error
+    real(dp) :: lattice(3,3)
+    logical :: ok_ohh, ok_box, ok_ort
+    integer i
+    
+    lattice = at%lattice
+    
+    ! Check OHH
+    ok_ohh = all(at%Z(1::3) == 8) .and. all(at%Z(2::3) == 1) .and. all(at%Z(3::3) == 1)
+    
+    do i = 1,3
+        box(i) = lattice(i,i) 
+        lattice(i,i) = 0
+    enddo
+    
+    ! Check orthogonal
+    ok_ort = all(abs(lattice)<1d-14) .and. at%is_orthorhombic
+    
+    ! Fix box (lattice) size if it is 0
+    ! If no Lattice is given: in quip (gap_fit) the box is set to something random but big enough, in quippy to 0. 
+    if (all(box<1)) box = 1000 ! If box is 0 (<1) set it to very big
+    
+    
+    ! Check that box is large enough
+    ok_box = all(box > 2*this%cutoff)
+    
+    if (.not.all([ok_ohh,ok_ort,ok_box]))then
+        ! STOP  __FILE__//":"//__LINE__//": water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box//" this box="//box
+        RAISE_ERROR("water_trimer: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
+    endif
+end subroutine
+    
+
 subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error) !//////////////////////////////////////////////////////////////////////////////////
     use find_water_triplets, only: find_triplets_lars
     type(water_trimer), intent(in) :: this
@@ -5060,11 +5067,12 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     integer, optional, intent(out) :: error
     integer :: n_descriptors, i, i_desc
     real(dp), dimension(:,:), allocatable :: triplets_diffs
-    integer, dimension(:), allocatable :: triplets_diffs_map 
     integer, dimension(:,:), allocatable :: itriplets
     logical :: my_do_descriptor, my_do_grad_descriptor
     integer, parameter :: trimer_size = 9, nd = 36
     integer, dimension(3,at%N/3) :: imonomers
+    real(dp) :: box(3)
+    
     INIT_ERROR(error)
     
     call system_timer('water_trimer_calc')
@@ -5080,42 +5088,16 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     
     call finalise(descriptor_out)
     
-    block ! Check that the criteria are fullfilled
-        real(dp) box(3), lattice(3,3)
-        logical :: ok_ohh, ok_box, ok_ort
-        integer :: n_mono, n_atom
-        
-        lattice = at%lattice
-        
-        forall (i=1:3) box(i) = lattice(i,i) 
-        
-        ! If no Lattice is given: in quip the box is set to something random but big enough, in quippy to 0. 
-        if (all(box<1)) box = 1000 ! If box is 0 (<1) set it to very big
-        forall (i=1:3) lattice(i,i) = box(i)
-        
-        ok_ohh = all(at%Z(1::3) == 8) .and. all(at%Z(2::3) == 1) .and. all(at%Z(3::3) == 1)
-        ok_ort = at%is_orthorhombic
-        ok_box = all(box > 2*this%cutoff)
-        
-        if (.not.all([ok_ohh,ok_ort,ok_box]))then
-            STOP  __FILE__//":"//__LINE__//": water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box//" this box="//box
-            ! RAISE_ERROR("water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
-        endif
-        
-        n_atom = at%N
-        n_mono = n_atom/3
-        imonomers = reshape([(i,i=1,n_atom)],[3,n_mono])
-        call find_triplets_lars(at%pos,n_mono,lattice,this%cutoff,itriplets,triplets_diffs,triplets_diffs_map)
-        n_descriptors = size(triplets_diffs_map)
-        
-    endblock 
     
+    call water_trimer_system_check(this,at,box,error)
+    call find_triplets_lars(at%pos,at%N/3,box,this%cutoff,itriplets,triplets_diffs,n_descriptors)
+    
+    imonomers = reshape([(i,i=1,at%N)],[3,at%N/3])
     
     ! Print stuff?
     call system_timer('water_trimer_calc: find_monomer_triplets')
     call print("itriplets("//size(itriplets,1)//", "//size(itriplets,2)//")", PRINT_NERD)
     call print("triplets_diffs("//size(triplets_diffs,1)//", "//size(triplets_diffs,2)//")", PRINT_NERD)
-    call print("triplets_diffs_map("//size(triplets_diffs_map)//")", PRINT_NERD)
     call print("ready to construct "//n_descriptors //" descriptors",PRINT_NERD)
     
     ! Allocate
@@ -5219,6 +5201,7 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
                     rlen(ij) = a0
                     desc0(ij) = (a0 + shft) ** pow
                     
+                    ! Gradient
                     b3 = - pow * (a0+shft)**(pow-1.0_dp)  * a3 / a0
                     gdesc0(ij,:,jj) = b3
                     gdesc0(ij,:,ii) = -b3
@@ -5236,7 +5219,7 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
                 real(dp) :: cutoff, width
                 cutoff= this%cutoff
                 width = this%cutoff_transition_width
-                    
+                
                 oo12 = pos(:,4)-pos(:,1)
                 oo13 = pos(:,7)-pos(:,1)
                 oo23 = pos(:,7)-pos(:,4)
@@ -5248,7 +5231,7 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
                 cut23 = coordination_function(o23,cutoff,width)
                 cut = (cut12*cut13 + cut12*cut23 + cut13*cut23) / 3
                 
-                
+                ! Gradient
                 dcut12 = dcoordination_function(o12, cutoff, width)
                 dcut13 = dcoordination_function(o13, cutoff, width)
                 dcut23 = dcoordination_function(o23, cutoff, width)
@@ -5289,7 +5272,6 @@ subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descri
     
     if (allocated(itriplets)) deallocate(itriplets)
     if (allocated(triplets_diffs)) deallocate(triplets_diffs)
-    if (allocated(triplets_diffs_map)) deallocate(triplets_diffs_map)
     
     call system_timer('water_trimer_calc')
     
