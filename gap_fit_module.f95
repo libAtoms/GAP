@@ -741,9 +741,8 @@ contains
     integer :: i
 
     this%max_cutoff = 0.0_dp
-
     if(allocated(this%my_descriptor)) then
-       do i = 1, size(this%my_descriptor)
+        do i = 1, size(this%my_descriptor)
           call finalise(this%my_descriptor(i))
        enddo
        deallocate(this%my_descriptor)

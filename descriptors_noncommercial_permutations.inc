@@ -126,6 +126,21 @@
 
             permutations=my_permutation_data%dist_vec_permutations
 
+         case(DT_WATER_TRIMER)
+            if (.not. this%descriptor_water_trimer%permutation_data%initialised)then
+              RAISE_ERROR("descriptor_permutations: permutation_data not initialised "//this%descriptor_type,error)
+            else if (this%descriptor_water_trimer%permutation_data%perm_number /= 1) then
+              RAISE_ERROR("descriptor_permutations: permutation_data%perm_number must be initialised to one"//this%descriptor_type,error)
+            end if
+
+            call permutation_data_copy(my_permutation_data, this%descriptor_water_trimer%permutation_data)
+
+            if (my_permutation_data%n_perms > 1) then
+              call next(my_permutation_data, 1)
+            end if
+
+            permutations=my_permutation_data%dist_vec_permutations
+
          case(DT_MOLECULE_LO_D)
             if (.not. this%descriptor_molecule_lo_d%permutation_data%initialised) then
               RAISE_ERROR("descriptor_permutations: permutation_data not initialised "//this%descriptor_type,error)
