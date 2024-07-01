@@ -2575,13 +2575,13 @@
         n_index
      integer :: monomer_one_size, monomer_two_size, monomer_three_size, n_monomer_one, n_monomer_two, n_monomer_three, n_products!, contributor_loc
      integer, dimension(1) :: unit_array
-     real(dp) :: temp_dist
+     real(dp) :: temp_dist, desc_der
      real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
-     real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
+     real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three, unit_vec
      real(dp) :: dist_one_two, dist_one_three, dist_two_three, cut12, cut13, cut23, dcut12, dcut13, dcut23
      real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
      real(dp), dimension(:,:), allocatable :: interatomic_distances,diffs_one,diffs_two,diffs_three,triplets_diffs
-     real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
+     real(dp), dimension(:,:,:), allocatable :: interatomic_vectors, unit_vectors
      integer, dimension(3) :: temp_shift, shift_one_two,shift_one_three
      integer, dimension(:), allocatable :: atomic_index_dimer, atomic_index_trimer, atomic_index_one, atomic_index_two, atomic_index_three,triplets_diffs_map
      integer, dimension(:,:), allocatable :: monomer_one_index, monomer_two_index, monomer_three_index, monomer_triplets
@@ -2646,6 +2646,7 @@
      allocate(atomic_index_dimer(dimer_size))
      allocate(atomic_index_trimer(trimer_size))
 
+     allocate(unit_vectors(d,3,trimer_size))
      allocate(interatomic_vectors(trimer_size,trimer_size,3))
      allocate(interatomic_distances(trimer_size,trimer_size))
      allocate(associated_to_monomer(at%N))
@@ -2958,16 +2959,25 @@
                         call print("TRIM  9",PRINT_NERD)
                         call print('TRIM  Lattice="10.0000000       0.00000000       0.00000000       0.00000000      10.0000000       0.00000000       0.00000000       0.00000000      10.00000" Properties=Z:I:1:pos:R:3',PRINT_NERD)
                         do i_atomic=1,trimer_size
-                        call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
+                            call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
                         end do
-
-                        !build the grad_data matrix
+                        
+                        ! Build the grad_data matrix
+                        unit_vectors = 0
                         descriptor_out%x(i_desc)%has_grad_data(:) = .true.
                         do k=1,d
                            i_atomic = this%component_atoms(k,1)
                            j_atomic = this%component_atoms(k,2)
-                           descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) * interatomic_vectors(i_atomic,j_atomic,:) / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
-                           descriptor_out%x(i_desc)%grad_data(k,:,j_atomic) = -descriptor_out%x(i_desc)%grad_data(k,:,i_atomic)        ! descriptor wrt j_atomic
+                           
+                           unit_vec = interatomic_vectors(i_atomic,j_atomic,:) / interatomic_distances(i_atomic,j_atomic)
+                           desc_der = this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp)
+                           
+                           descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) = - desc_der * unit_vec  ! descriptor wrt atom i_atomic
+                           descriptor_out%x(i_desc)%grad_data(k,:,j_atomic) =   desc_der * unit_vec  ! descriptor wrt j_atomic
+                           
+                           ! Unit vectors for cutoff derivatives
+                           unit_vectors(k,:,i_atomic) = -unit_vec
+                           unit_vectors(k,:,j_atomic) =  unit_vec
                         end do
 
                         cutoff_type_grad: if (this%mpifind) then
@@ -3008,8 +3018,8 @@
                                     if (this%cutoff_contributor(m)) then
                                       if (any(this%component_atoms(k,:) == i_atomic) .or. any(this%component_atoms(m,:) == i_atomic)) then
                                       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) &
-                                        + primitive_cutoffs(m)*primitive_cutoff_grads(k)*descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
-                                        + primitive_cutoffs(k)*primitive_cutoff_grads(m)*descriptor_out%x(i_desc)%grad_data(m,:,i_atomic)
+                                      + primitive_cutoffs(m) * primitive_cutoff_grads(k) * unit_vectors(k,:,i_atomic) &
+                                      + primitive_cutoffs(k) * primitive_cutoff_grads(m) * unit_vectors(m,:,i_atomic)
                                       end if
                                     end if
                                   end do
