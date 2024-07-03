@@ -107,6 +107,7 @@ module descriptors_module
    integer, parameter, public :: DT_DISTANCE_NB     = 29
    integer, parameter, public :: DT_SOAP_EXPRESS    = 30
    integer, parameter, public :: DT_SOAP_TURBO      = 31
+   integer, parameter, public :: DT_WATER_TRIMER  = 32
 
    integer, parameter :: NP_WATER_DIMER    = 8
    integer, parameter :: NP_A2_DIMER       = 8
@@ -485,7 +486,7 @@ module descriptors_module
    public :: soap, general_monomer, bispectrum_so4, bispectrum_so3, behler, distance_2b, &
         coordination, angle_3b, co_angle_3b, co_distance_2b, cosnx, trihis, water_monomer, &
         water_dimer, a2_dimer, bond_real_space, power_so3, power_so4, an_monomer, general_dimer, &
-        general_trimer, rdf, as_distance_2b, molecule_lo_d, alex,  com_dimer,  distance_nb, &
+        general_trimer, water_trimer, rdf, as_distance_2b, molecule_lo_d, alex,  com_dimer,  distance_nb, &
         descriptor_data_mono, fourier_so4_type, radialfunction_type, transfer_parameters_type, &
         ab_dimer, atom_real_space, spherical_harmonics_type, behler_g2, behler_g3, soap_turbo, soap_express
 #else
@@ -533,6 +534,7 @@ module descriptors_module
       type(general_monomer) :: descriptor_general_monomer
       type(general_dimer)   :: descriptor_general_dimer
       type(general_trimer)  :: descriptor_general_trimer
+      type(water_trimer)    :: descriptor_water_trimer
       type(molecule_lo_d)   :: descriptor_molecule_lo_d
       type(com_dimer)       :: descriptor_com_dimer
       type(soap_express)    :: descriptor_soap_express
@@ -577,7 +579,7 @@ module descriptors_module
       coordination_initialise, angle_3b_initialise, co_angle_3b_initialise, co_distance_2b_initialise, cosnx_initialise, trihis_initialise, &
       water_monomer_initialise, water_dimer_initialise, A2_dimer_initialise, AB_dimer_initialise, distance_Nb_initialise,  rdf_initialise, as_distance_2b_initialise, alex_initialise, &
       atom_real_space_initialise, power_so3_initialise, power_SO4_initialise, soap_initialise, soap_turbo_initialise, &
-      general_monomer_initialise, general_dimer_initialise, general_trimer_initialise,  molecule_lo_d_initialise,  AN_monomer_initialise, &
+      general_monomer_initialise, general_dimer_initialise, general_trimer_initialise, water_trimer_initialise,  molecule_lo_d_initialise,  AN_monomer_initialise, &
       bond_real_space_initialise, transfer_initialise, com_dimer_initialise,  soap_express_initialise
 #else
       module procedure descriptor_initialise, RadialFunction_initialise, fourier_so4_initialise, &
@@ -595,7 +597,7 @@ module descriptors_module
       bispectrum_SO4_finalise, bispectrum_SO3_finalise, behler_finalise, distance_2b_finalise, coordination_finalise, angle_3b_finalise, co_angle_3b_finalise, &
       co_distance_2b_finalise, cosnx_finalise, trihis_finalise, water_monomer_finalise, water_dimer_finalise, rdf_finalise, as_distance_2b_finalise,  alex_finalise, &
       A2_dimer_finalise, AB_dimer_finalise, atom_real_space_finalise, power_so3_finalise, power_SO4_finalise, soap_finalise, distance_Nb_finalise,  soap_turbo_finalise, &
-      AN_monomer_finalise, general_monomer_finalise, general_dimer_finalise, general_trimer_finalise,  molecule_lo_d_finalise, com_dimer_finalise, &
+      AN_monomer_finalise, general_monomer_finalise, general_dimer_finalise, general_trimer_finalise, water_trimer_finalise, molecule_lo_d_finalise, com_dimer_finalise, &
       bond_real_space_finalise, soap_express_finalise
 #else
       module procedure descriptor_finalise, descriptor_data_finalise, RadialFunction_finalise, fourier_so4_finalise, cplx_2d_array1_finalise, cplx_3d_array2_finalise, &
@@ -612,7 +614,7 @@ module descriptors_module
       co_distance_2b_calc, cosnx_calc, trihis_calc, water_monomer_calc, water_dimer_calc, A2_dimer_calc, AB_dimer_calc,  atom_real_space_calc, &
       power_so3_calc, power_SO4_calc, soap_calc, rdf_calc, as_distance_2b_calc, &
       distance_Nb_calc, alex_calc, soap_turbo_calc, &
-      AN_monomer_calc,  soap_express_calc, general_monomer_calc, general_dimer_calc, general_trimer_calc,  molecule_lo_d_calc, com_dimer_calc, bond_real_space_calc
+      AN_monomer_calc,  soap_express_calc, general_monomer_calc, general_dimer_calc, general_trimer_calc, water_trimer_calc,  molecule_lo_d_calc, com_dimer_calc, bond_real_space_calc
 #else
       module procedure descriptor_calc, descriptor_calc_array, bispectrum_SO4_calc, bispectrum_SO3_calc, behler_calc, distance_2b_calc, coordination_calc, angle_3b_calc, co_angle_3b_calc, &
       co_distance_2b_calc, cosnx_calc, trihis_calc, water_monomer_calc, water_dimer_calc, A2_dimer_calc, AB_dimer_calc,  atom_real_space_calc, &
@@ -628,7 +630,7 @@ module descriptors_module
       module procedure descriptor_cutoff, bispectrum_SO4_cutoff, bispectrum_SO3_cutoff, behler_cutoff, distance_2b_cutoff, coordination_cutoff, angle_3b_cutoff, co_angle_3b_cutoff, &
       co_distance_2b_cutoff, cosnx_cutoff, trihis_cutoff, water_monomer_cutoff, water_dimer_cutoff, A2_dimer_cutoff, AB_dimer_cutoff, atom_real_space_cutoff, &
       power_so3_cutoff, power_SO4_cutoff, soap_cutoff, alex_cutoff, distance_Nb_cutoff, rdf_cutoff, as_distance_2b_cutoff, soap_turbo_cutoff, &
-      molecule_lo_d_cutoff, com_dimer_cutoff, soap_express_cutoff, AN_monomer_cutoff, general_monomer_cutoff, general_dimer_cutoff, general_trimer_cutoff,  bond_real_space_cutoff
+      molecule_lo_d_cutoff, com_dimer_cutoff, soap_express_cutoff, AN_monomer_cutoff, general_monomer_cutoff, general_dimer_cutoff, general_trimer_cutoff, water_trimer_cutoff,  bond_real_space_cutoff
 #else
       module procedure descriptor_cutoff, bispectrum_SO4_cutoff, bispectrum_SO3_cutoff, behler_cutoff, distance_2b_cutoff, coordination_cutoff, angle_3b_cutoff, co_angle_3b_cutoff, &
       co_distance_2b_cutoff, cosnx_cutoff, trihis_cutoff, water_monomer_cutoff, water_dimer_cutoff, A2_dimer_cutoff, AB_dimer_cutoff, atom_real_space_cutoff, &
@@ -643,7 +645,7 @@ module descriptors_module
       co_distance_2b_sizes, cosnx_sizes, trihis_sizes, water_monomer_sizes, water_dimer_sizes, A2_dimer_sizes, AB_dimer_sizes, atom_real_space_sizes, &
       power_so3_sizes, power_SO4_sizes, soap_sizes,  rdf_sizes, as_distance_2b_sizes, &
       alex_sizes, distance_Nb_sizes, soap_turbo_sizes, &
-      molecule_lo_d_sizes, com_dimer_sizes,  soap_express_sizes, AN_monomer_sizes, general_monomer_sizes, general_dimer_sizes, general_trimer_sizes,  bond_real_space_sizes
+      molecule_lo_d_sizes, com_dimer_sizes,  soap_express_sizes, AN_monomer_sizes, general_monomer_sizes, general_dimer_sizes, general_trimer_sizes, water_trimer_sizes,  bond_real_space_sizes
 #else
       module procedure descriptor_sizes, bispectrum_SO4_sizes, bispectrum_SO3_sizes, behler_sizes, distance_2b_sizes, coordination_sizes, angle_3b_sizes, co_angle_3b_sizes, &
       co_distance_2b_sizes, cosnx_sizes, trihis_sizes, water_monomer_sizes, water_dimer_sizes, A2_dimer_sizes, AB_dimer_sizes, atom_real_space_sizes, &
@@ -676,9 +678,9 @@ module descriptors_module
       logical :: is_bispectrum_so4, is_bispectrum_so3, is_behler, is_distance_2b, is_coordination, is_angle_3b, &
          is_co_angle_3b, is_co_distance_2b, is_cosnx, is_trihis, is_water_monomer, is_water_dimer, is_A2_dimer, &
          is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, is_soap, &
-         is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_rdf, is_as_distance_2b, &
+         is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_water_trimer, is_rdf, is_as_distance_2b, &
          is_molecule_lo_d, is_alex, is_com_dimer, is_distance_Nb, is_soap_express, is_soap_turbo
-
+      integer n_true
       INIT_ERROR(error)
 
       call initialise(params)
@@ -705,6 +707,7 @@ module descriptors_module
       call param_register(params, 'general_monomer', 'false', is_general_monomer, help_string="Type of descriptor is general_monomer.")
       call param_register(params, 'general_dimer', 'false', is_general_dimer, help_string="Type of descriptor is general_dimer.")
       call param_register(params, 'general_trimer', 'false', is_general_trimer, help_string="Type of descriptor is general_trimer.")
+      call param_register(params, 'water_trimer', 'false', is_water_trimer, help_string="Type of descriptor is water_trimer.")
       call param_register(params, 'rdf', 'false', is_rdf, help_string="Type of descriptor is rdf.")
       call param_register(params, 'as_distance_2b', 'false', is_as_distance_2b, help_string="Type of descriptor is as_distance_2b.")
       call param_register(params, 'molecule_lo_d', 'false', is_molecule_lo_d, help_string="Type of descriptor is molecule_lo_d.")
@@ -718,12 +721,13 @@ module descriptors_module
          RAISE_ERROR("descriptor_initialise failed to parse args_str='"//trim(args_str)//"'", error)
       endif
       call finalise(params)
-
-      if (count( (/is_bispectrum_so4, is_bispectrum_so3, is_behler, is_distance_2b, is_coordination, is_angle_3b, is_co_angle_3b, is_co_distance_2b, &
+      
+      n_true = count( (/is_bispectrum_so4, is_bispectrum_so3, is_behler, is_distance_2b, is_coordination, is_angle_3b, is_co_angle_3b, is_co_distance_2b, &
       is_cosnx, is_trihis, is_water_monomer, is_water_dimer, is_A2_dimer, is_AB_dimer, is_bond_real_space, is_atom_real_space, is_power_so3, is_power_so4, &
-      is_soap, is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_rdf, is_as_distance_2b, is_molecule_lo_d, is_alex, is_com_dimer, &
-      is_distance_Nb, is_soap_express, is_soap_turbo /) ) /= 1) then
-         RAISE_ERROR("descriptor_initialise found too few or too many IP Model types args_str='"//trim(args_str)//"'", error)
+      is_soap, is_AN_monomer, is_general_monomer, is_general_dimer, is_general_trimer, is_water_trimer, is_rdf, is_as_distance_2b, is_molecule_lo_d, is_alex, is_com_dimer, &
+      is_distance_Nb, is_soap_express, is_soap_turbo /) ) 
+      if (n_true/= 1) then
+         RAISE_ERROR("descriptor_initialise found "//n_true//" IP Model types args_str='"//trim(args_str)//"'", error)
       endif
 
       get_descriptor_type = DT_NONE
@@ -774,6 +778,8 @@ module descriptors_module
          get_descriptor_type = DT_GENERAL_DIMER
       elseif( is_general_trimer ) then
          get_descriptor_type = DT_GENERAL_TRIMER
+      elseif( is_water_trimer ) then
+         get_descriptor_type = DT_WATER_TRIMER
       elseif( is_rdf ) then
          get_descriptor_type = DT_RDF
       elseif( is_as_distance_2b ) then
@@ -867,6 +873,8 @@ module descriptors_module
          call initialise(this%descriptor_general_dimer,args_str,error)
       case(DT_GENERAL_TRIMER)
          call initialise(this%descriptor_general_trimer,args_str,error)
+      case(DT_WATER_TRIMER)
+         call initialise(this%descriptor_water_trimer,args_str,error)
       case(DT_SOAP_EXPRESS)
          call initialise(this%descriptor_soap_express,args_str,error)
 #endif
@@ -938,6 +946,8 @@ module descriptors_module
             call finalise(this%descriptor_general_dimer,error)
          case(DT_GENERAL_TRIMER)
             call finalise(this%descriptor_general_trimer,error)
+         case(DT_WATER_TRIMER)
+            call finalise(this%descriptor_water_trimer,error)
          case(DT_SOAP_EXPRESS)
             call finalise(this%descriptor_soap_express,error)
          case(DT_SOAP_TURBO)
@@ -3690,7 +3700,7 @@ module descriptors_module
                enddo
             enddo
          enddo
-      case(DT_GENERAL_MONOMER,DT_GENERAL_DIMER,DT_GENERAL_TRIMER,DT_WATER_MONOMER,DT_WATER_DIMER,DT_A2_DIMER,DT_AB_DIMER,DT_TRIHIS,DT_BOND_REAL_SPACE,DT_ATOM_REAL_SPACE,DT_AN_MONOMER)
+      case(DT_GENERAL_MONOMER,DT_GENERAL_DIMER,DT_GENERAL_TRIMER,DT_WATER_TRIMER,DT_WATER_MONOMER,DT_WATER_DIMER,DT_A2_DIMER,DT_AB_DIMER,DT_TRIHIS,DT_BOND_REAL_SPACE,DT_ATOM_REAL_SPACE,DT_AN_MONOMER)
          allocate(descriptor_str(1))
          descriptor_str(1) = trim(this)
       case(DT_DISTANCE_NB)
@@ -3842,6 +3852,8 @@ module descriptors_module
             call calc(this%descriptor_general_dimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_GENERAL_TRIMER)
             call calc(this%descriptor_general_trimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
+         case(DT_WATER_TRIMER)
+            call calc(this%descriptor_water_trimer,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_MOLECULE_LO_D)
             call calc(this%descriptor_molecule_lo_d,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
          case(DT_SOAP_EXPRESS)
@@ -10830,6 +10842,8 @@ module descriptors_module
             descriptor_dimensions = general_dimer_dimensions(this%descriptor_general_dimer,error)
          case(DT_GENERAL_TRIMER)
             descriptor_dimensions = general_trimer_dimensions(this%descriptor_general_trimer,error)
+         case(DT_WATER_TRIMER)
+            descriptor_dimensions = water_trimer_dimensions(this%descriptor_water_trimer,error)
          case(DT_MOLECULE_LO_D)
             descriptor_dimensions = molecule_lo_d_dimensions(this%descriptor_molecule_lo_d,error)
          case(DT_SOAP_EXPRESS)
@@ -11292,6 +11306,8 @@ module descriptors_module
             descriptor_cutoff = cutoff(this%descriptor_general_dimer,error)
          case(DT_GENERAL_TRIMER)
             descriptor_cutoff = cutoff(this%descriptor_general_trimer,error)
+         case(DT_WATER_TRIMER)
+            descriptor_cutoff = cutoff(this%descriptor_water_trimer,error)
          case(DT_COM_DIMER)
             descriptor_cutoff = cutoff(this%descriptor_com_dimer,error)
          case(DT_SOAP_EXPRESS)
@@ -11750,6 +11766,9 @@ module descriptors_module
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
          case(DT_GENERAL_TRIMER)
             call general_trimer_sizes(this%descriptor_general_trimer,at, &
+               n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
+         case(DT_WATER_TRIMER)
+            call water_trimer_sizes(this%descriptor_water_trimer,at, &
                n_descriptors,n_cross,mask=mask,n_index=n_index,error=error)
          case(DT_COM_DIMER)
             call com_dimer_sizes(this%descriptor_com_dimer,at, &
@@ -12224,7 +12243,7 @@ module descriptors_module
 
       n_descriptors = 0
       n_cross = 0
-call print("mask present ? "//present(mask))
+call print("mask present ? "//present(mask),PRINT_NERD)
       do i = 1, at%N
          if(at%Z(i) == 8) then
             if(present(mask)) then
@@ -12686,6 +12705,11 @@ call print("mask present ? "//present(mask))
               RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)
             end if
             descriptor_n_permutations = this%descriptor_general_trimer%permutation_data%n_perms
+         case(DT_WATER_TRIMER)
+            if (.not. this%descriptor_water_trimer%permutation_data%initialised)then
+              RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)
+            end if
+            descriptor_n_permutations = this%descriptor_water_trimer%permutation_data%n_perms
          case(DT_MOLECULE_LO_D)
             if (.not. this%descriptor_molecule_lo_d%permutation_data%initialised)then
               RAISE_ERROR("descriptor_n_permutations: permutation_data not initialised "//this%descriptor_type,error)

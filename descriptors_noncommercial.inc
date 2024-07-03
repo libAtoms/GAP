@@ -1097,6 +1097,9 @@
       deallocate(intermolecular)
    endsubroutine general_trimer_initialise
 
+   
+   
+   
    subroutine general_trimer_finalise(this,error)
       type(general_trimer), intent(inout) :: this
       integer, optional, intent(out) :: error
@@ -1120,7 +1123,6 @@
       this%initialised = .false.
 
    endsubroutine general_trimer_finalise
-
 
    subroutine molecule_lo_d_initialise(this,args_str,error)
       type(molecule_lo_d), intent(inout) :: this
@@ -2571,15 +2573,15 @@
      integer :: d, n_descriptors, n_cross, dimer_size, trimer_size, &
         i, j, k, n, m, i_atomic, j_atomic, start, finish, i_desc,this_diff,triplet_pos, &
         n_index
-     integer :: monomer_one_size, monomer_two_size, monomer_three_size, n_monomer_one, n_monomer_two, n_monomer_three, n_products, contributor_loc
+     integer :: monomer_one_size, monomer_two_size, monomer_three_size, n_monomer_one, n_monomer_two, n_monomer_three, n_products!, contributor_loc
      integer, dimension(1) :: unit_array
-     real(dp) :: temp_dist
+     real(dp) :: temp_dist, desc_der
      real(dp), dimension(3) :: diff_one_two, diff_one_three,diff_two_three,mean_pos_one,mean_pos_two,mean_pos_three
-     real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three
+     real(dp), dimension(3) :: grad_cut_one, grad_cut_two, grad_cut_three, unit_vec
      real(dp) :: dist_one_two, dist_one_three, dist_two_three, cut12, cut13, cut23, dcut12, dcut13, dcut23
      real(dp), dimension(:), allocatable :: dist_vec, primitive_cutoffs, primitive_cutoff_grads
      real(dp), dimension(:,:), allocatable :: interatomic_distances,diffs_one,diffs_two,diffs_three,triplets_diffs
-     real(dp), dimension(:,:,:), allocatable :: interatomic_vectors
+     real(dp), dimension(:,:,:), allocatable :: interatomic_vectors, unit_vectors
      integer, dimension(3) :: temp_shift, shift_one_two,shift_one_three
      integer, dimension(:), allocatable :: atomic_index_dimer, atomic_index_trimer, atomic_index_one, atomic_index_two, atomic_index_three,triplets_diffs_map
      integer, dimension(:,:), allocatable :: monomer_one_index, monomer_two_index, monomer_three_index, monomer_triplets
@@ -2644,6 +2646,7 @@
      allocate(atomic_index_dimer(dimer_size))
      allocate(atomic_index_trimer(trimer_size))
 
+     allocate(unit_vectors(d,3,trimer_size))
      allocate(interatomic_vectors(trimer_size,trimer_size,3))
      allocate(interatomic_distances(trimer_size,trimer_size))
      allocate(associated_to_monomer(at%N))
@@ -2956,16 +2959,25 @@
                         call print("TRIM  9",PRINT_NERD)
                         call print('TRIM  Lattice="10.0000000       0.00000000       0.00000000       0.00000000      10.0000000       0.00000000       0.00000000       0.00000000      10.00000" Properties=Z:I:1:pos:R:3',PRINT_NERD)
                         do i_atomic=1,trimer_size
-                        call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
+                            call print("TRIM  "//at%Z(atomic_index_trimer(i_atomic))//"    "//descriptor_out%x(i_desc)%pos(:,i_atomic),PRINT_NERD)
                         end do
-
-                        !build the grad_data matrix
+                        
+                        ! Build the grad_data matrix
+                        unit_vectors = 0
                         descriptor_out%x(i_desc)%has_grad_data(:) = .true.
                         do k=1,d
                            i_atomic = this%component_atoms(k,1)
                            j_atomic = this%component_atoms(k,2)
-                           descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) = - this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp) * interatomic_vectors(i_atomic,j_atomic,:) / interatomic_distances(i_atomic,j_atomic)  ! descriptor wrt atom i_atomic
-                           descriptor_out%x(i_desc)%grad_data(k,:,j_atomic) = -descriptor_out%x(i_desc)%grad_data(k,:,i_atomic)        ! descriptor wrt j_atomic
+                           
+                           unit_vec = interatomic_vectors(i_atomic,j_atomic,:) / interatomic_distances(i_atomic,j_atomic)
+                           desc_der = this%power * (dist_vec(k)+this%dist_shift)**(this%power-1.0_dp)
+                           
+                           descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) = - desc_der * unit_vec  ! descriptor wrt atom i_atomic
+                           descriptor_out%x(i_desc)%grad_data(k,:,j_atomic) =   desc_der * unit_vec  ! descriptor wrt j_atomic
+                           
+                           ! Unit vectors for cutoff derivatives
+                           unit_vectors(k,:,i_atomic) = -unit_vec
+                           unit_vectors(k,:,j_atomic) =  unit_vec
                         end do
 
                         cutoff_type_grad: if (this%mpifind) then
@@ -3006,8 +3018,8 @@
                                     if (this%cutoff_contributor(m)) then
                                       if (any(this%component_atoms(k,:) == i_atomic) .or. any(this%component_atoms(m,:) == i_atomic)) then
                                       descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,i_atomic) &
-                                        + primitive_cutoffs(m)*primitive_cutoff_grads(k)*descriptor_out%x(i_desc)%grad_data(k,:,i_atomic) &
-                                        + primitive_cutoffs(k)*primitive_cutoff_grads(m)*descriptor_out%x(i_desc)%grad_data(m,:,i_atomic)
+                                      + primitive_cutoffs(m) * primitive_cutoff_grads(k) * unit_vectors(k,:,i_atomic) &
+                                      + primitive_cutoffs(k) * primitive_cutoff_grads(m) * unit_vectors(m,:,i_atomic)
                                       end if
                                     end if
                                   end do
@@ -3018,9 +3030,9 @@
                            !normalisation factor
                            descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) = descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) / n_products
                         end if cutoff_type_grad
-
+                        
                      end if calc_grad_descriptor
-
+                     
                   end do loop_trimers
                end do loop_triplets
             end do loop_monomer_pairs
@@ -3055,7 +3067,6 @@
      call system_timer('general_trimer_calc')
 
    endsubroutine general_trimer_calc
-
 
 
    subroutine molecule_lo_d_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error)
@@ -3397,6 +3408,8 @@
 
    endfunction general_trimer_dimensions
 
+
+
    function molecule_lo_d_dimensions(this,error) result(i)
       type(molecule_lo_d), intent(in) :: this
       integer, optional, intent(out) :: error
@@ -3492,6 +3505,7 @@
 
    endfunction general_trimer_cutoff
 
+   
    
    function molecule_lo_d_cutoff(this,error) 
       type(molecule_lo_d), intent(in) :: this
@@ -3802,6 +3816,7 @@
          size(this%signature_two) + size(this%signature_three)
 
    endsubroutine general_trimer_sizes
+
 
       subroutine molecule_lo_d_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
       type(molecule_lo_d), intent(in) :: this
@@ -4826,4 +4841,452 @@
 !!!!!!!!
 
 
-  
+!!!!!!!!
+!!! 3-body water descriptor starts here
+!!! -- Jonatan Öström, @sujona, jonatan.ostrom@gmail.com
+!!!
+!!! This is an adaptation of the general_trimer routines to calculate water trimers faster.
+!!! These routines (should) give equivalent results as long as 
+!!! - the lattice is orthogonal
+!!! - the shortest lattice vector is > 2*trimer_cutoff
+!!! - there is only water in the simulation
+!!! The main issues of the general_trimer (and dimer) routines are that large arrays (monomer_triplets, triplets_diffs, ...) are
+!!! - reallocated at each found trimer (or dimer)
+!!! - double-checked to avoid double inclusions
+!!!!!!!!
+
+
+
+subroutine water_trimer_initialise(this,args_str,error)
+    type(water_trimer), intent(inout) :: this
+    character(len=*), intent(in) :: args_str
+    integer, optional, intent(out) :: error
+    integer :: i,j, start, finish
+    integer, parameter :: trimer_size = 9, d = 36, at_per_mol = 3
+    integer, parameter :: signature(*) = [8,1,1,8,1,1,8,1,1]
+    logical :: intermolecular(9,9), ordercheck
+    type(Dictionary) :: params
+    
+
+    INIT_ERROR(error)
+
+    call finalise(this)
+
+    call initialise(params)
+    call param_register(params, 'cutoff', '4.00', this%cutoff, help_string="Cutoff(intermolecular) for water_trimer-type descriptors")
+    call param_register(params, 'monomer_cutoff', '1.90', this%monomer_cutoff, help_string="Monomer cutoff for water_trimer-type descriptors")
+    call param_register(params, 'cutoff_transition_width', '1.00', this%cutoff_transition_width, help_string="Width of smooth cutoff region for water_trimer-type descriptors")
+    call param_register(params, 'atom_ordercheck', 'false', ordercheck, help_string="T: find molecules. F: go by order of atoms")
+    call param_register(params, 'strict', 'true', this%strict, help_string="Raise error if not all atoms assigned to monomer or if no monomer pairs found")
+    call param_register(params, 'power', '1.0', this%power, help_string="Power of distances to be used in the kernel")
+    call param_register(params, 'dist_shift', '0.0', this%dist_shift, help_string="Distance shift for inverse distance descriptors.")
+    
+        
+    if (ordercheck)then
+        RAISE_ERROR("This rouine doesn't do ordercheck, OHHOHHOHH is necessary",error)
+    endif
+    if (.not. param_read_line(params, args_str, ignore_unknown=.true.,task='water_trimer_initialise args_str')) then
+    RAISE_ERROR("water_trimer_initialise failed to parse args_str='"//trim(args_str)//"'", error)
+    endif
+    call finalise(params)
+
+    call permutation_data_initialise(this%permutation_data,signature_one=this%signature,signature_two=this%signature,signature_three=this%signature,internal_swaps_only=this%internal_swaps_only,error=error)
+
+
+    ! allocate(signature(trimer_size))
+    ! allocate(intermolecular(trimer_size,trimer_size))
+    
+    ! allocate(this%is_intermolecular(d))
+    ! allocate(this%cutoff_contributor(d))
+    ! allocate(this%component_atoms(d,2))
+
+    ! signature(1:n_atoms_one) = this%signature_one
+    ! signature(1+n_atoms_one:n_atoms_one+n_atoms_two) = this%signature_two
+    ! signature(1+n_atoms_one+n_atoms_two:trimer_size) = this%signature_three
+    intermolecular = .false.
+    this%cutoff_contributor=.false.
+    
+    ! Set the intermolecular interactions
+    do i=1,at_per_mol
+        do j=1+at_per_mol,trimer_size
+            intermolecular(i,j)=.true.
+            intermolecular(j,i)=.true.
+        end do
+    end do
+    do i=1+at_per_mol,at_per_mol+at_per_mol
+        do j=1+at_per_mol+at_per_mol,trimer_size
+            intermolecular(i,j)=.true.
+            intermolecular(j,i)=.true.
+        end do
+    end do
+    
+    ! Linearize intermolecular matrix, and component_atoms
+    start = 0
+    finish=trimer_size-1
+    do i=1,trimer_size
+    do j=1,finish-start
+        this%is_intermolecular(start+j) = intermolecular(i,i+j)
+        this%component_atoms(start+j,:) = (/ i, i+j /)
+    end do
+    start = finish
+    finish=finish + trimer_size-i-1
+    end do
+    
+    ! Only non-hydrogens contribute to general cutoff
+    do i=1,d
+    if (this%is_intermolecular(i)) then
+        if (.not. signature(this%component_atoms(i,1))==1 ) then
+        if (.not. signature(this%component_atoms(i,2))==1 ) then
+            this%cutoff_contributor(i)=.true.
+        end if
+        end if
+    end if
+    end do
+
+    this%initialised = .true.
+endsubroutine water_trimer_initialise
+
+
+subroutine water_trimer_finalise(this,error)
+    type(water_trimer), intent(inout) :: this
+    integer, optional, intent(out) :: error
+    INIT_ERROR(error)
+    if(.not. this%initialised) return
+    this%cutoff = 0.0_dp
+    this%cutoff_transition_width = 0.0_dp
+    this%atom_ordercheck = .false.
+    this%internal_swaps_only = .true.
+    this%use_smooth_cutoff = .false.
+    this%power = 1.0_dp
+    this%dist_shift = 0.0_dp
+    this%initialised = .false.
+endsubroutine water_trimer_finalise
+
+
+
+function water_trimer_dimensions(this,error) result(i)
+    type(water_trimer), intent(in) :: this
+    integer, optional, intent(out) :: error
+    integer :: i
+    
+    INIT_ERROR(error)
+    
+    if(.not. this%initialised) then
+        RAISE_ERROR("water_trimer_dimensions: descriptor object not initialised", error)
+    endif
+    if(.not. this%permutation_data%initialised) then
+        RAISE_ERROR("water_trimer_dimensions: descriptor object's permutation data not initialised", error)
+    endif
+    
+    i = size(this%permutation_data%dist_vec)
+    
+endfunction water_trimer_dimensions
+
+function water_trimer_cutoff(this,error) 
+    type(water_trimer), intent(in) :: this
+    integer, optional, intent(out) :: error
+    real(dp) :: water_trimer_cutoff
+    
+    INIT_ERROR(error)
+    
+    if(.not. this%initialised) then
+        RAISE_ERROR("water_trimer_cutoff: descriptor object not initialised", error)
+    endif
+    
+    water_trimer_cutoff = this%cutoff
+    
+endfunction water_trimer_cutoff
+
+ 
+
+subroutine water_trimer_sizes(this,at,n_descriptors,n_cross,mask,n_index,error)
+    use find_water_triplets, only: find_triplets_lars
+    type(water_trimer), intent(in) :: this
+    type(atoms), intent(in) :: at
+    integer, intent(out) :: n_descriptors, n_cross
+    logical, dimension(:), intent(in), optional :: mask
+    integer, intent(out), optional :: n_index
+    integer, optional, intent(out) :: error
+    
+    integer, dimension(:,:), allocatable :: monomer_one_index, monomer_triplets
+    real(dp), dimension(:,:), allocatable :: triplets_diffs
+    real(dp) box(3)
+    
+    INIT_ERROR(error)
+    
+    if(.not. this%initialised) then
+        RAISE_ERROR("water_trimer_sizes: descriptor object not initialised", error)
+    endif
+    
+    call water_trimer_system_check(this,at,box,error)
+    call find_triplets_lars(at%pos,at%N/3,box,this%cutoff,monomer_triplets,triplets_diffs,n_descriptors)
+    
+    n_cross = n_descriptors * 9
+    
+    if(allocated(monomer_triplets)) deallocate(monomer_triplets)
+    if(allocated(triplets_diffs)) deallocate(triplets_diffs)
+    
+    if( present(n_index) ) n_index = 9
+    
+endsubroutine water_trimer_sizes
+
+subroutine water_trimer_system_check(this,at,box,error)
+    type(water_trimer), intent(in) :: this
+    type(atoms), intent(in) :: at
+    real(dp), intent(out) :: box(3)
+    integer, optional, intent(inout) :: error
+    real(dp) :: lattice(3,3)
+    logical :: ok_ohh, ok_box, ok_ort
+    integer i
+    
+    lattice = at%lattice
+    
+    ! Check OHH
+    ok_ohh = all(at%Z(1::3) == 8) .and. all(at%Z(2::3) == 1) .and. all(at%Z(3::3) == 1)
+    
+    do i = 1,3
+        box(i) = lattice(i,i) 
+        lattice(i,i) = 0
+    enddo
+    
+    ! Check orthogonal
+    ok_ort = all(abs(lattice)<1d-14) .and. at%is_orthorhombic
+    
+    ! Fix box (lattice) size if it is 0
+    ! If no Lattice is given: in quip (gap_fit) the box is set to something random but big enough, in quippy to 0. 
+    if (all(box<1)) box = 1000 ! If box is 0 (<1) set it to very big
+    
+    
+    ! Check that box is large enough
+    ok_box = all(box > 2*this%cutoff)
+    
+    if (.not.all([ok_ohh,ok_ort,ok_box]))then
+        ! STOP  __FILE__//":"//__LINE__//": water_trimer_calc: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box//" this box="//box
+        RAISE_ERROR("water_trimer: Inapplicable: ohh_order="//ok_ohh//" orthogonal="//ok_ort//" large_enough="//ok_box, error)
+    endif
+end subroutine
+    
+
+subroutine water_trimer_calc(this,at,descriptor_out,do_descriptor,do_grad_descriptor,args_str,error) !//////////////////////////////////////////////////////////////////////////////////
+    use find_water_triplets, only: find_triplets_lars
+    type(water_trimer), intent(in) :: this
+    type(atoms), intent(in) :: at
+    type(descriptor_data), intent(out) :: descriptor_out
+    logical, intent(in), optional :: do_descriptor, do_grad_descriptor
+    character(len=*), intent(in), optional :: args_str
+    integer, optional, intent(out) :: error
+    integer :: n_descriptors, i, i_desc
+    real(dp), dimension(:,:), allocatable :: triplets_diffs
+    integer, dimension(:,:), allocatable :: itriplets
+    logical :: my_do_descriptor, my_do_grad_descriptor
+    integer, parameter :: trimer_size = 9, nd = 36
+    integer, dimension(3,at%N/3) :: imonomers
+    real(dp) :: box(3)
+    
+    INIT_ERROR(error)
+    
+    call system_timer('water_trimer_calc')
+    
+    if(.not. this%initialised) then
+        RAISE_ERROR("water_trimer_calc: descriptor object not initialised", error)
+    endif
+    
+    my_do_descriptor = optional_default(.false., do_descriptor)
+    my_do_grad_descriptor = .true. !optional_default(.false., do_grad_descriptor) ! fix!!!
+    
+    if( .not. my_do_descriptor .and. .not. my_do_grad_descriptor ) return
+    
+    call finalise(descriptor_out)
+    
+    
+    call water_trimer_system_check(this,at,box,error)
+    call find_triplets_lars(at%pos,at%N/3,box,this%cutoff,itriplets,triplets_diffs,n_descriptors)
+    
+    imonomers = reshape([(i,i=1,at%N)],[3,at%N/3])
+    
+    ! Print stuff?
+    call system_timer('water_trimer_calc: find_monomer_triplets')
+    call print("itriplets("//size(itriplets,1)//", "//size(itriplets,2)//")", PRINT_NERD)
+    call print("triplets_diffs("//size(triplets_diffs,1)//", "//size(triplets_diffs,2)//")", PRINT_NERD)
+    call print("ready to construct "//n_descriptors //" descriptors",PRINT_NERD)
+    
+    ! Allocate
+    allocate(descriptor_out%x(n_descriptors))
+    do i = 1, n_descriptors
+        if(my_do_descriptor) then
+            allocate(descriptor_out%x(i)%data(nd))
+            allocate(descriptor_out%x(i)%ci(trimer_size))
+            descriptor_out%x(i)%has_data = .false.
+            descriptor_out%x(i)%data = 0.0_dp
+            descriptor_out%x(i)%ci = 0
+            descriptor_out%x(i)%covariance_cutoff = 1.0_dp
+        endif
+        if(my_do_grad_descriptor) then
+            allocate(descriptor_out%x(i)%grad_data(nd,3,trimer_size))
+            allocate(descriptor_out%x(i)%ii(trimer_size))
+            allocate(descriptor_out%x(i)%pos(3,trimer_size))
+            allocate(descriptor_out%x(i)%has_grad_data(trimer_size))
+            allocate(descriptor_out%x(i)%grad_covariance_cutoff(3,trimer_size))
+            descriptor_out%x(i)%has_grad_data = .false.
+            descriptor_out%x(i)%grad_data = 0.0_dp
+            descriptor_out%x(i)%ii = 0
+            descriptor_out%x(i)%pos = 0.0_dp
+            descriptor_out%x(i)%grad_covariance_cutoff = 0.0_dp
+        endif
+    enddo
+    
+    ! Loop through trimers
+    ! Could do OpenMP here but that's done externally for the training... Hmm but SOAP has it right?
+    ! Blocks are in place, so making functions or openMP is easy. 
+    the_loop : do i_desc = 1, n_descriptors
+            
+        block 
+            integer, parameter :: monomer_size = 3, trimer_size = 9, nd = 36
+            real(dp) cut
+            real(dp), dimension(3,9) :: pos, gcuts
+            real(dp), dimension(nd) :: desc0, rlen
+            ! real(dp), dimension(3,36) :: rvec
+            ! real(dp), dimension(3,9,36) :: gdesc0
+            real(dp), dimension(nd,3,9) :: gdesc0
+            integer ii, jj
+            integer i1, i2,i3
+            real(dp) :: diffs1(3,monomer_size)
+            real(dp) :: diffs2(3,monomer_size)
+            real(dp) :: diffs3(3,monomer_size)
+            integer :: iatoms1(monomer_size)
+            integer :: iatmos2(monomer_size)
+            integer :: iatoms3(monomer_size)
+            integer :: iatoms123(trimer_size)
+            real(dp), dimension(3) :: diff12, diff13
+            real(dp), dimension(3) :: mean_pos1,mean_pos2,mean_pos3
+            
+            
+            i1 = itriplets(1,i_desc)
+            i2 = itriplets(2,i_desc)
+            i3 = itriplets(3,i_desc)
+            
+            iatoms1 = imonomers(:,i1) !store the indices of atoms in this monomer
+            iatmos2 = imonomers(:,i2) 
+            iatoms3 = imonomers(:,i3)
+            
+            iatoms123=(/iatoms1,iatmos2,iatoms3/)
+            
+            mean_pos1 = calc_mean_pos(at,iatoms1)
+            mean_pos2 = calc_mean_pos(at,iatmos2)
+            mean_pos3 = calc_mean_pos(at,iatoms3)
+            
+            
+            diff12 = triplets_diffs(1:3,i_desc)
+            diff13 = triplets_diffs(4:6,i_desc)
+            
+            
+            do ii=1,3
+                diffs1(:,ii) = diff_min_image(at,at%pos(:,iatoms1(ii)),mean_pos1)
+                diffs2(:,ii) = diff_min_image(at,at%pos(:,iatmos2(ii)),mean_pos2)
+                diffs3(:,ii) = diff_min_image(at,at%pos(:,iatoms3(ii)),mean_pos3)
+            end do
+            
+            
+            do ii=1,3
+                pos(:,  ii) = mean_pos1          - diffs1(:,ii)
+                pos(:,3+ii) = mean_pos1 + diff12 - diffs2(:,ii)
+                pos(:,6+ii) = mean_pos1 + diff13 - diffs3(:,ii)
+            end do
+                
+            ! Calcualate descriptor
+            block 
+                real(dp) a0, shft, pow
+                real(dp), dimension(3) :: a3, b3
+                integer ii, jj, ij
+            
+                shft  = this%dist_shift
+                pow   = this%power
+                gdesc0 = 0
+                do ij = 1, nd
+                    jj = this%component_atoms(ij,1)
+                    ii = this%component_atoms(ij,2)
+                    a3 = pos(:,ii)-pos(:,jj)
+                    a0 = norm(a3)
+                    ! rvec(:,ij) = a3
+                    rlen(ij) = a0
+                    desc0(ij) = (a0 + shft) ** pow
+                    
+                    ! Gradient
+                    b3 = - pow * (a0+shft)**(pow-1.0_dp)  * a3 / a0
+                    gdesc0(ij,:,jj) = b3
+                    gdesc0(ij,:,ii) = -b3
+                    
+                enddo
+            endblock
+            
+            ! Calculate cutoff
+            block 
+                real(dp), dimension(3) :: oo12, oo13, oo23
+                real(dp), dimension(3) :: gcut1, gcut2, gcut3
+                real(dp) :: o12, o13, o23
+                real(dp) :: cut12, cut13, cut23
+                real(dp) :: dcut12, dcut13, dcut23
+                real(dp) :: cutoff, width
+                cutoff= this%cutoff
+                width = this%cutoff_transition_width
+                
+                oo12 = pos(:,4)-pos(:,1)
+                oo13 = pos(:,7)-pos(:,1)
+                oo23 = pos(:,7)-pos(:,4)
+                o12 = norm(oo12)
+                o13 = norm(oo13)
+                o23 = norm(oo23)
+                cut12 = coordination_function(o12,cutoff,width)
+                cut13 = coordination_function(o13,cutoff,width)
+                cut23 = coordination_function(o23,cutoff,width)
+                cut = (cut12*cut13 + cut12*cut23 + cut13*cut23) / 3
+                
+                ! Gradient
+                dcut12 = dcoordination_function(o12, cutoff, width)
+                dcut13 = dcoordination_function(o13, cutoff, width)
+                dcut23 = dcoordination_function(o23, cutoff, width)
+                gcut1 = (- oo12 / o12 * dcut12 * (cut13+cut23) - oo13 / o13 * dcut13 * (cut12+cut23)) / 3
+                gcut2 = (  oo12 / o12 * dcut12 * (cut13+cut23) - oo23 / o23 * dcut23 * (cut12+cut13)) / 3
+                gcut3 = (  oo13 / o13 * dcut13 * (cut12+cut23) + oo23 / o23 * dcut23 * (cut12+cut13)) / 3
+                
+                gcuts = 0 
+                gcuts(:,1) = gcut1
+                gcuts(:,4) = gcut2
+                gcuts(:,7) = gcut3
+            endblock
+            
+            if(my_do_descriptor) then
+                descriptor_out%x(i_desc)%has_data = .true.
+                descriptor_out%x(i_desc)%data(:) = desc0
+                descriptor_out%x(i_desc)%ci(:) = iatoms123
+                descriptor_out%x(i_desc)%covariance_cutoff = cut
+            end if
+        
+            if(my_do_grad_descriptor) then
+                descriptor_out%x(i_desc)%has_grad_data = .true.
+                descriptor_out%x(i_desc)%grad_data(:,:,:) = gdesc0
+                descriptor_out%x(i_desc)%ii(:) = iatoms123
+                descriptor_out%x(i_desc)%pos(:,:) = pos
+                descriptor_out%x(i_desc)%grad_covariance_cutoff(:,:) = gcuts
+            end if 
+            
+        endblock
+        if (.false.) then ! to compare with general trimer
+            write(12,'(a,*(f10.5))') "  desc = ", descriptor_out%x(i_desc)%data
+            write(12,'(a,*(f10.5))') "g desc = ", descriptor_out%x(i_desc)%grad_data
+            write(12,'(a,*(f10.5))') "   cut = ", descriptor_out%x(i_desc)%covariance_cutoff
+            write(12,'(a,*(f10.5))') "g  cut = ", descriptor_out%x(i_desc)%grad_covariance_cutoff
+            stop "testing"
+        endif
+    enddo the_loop
+    
+    if (allocated(itriplets)) deallocate(itriplets)
+    if (allocated(triplets_diffs)) deallocate(triplets_diffs)
+    
+    call system_timer('water_trimer_calc')
+    
+endsubroutine water_trimer_calc !////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+!!!!!!!!
+!!! 3-body water descriptor ends here
+!!!!!!!!
