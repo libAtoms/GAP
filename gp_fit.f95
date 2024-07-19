@@ -457,7 +457,7 @@ module gp_fit_module
 
       inquire(file=trim(sparse_file), exist=exist_sparse_file)
       if (.not. exist_sparse_file) then
-         RAISE_ERROR('count_entries_in_sparse_file: '//trim(sparse_file)//' does not exist', error)
+         RAISE_ERROR('count_entries_in_sparse_file: "'//trim(sparse_file)//'" does not exist', error)
       end if
 
       call fwc_l(trim(sparse_file)//C_NULL_CHAR, n_sparse_file)
