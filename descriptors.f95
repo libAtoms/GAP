@@ -3046,6 +3046,12 @@ module descriptors_module
         endif
       endif
 
+      if( this%compact_clusters .and. this%order > 2 .and. xml_version < 1726500349 ) then
+         RAISE_ERROR("distance_Nb_initialise: potential (compact_clusters="//this%compact_clusters//" order="//
+            this%order//") was generated using an earlier version of GAP ("//xml_version//
+            "), and is affected by https://github.com/libAtoms/QUIP/issues/669 which has since been fixed. Retrain your model with a recent version.", error)
+      endif
+
 
       allocate(this%Z(this%order))
       default_Z = ""
