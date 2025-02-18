@@ -3046,6 +3046,12 @@ module descriptors_module
         endif
       endif
 
+      if( this%compact_clusters .and. this%order > 2 .and. xml_version < 1726500349 ) then
+         RAISE_ERROR("distance_Nb_initialise: potential (compact_clusters="//this%compact_clusters//" order="//
+            this%order//") was generated using an earlier version of GAP ("//xml_version//
+            "), and is affected by https://github.com/libAtoms/QUIP/issues/669 which has since been fixed. Retrain your model with a recent version.", error)
+      endif
+
 
       allocate(this%Z(this%order))
       default_Z = ""
@@ -10037,6 +10043,7 @@ module descriptors_module
       integer :: d, n_descriptors, n_cross, i_desc, i_data, i, j, ii, jj, kk, ll, &
          iConnectivity, n_index
       integer, dimension(3) :: s_i, s_j
+      integer, dimension(this%order) :: new_order
       real(dp) :: r_ij, fcut_connectivity
       real(dp), dimension(3) :: dfcut_connectivity
       real(dp), dimension(3) :: d_ij
@@ -10129,6 +10136,22 @@ module descriptors_module
          call distance_Nb_calc_get_clusters(this,at,atoms_in_descriptors=atoms_in_descriptors,error=error)
       endif
 
+      do i_desc = 1, n_descriptors
+         if( this%order > 1 ) then
+            new_order = -1
+            do ii = 1, this%order
+               i = atoms_in_descriptors(1,ii,i_desc)
+               do jj = 1, this%order
+                  if( at%Z(i) == this%Z(jj) .and. new_order(jj) == -1 ) then
+                     new_order(jj) = ii
+                     exit
+                  endif
+               enddo
+            enddo
+            atoms_in_descriptors(:,:,i_desc) = atoms_in_descriptors(:,new_order,i_desc)
+         endif
+      enddo
+
       allocate(fcut_pair(this%order,this%order))
       if( my_do_grad_descriptor ) then
          allocate(dfcut_pair(this%order,this%order), directions(3,this%order,this%order))
@@ -10172,26 +10195,26 @@ module descriptors_module
 
                descriptor_out%x(i_desc)%covariance_cutoff = 1.0_dp
 
-               do jj = 2, this%order
-                  descriptor_out%x(i_desc)%covariance_cutoff = descriptor_out%x(i_desc)%covariance_cutoff * fcut_pair(jj,1)
+               do ii = 1, this%order
+                  do jj = ii+1, this%order
+                     descriptor_out%x(i_desc)%covariance_cutoff = descriptor_out%x(i_desc)%covariance_cutoff * fcut_pair(jj,ii)
+                  enddo
                enddo
 
                if( my_do_grad_descriptor ) then
-                  descriptor_out%x(i_desc)%grad_covariance_cutoff(:,1) = 0.0_dp
-                  do kk = 2, this%order
-                     descriptor_out%x(i_desc)%grad_covariance_cutoff(:,kk) = 1.0_dp
-                     do jj = 2, this%order
-                        if( jj == kk ) then
-                           descriptor_out%x(i_desc)%grad_covariance_cutoff(:,kk) = &
-                           descriptor_out%x(i_desc)%grad_covariance_cutoff(:,kk) * dfcut_pair(jj,1) * (-directions(:,jj,1))
-                        else
-                           descriptor_out%x(i_desc)%grad_covariance_cutoff(:,kk) = &
-                           descriptor_out%x(i_desc)%grad_covariance_cutoff(:,kk) * fcut_pair(jj,1)
-                        endif
+                  if( descriptor_out%x(i_desc)%covariance_cutoff > 0.0_dp ) then
+                     do ii = 1, this%order
+                        descriptor_out%x(i_desc)%grad_covariance_cutoff(:,ii) = 0.0_dp
+                        do jj = 1, this%order
+                           if( ii /= jj ) descriptor_out%x(i_desc)%grad_covariance_cutoff(:,ii) = &
+                              descriptor_out%x(i_desc)%grad_covariance_cutoff(:,ii) - &
+                              descriptor_out%x(i_desc)%covariance_cutoff / fcut_pair(jj,ii) * dfcut_pair(jj,ii) * directions(:,ii,jj)
+                        enddo
                      enddo
-                     descriptor_out%x(i_desc)%grad_covariance_cutoff(:,1) = &
-                     descriptor_out%x(i_desc)%grad_covariance_cutoff(:,1) - descriptor_out%x(i_desc)%grad_covariance_cutoff(:,kk)
-                  enddo
+                  else
+                     descriptor_out%x(i_desc)%grad_covariance_cutoff = 0.0_dp
+                  endif
+
                endif
 
 
