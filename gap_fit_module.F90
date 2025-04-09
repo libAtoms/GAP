@@ -232,7 +232,7 @@ contains
         if (has_config_file) then
            inquire(file=config_file, exist=file_exists)
            if (.not. file_exists) call system_abort("Config file does not exist: "//config_file)
-           call read(this%config_string, config_file, keep_lf=.true., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
+           call read(this%config_string, config_file, keep_lf=.false., mpi_comm=this%mpi_obj%communicator, mpi_id=this%mpi_obj%my_proc)
         end if
      end if
      if (.not. has_config_file) this%config_string = this%command_line
