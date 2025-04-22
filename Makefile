@@ -33,7 +33,7 @@
 #! HND X
 #! HND XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-CUSTOM_F95FLAGS += -frealloc-lhs
+CUSTOM_F90FLAGS += -frealloc-lhs
 
 ifeq (${QUIP_ARCH},)
   include Makefile.arch
@@ -46,34 +46,34 @@ include Makefile.rules
 
 ifeq (${HAVE_DESCRIPTORS_NONCOMMERCIAL},1)
   DEFINES += -DDESCRIPTORS_NONCOMMERCIAL
-  GAP1_F95_FILES = make_permutations_noncommercial_v2
+  GAP1_F90_FILES = make_permutations_noncommercial_v2
 else
-  GAP1_F95_FILES = 
+  GAP1_F90_FILES = 
 endif
 
-SOAP_TURBO_F95_FILES = soap_turbo_functions soap_turbo_radial soap_turbo_angular soap_turbo_compress soap_turbo
-SOAP_TURBO_F95_SOURCES =  ${addsuffix .f90, ${SOAP_TURBO_F95_FILES}}
-SOAP_TURBO_F95_OBJS =  ${addsuffix .o, ${SOAP_TURBO_F95_FILES}}
+SOAP_TURBO_F90_FILES = soap_turbo_functions soap_turbo_radial soap_turbo_angular soap_turbo_compress soap_turbo
+SOAP_TURBO_F90_SOURCES =  ${addsuffix .f90, ${SOAP_TURBO_F90_FILES}}
+SOAP_TURBO_F90_OBJS =  ${addsuffix .o, ${SOAP_TURBO_F90_FILES}}
 
-GAP1_F95_FILES += find_water_triplets_noncommercial descriptors gp_predict descriptors_wrapper clustering 
-GAP1_F95_SOURCES = ${addsuffix .f95, ${GAP1_F95_FILES}}
-GAP1_F95_OBJS = ${addsuffix .o, ${GAP1_F95_FILES}}
+GAP1_F90_FILES += find_water_triplets_noncommercial descriptors gp_predict descriptors_wrapper clustering 
+GAP1_F90_SOURCES = ${addsuffix .F90, ${GAP1_F90_FILES}}
+GAP1_F90_OBJS = ${addsuffix .o, ${GAP1_F90_FILES}}
 
-GAP2_F95_FILES = gp_fit gap_fit_module 
-GAP2_F95_SOURCES = ${addsuffix .f95, ${GAP2_F95_FILES}}
-GAP2_F95_OBJS = ${addsuffix .o, ${GAP2_F95_FILES}}
+GAP2_F90_FILES = gp_fit gap_fit_module 
+GAP2_F90_SOURCES = ${addsuffix .F90, ${GAP2_F90_FILES}}
+GAP2_F90_OBJS = ${addsuffix .o, ${GAP2_F90_FILES}}
 
 default: ${GAP_LIBFILE}
 
 
 
 ifeq (${USE_MAKEDEP},1)
-GAP1_F95_FPP_FILES = ${addsuffix .fpp, ${GAP1_F95_FILES}}
-GAP2_F95_FPP_FILES = ${addsuffix .fpp, ${GAP2_F95_FILES}}
-GAP1.depend: ${GAP1_F95_FPP_FILES}
-	${SCRIPT_PATH}/${MAKEDEP} ${MAKEDEP_ARGS} -- ${addprefix ../../src/GAP/,${GAP1_F95_SOURCES}} > GAP1.depend
-GAP2.depend: ${GAP2_F95_FPP_FILES} ${GAP1_F95_FPP_FILES}
-	${SCRIPT_PATH}/${MAKEDEP} ${MAKEDEP_ARGS} -- ${addprefix ../../src/GAP/,${GAP2_F95_SOURCES}} > GAP2.depend
+GAP1_F90_FPP_FILES = ${addsuffix .fpp, ${GAP1_F90_FILES}}
+GAP2_F90_FPP_FILES = ${addsuffix .fpp, ${GAP2_F90_FILES}}
+GAP1.depend: ${GAP1_F90_FPP_FILES}
+	${SCRIPT_PATH}/${MAKEDEP} ${MAKEDEP_ARGS} -- ${addprefix ../../src/GAP/,${GAP1_F90_SOURCES}} > GAP1.depend
+GAP2.depend: ${GAP2_F90_FPP_FILES} ${GAP1_F90_FPP_FILES}
+	${SCRIPT_PATH}/${MAKEDEP} ${MAKEDEP_ARGS} -- ${addprefix ../../src/GAP/,${GAP2_F90_SOURCES}} > GAP2.depend
 
 -include GAP1.depend
 -include GAP2.depend
@@ -93,21 +93,21 @@ LIBFILES = libatoms.a ${GAP_LIBFILE} libquip_core.a libquiputils.a
 Programs: ${PROGRAMS} 
 	#cp ${QUIP_ROOT}/src/GAP/teach_sparse .
 
-${PROGRAMS}: % : ${LIBFILES} ${GAP2_F95_OBJS} ${GAPFIT_LIBFILE}  %.o
-	$(LINKER) $(LINKFLAGS) -o $@ ${F95OPTS} $@.o ${GAPFIT_LIBFILE} ${LIBS} ${LINKOPTS}
+${PROGRAMS}: % : ${LIBFILES} ${GAP2_F90_OBJS} ${GAPFIT_LIBFILE}  %.o
+	$(LINKER) $(LINKFLAGS) -o $@ ${F90OPTS} $@.o ${GAPFIT_LIBFILE} ${LIBS} ${LINKOPTS}
 
 
 
-${GAP_LIBFILE}: ${SOAP_TURBO_F95_OBJS}  ${GAP1_F95_OBJS}
+${GAP_LIBFILE}: ${SOAP_TURBO_F90_OBJS}  ${GAP1_F90_OBJS}
 ifneq (${LIBTOOL},)
-	${LIBTOOL} -o ${GAP_LIBFILE}  ${SOAP_TURBO_F95_OBJS} ${GAP1_F95_OBJS}
+	${LIBTOOL} -o ${GAP_LIBFILE}  ${SOAP_TURBO_F90_OBJS} ${GAP1_F90_OBJS}
 else
 	${AR} ${AR_ADD} ${GAP_LIBFILE} $?
 endif
 
-${GAPFIT_LIBFILE}: ${GAP2_F95_OBJS}
+${GAPFIT_LIBFILE}: ${GAP2_F90_OBJS}
 ifneq (${LIBTOOL},)
-	${LIBTOOL} -o ${GAPFIT_LIBFILE} ${GAP2_F95_OBJS}
+	${LIBTOOL} -o ${GAPFIT_LIBFILE} ${GAP2_F90_OBJS}
 else
 	${AR} ${AR_ADD} ${GAPFIT_LIBFILE} $?
 endif
