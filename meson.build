@@ -20,4 +20,5 @@ GAP = library('GAP',
     mpi_dep,
     ],
   link_with : [libAtoms,fox],
+  link_args: ['-lgomp'],
   )

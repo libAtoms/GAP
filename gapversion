@@ -4,10 +4,10 @@
 # of file (or the file GAP_VERSION if it exists). The gapversion
 # is the UNIX timestap of the most recently changed file.
 
-GAP_FILES="descriptors.f95 descriptors_wrapper.f95 \
-  gp_predict.f95 \
-  clustering.f95 gp_fit.f95 \
-  gap_fit_module.f95 gap_fit.f95"
+GAP_FILES="descriptors.F90 descriptors_wrapper.F90 \
+  gp_predict.F90 \
+  clustering.F90 gp_fit.F90 \
+  gap_fit_module.F90 gap_fit.F90"
 
 GAP_ROOT=$(dirname "$0")
 
