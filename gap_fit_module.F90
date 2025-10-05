@@ -1600,7 +1600,7 @@ contains
 
      call date_and_time(values=values)
      ! Get totally unique label for GAP. This will be used at various places.
-     write(gp_label,'("GAP_"7(i0,"_")i0)') values
+     write(gp_label,'("GAP_",7(i0,"_"),i0)') values
 
      ! Unique temporary file
      gp_tmp_file = 'tmp_'//trim(gp_label)//'.xml'
