@@ -3338,31 +3338,6 @@ module descriptors_module
       allocate(this%alpha_max(this%n_species))
       allocate(this%species_Z(this%n_species))
 
-!     central_weight is special because regular SOAP and soap_turbo use the same keyword
-      call initialise(params)
-!     If it's set as a vector
-      if( index(args_str,"central_weight={") /= 0 )then
-         if( this%n_species == 1 )then
-           is_central_weight_set = .true.
-            call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
-               help_string="Weight of central atom in environment")
-         end if
-!     If it's set as a scalar
-      else if( index(args_str,"central_weight=") /= 0 )then
-         is_central_weight_set = .true.
-         call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
-            help_string="Weight of central atom in environment")
-!     If it's not set
-      else
-         is_central_weight_set = .true.
-         call param_register(params, 'central_weight', "1.0", this%central_weight(1), &
-            help_string="Weight of central atom in environment")
-      end if
-      call finalise(params)
-      if( is_central_weight_set )then
-         this%central_weight = this%central_weight(1)
-      end if
-
 !     Now we set the soap_turbo hypers with the explicit array definitions OR use the implicit definitions
 !     to set them
       call initialise(params)
@@ -3488,8 +3463,21 @@ module descriptors_module
             help_string="Atomic number of species, including the central atom")
       end if
 !     central_weight
-      if( .not. is_central_weight_set )then
-         call param_register(params, 'central_weight', '//MANDATORY//', this%central_weight, &
+      if( index(args_str,"central_weight={") /= 0 )then
+         if( this%n_species == 1 )then
+            call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
+               help_string="Weight of central atom in environment")
+         else
+            call param_register(params, 'central_weight', '//MANDATORY//', this%central_weight, &
+               help_string="Weight of central atom in environment")
+         end if
+      else if( index(args_str,"central_weight=") /= 0 )then
+         is_central_weight_set = .true.
+         call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
+            help_string="Weight of central atom in environment")
+      else
+         is_central_weight_set = .true.
+         call param_register(params, 'central_weight', "1.0", this%central_weight(1), &
             help_string="Weight of central atom in environment")
       end if
 
@@ -3498,6 +3486,7 @@ module descriptors_module
          RAISE_ERROR("soap_turbo_initialise failed to parse args_str='"//trim(args_str)//"'", error)
       endif
       call finalise(params)
+
 
       if( is_n_max_set )then
          this%alpha_max = this%alpha_max(1)
@@ -3522,6 +3511,9 @@ module descriptors_module
       end if
       if( set_sigma_t_to_r_scaling )then
          this%atom_sigma_t_scaling = this%atom_sigma_r_scaling
+      end if
+      if( is_central_weight_set )then
+         this%central_weight = this%central_weight(1)
       end if
 
 
