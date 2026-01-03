@@ -3344,10 +3344,15 @@ module descriptors_module
       if( index(args_str,"central_weight={") /= 0 )then
          if( this%n_species == 1 )then
            is_central_weight_set = .true.
-            call param_register(params, 'central_weight', "1.0", this%central_weight(1), &
+            call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
                help_string="Weight of central atom in environment")
          end if
-!     If it's set as a scalar or not set
+!     If it's set as a scalar
+      else if( index(args_str,"central_weight=") /= 0 )then
+         is_central_weight_set = .true.
+         call param_register(params, 'central_weight', PARAM_MANDATORY, this%central_weight(1), &
+            help_string="Weight of central atom in environment")
+!     If it's not set
       else
          is_central_weight_set = .true.
          call param_register(params, 'central_weight', "1.0", this%central_weight(1), &
