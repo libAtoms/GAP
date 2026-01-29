@@ -21,4 +21,5 @@ GAP = library('GAP',
     ],
   link_with : [libAtoms,fox],
   link_args: ['-lgomp'],
+  install: true,
   )
