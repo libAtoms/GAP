@@ -70,15 +70,17 @@ module gap_fit_module
 
      character(len=STRING_LENGTH) :: at_file='', core_ip_args = '', e0_str, local_property0_str, &
      energy_parameter_name, local_property_parameter_name, force_parameter_name, virial_parameter_name, &
-     stress_parameter_name, hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
-     config_type_sigma_string, core_param_file, gp_file, template_file, force_mask_parameter_name, &
-     local_property_mask_parameter_name, condition_number_norm, linear_system_dump_file, config_file
+     stress_parameter_name, hessian_parameter_name, dipole_parameter_name, config_type_parameter_name, &
+     sigma_parameter_name, config_type_sigma_string, core_param_file, gp_file, template_file, &
+     force_mask_parameter_name, local_property_mask_parameter_name, condition_number_norm, &
+     linear_system_dump_file, config_file
 
      character(len=10240) :: command_line = ''
      real(dp), dimension(total_elements) :: e0, local_property0
      real(dp) :: max_cutoff
      real(dp), dimension(4) :: default_sigma
      real(dp) :: default_local_property_sigma
+     real(dp) :: default_dipole_sigma
      real(dp) :: sparse_jitter, e0_offset, hessian_delta
      integer :: e0_method = E0_ISOLATED
      logical :: do_core = .false., do_copy_at_file, has_config_type_sigma, sigma_per_atom = .true.
@@ -89,6 +91,7 @@ module gap_fit_module
      integer :: n_ener = 0
      integer :: n_force = 0
      integer :: n_virial = 0
+     integer :: n_dipole = 0
      integer :: n_hessian = 0
      integer :: n_local_property = 0
      integer :: n_species = 0
@@ -165,8 +168,9 @@ contains
      character(len=STRING_LENGTH), pointer :: at_file, e0_str, local_property0_str, &
           core_param_file, core_ip_args, &
           energy_parameter_name, local_property_parameter_name, force_parameter_name, &
-          virial_parameter_name, stress_parameter_name, hessian_parameter_name, &
-          config_type_parameter_name, sigma_parameter_name, config_type_sigma_string, &
+          virial_parameter_name, dipole_parameter_name, stress_parameter_name, &
+          hessian_parameter_name, config_type_parameter_name, sigma_parameter_name, &
+          config_type_sigma_string, &
           gp_file, template_file, force_mask_parameter_name, condition_number_norm, &
           linear_system_dump_file, config_file, local_property_mask_parameter_name
 
@@ -181,6 +185,7 @@ contains
      real(dp), pointer :: e0_offset, sparse_jitter, hessian_delta
      real(dp), dimension(:), pointer :: default_sigma
      real(dp), pointer :: default_local_property_sigma
+     real(dp), pointer :: default_dipole_sigma
 
      integer :: rnd_seed
      integer, pointer :: mpi_blocksize_rows, mpi_blocksize_cols
@@ -192,6 +197,7 @@ contains
      e0_offset => this%e0_offset
      default_sigma => this%default_sigma
      default_local_property_sigma => this%default_local_property_sigma
+     default_dipole_sigma => this%default_dipole_sigma
      sparse_jitter => this%sparse_jitter
      hessian_delta => this%hessian_delta
      core_param_file => this%core_param_file
@@ -200,6 +206,7 @@ contains
      local_property_parameter_name => this%local_property_parameter_name
      force_parameter_name => this%force_parameter_name
      virial_parameter_name => this%virial_parameter_name
+     dipole_parameter_name => this%dipole_parameter_name
      stress_parameter_name => this%stress_parameter_name
      hessian_parameter_name => this%hessian_parameter_name
      config_type_parameter_name => this%config_type_parameter_name
@@ -253,14 +260,17 @@ contains
 
      call param_register(params, 'e0_method','isolated',e0_method, &
         help_string="Method to determine e0, if not explicitly specified. Possible options: isolated (default, each atom &
-        present in the XYZ needs to have an isolated representative, with a valid energy), average (e0 is the average of &
-        all total energies across the XYZ)")
+        & present in the XYZ needs to have an isolated representative, with a valid energy), average (e0 is the average of &
+        & all total energies across the XYZ)")
 
      call param_register(params, 'default_kernel_regularisation', '//MANDATORY//', default_sigma, has_value_target = has_default_sigma, &
          help_string="error in [energies forces virials hessians]", altkey="default_sigma")
 
      call param_register(params, 'default_kernel_regularisation_local_property', '0.001', default_local_property_sigma, &
          help_string="error in local_property", altkey="default_local_property_sigma")
+
+     call param_register(params, 'default_kernel_regularisation_dipole', '0.001', default_dipole_sigma, &
+         help_string="error in dipole", altkey="default_dipole_sigma")
 
      call param_register(params, 'sparse_jitter', "1.0e-10", sparse_jitter, &
          help_string="Extra regulariser used to regularise the sparse covariance matrix before it is passed to the linear solver. Use something small, it really shouldn't affect your results, if it does, your sparse basis is still very ill-conditioned.")
@@ -286,18 +296,25 @@ contains
      call param_register(params, 'virial_parameter_name', 'virial', virial_parameter_name, &
           help_string="Name of virial property in the input XYZ file that describes the data")
 
+     call param_register(params, 'dipole_parameter_name', 'dipole', dipole_parameter_name, &
+          help_string="Name of dipole property in the input XYZ file that describes the data")
+
      call param_register(params, 'stress_parameter_name', 'stress', stress_parameter_name, &
-          help_string="Name of stress property (6-vector or 9-vector) in the input XYZ file that describes the data - stress values only used if virials are not available (opposite sign, standard Voigt order)")
+          help_string="Name of stress property (6-vector or 9-vector) in the input XYZ file &
+          & that describes the data - stress values only used if virials are not available (opposite sign, standard Voigt order)")
 
      call param_register(params, 'hessian_parameter_name', 'hessian', hessian_parameter_name, &
           help_string="Name of hessian property (column) in the input XYZ file that describes the data")
 
      call param_register(params, 'config_type_parameter_name', 'config_type', config_type_parameter_name, &
-          help_string="Allows grouping on configurations into. This option is the name of the key that indicates the configuration type in the input XYZ file. With the default, the key-value pair config_type=blah would place that configuration into the group blah.")
+          help_string="Allows grouping on configurations into. This option is the name of the key that &
+          & indicates the configuration type in the input XYZ file. With the default, the key-value pair &
+          & config_type=blah would place that configuration into the group blah.")
 
      call param_register(params, 'kernel_regularisation_parameter_name', 'sigma', sigma_parameter_name, &
           help_string="kernel regularisation parameters for a given configuration in the database. &
-          Overrides the command line values (both defaults and config-type-specific values). In the input XYZ file, it must be prepended by energy_, force_, virial_ or hessian_", altkey="sigma_parameter_name")
+          & Overrides the command line values (both defaults and config-type-specific values). &
+          & In the input XYZ file, it must be prepended by energy_, force_, virial_ or hessian_", altkey="sigma_parameter_name")
 
      call param_register(params, 'force_mask_parameter_name', 'force_mask', force_mask_parameter_name, &
           help_string="To exclude forces on specific atoms from the fit. In the XYZ, it must be a logical column.")
@@ -306,16 +323,17 @@ contains
           help_string="To exclude local_properties on specific atoms from the fit. In the XYZ, it must be a logical column.")
 
      call param_register(params, 'parameter_name_prefix', '', parameter_name_prefix, &
-          help_string="Prefix that gets uniformly appended in front of {energy,local_property,force,virial,...}_parameter_name")
+          help_string="Prefix that gets uniformly appended in front of {energy,local_property,force,virial,dipole,...}_parameter_name")
 
      call param_register(params, 'config_type_kernel_regularisation', '', config_type_sigma_string, has_value_target = this%has_config_type_sigma, &
-          help_string="What kernel regularisation values to choose for each type of data, when the configurations are grouped into config_types. Format: {configtype1:energy:force:virial:hessian:config_type2:energy:force:virial:hessian...}", altkey="config_type_sigma")
+          help_string="What kernel regularisation values to choose for each type of data, when the configurations are grouped into config_types. &
+          &Format: {configtype1:energy:force:virial:hessian:config_type2:energy:force:virial:hessian...}", altkey="config_type_sigma")
 
      call param_register(params, 'kernel_regularisation_is_per_atom', 'T', sigma_per_atom, &
-          help_string="Interpretation of the energy and virial sigmas specified in >>default_kernel_regularisation<< and >>config_type_kernel_regularisation<<. &
-          If >>T<<, they are interpreted as per-atom errors, and the variance will be scaled according to the number of atoms in the configuration. &
-          If >>F<< they are treated as absolute errors and no scaling is performed. &
-          NOTE: values specified on a per-configuration basis (see >>kernel_regularisation_parameter_name<<) are always absolute, not per-atom.", altkey="sigma_per_atom")
+          help_string="Interpretation of the energy, dipole and virial sigmas specified in >>default_kernel_regularisation<< and >>config_type_kernel_regularisation<<. &
+          & If >>T<<, they are interpreted as per-atom errors, and the variance will be scaled according to the number of atoms in the configuration. &
+          & If >>F<< they are treated as absolute errors and no scaling is performed. &
+          & NOTE: values specified on a per-configuration basis (see >>kernel_regularisation_parameter_name<<) are always absolute, not per-atom.", altkey="sigma_per_atom")
 
      call param_register(params, 'do_copy_atoms_file', 'T', do_copy_at_file, &
           help_string="Copy the input XYZ file into the GAP XML file (should be set to False for NetCDF input).", altkey="do_copy_at_file")
@@ -389,21 +407,22 @@ contains
         local_property_parameter_name = trim(parameter_name_prefix) // trim(local_property_parameter_name)
         force_parameter_name = trim(parameter_name_prefix) // trim(force_parameter_name)
         virial_parameter_name = trim(parameter_name_prefix) // trim(virial_parameter_name)
+        dipole_parameter_name = trim(parameter_name_prefix) // trim(dipole_parameter_name)
         hessian_parameter_name = trim(parameter_name_prefix) // trim(hessian_parameter_name)
         stress_parameter_name = trim(parameter_name_prefix) // trim(stress_parameter_name)
         config_type_parameter_name = trim(parameter_name_prefix) // trim(config_type_parameter_name)
         sigma_parameter_name = trim(parameter_name_prefix) // trim(sigma_parameter_name)
         force_mask_parameter_name = trim(parameter_name_prefix) // trim(force_mask_parameter_name)
         local_property_mask_parameter_name = trim(parameter_name_prefix) // trim(local_property_mask_parameter_name)
-        local_property_parameter_name = trim(parameter_name_prefix) // trim(local_property_parameter_name)
      endif
 
      if (sparsify_only_no_fit) then
         force_parameter_name = '//IGNORE//'
         virial_parameter_name = '//IGNORE//'
+        dipole_parameter_name = '//IGNORE//'
         hessian_parameter_name = '//IGNORE//'
         stress_parameter_name = '//IGNORE//'
-        call print_warning("sparsify_only_no_fit == T: force, virial, hessian, stress parameters are ignored.")
+        call print_warning("sparsify_only_no_fit == T: force, virial, dipole, hessian, stress parameters are ignored.")
      end if
 
      if( len_trim(this%gp_file) > 216 ) then    ! The filename's length is limited to 255 char.s in some filesystem.
@@ -555,9 +574,12 @@ contains
         call initialise(params)
 
         call param_register(params, 'energy_scale', "//MANDATORY//", delta, &
-             help_string="Set the typical scale of the function you are fitting (or the specific term if you use multiple descriptors). It is equivalent to the standard deviation of the Gaussian process in the probabilistic view, and typically this would be &
-             set to the standard deviation (i.e. root mean square) of the function &
-             that is approximated with the Gaussian process. ", altkey="delta")
+             help_string="Set the typical scale of the function you are fitting & 
+             & (or the specific term if you use multiple descriptors). &
+             & It is equivalent to the standard deviation of the Gaussian process &
+             & in the probabilistic view, and typically this would be &
+             & set to the standard deviation (i.e. root mean square) of the function &
+             & that is approximated with the Gaussian process. ", altkey="delta")
 
         call param_register(params, 'f0', '0.0', f0, &
              help_string="Set the mean of the Gaussian process. Defaults to 0.")
@@ -570,18 +592,18 @@ contains
 
         call param_register(params, 'sparse_method', 'RANDOM', sparse_method_str, &
              help_string="Sparsification method. RANDOM(default), PIVOT, CLUSTER, UNIFORM, KMEANS, COVARIANCE, NONE, FUZZY, FILE, &
-             INDEX_FILE, CUR_COVARIANCE, CUR_POINTS")
+             & INDEX_FILE, CUR_COVARIANCE, CUR_POINTS")
 
         call param_register(params, 'lengthscale_factor', '1.0', theta_fac_string, has_value_target = this%has_theta_fac(i_coordinate), &
              help_string="Set the width of Gaussians for the Gaussian and PP kernel by multiplying the range of each descriptor by lengthscale_factor. &
-             Can be a single number or different for each dimension. For multiple theta_fac separate each value by whitespaces.", altkey="theta_fac")
+             & Can be a single number or different for each dimension. For multiple theta_fac separate each value by whitespaces.", altkey="theta_fac")
 
         call param_register(params, 'lengthscale_uniform', '0.0', theta_uniform, has_value_target = this%has_theta_uniform(i_coordinate), &
              help_string="Set the width of Gaussians for the Gaussian and PP kernel, same in each dimension.", altkey="theta_uniform")
 
         call param_register(params, 'lengthscale_file', '', theta_file, has_value_target = this%has_theta_file(i_coordinate), &
              help_string="Set the width of Gaussians for the Gaussian kernel from a file. &
-             There should be as many real numbers as the number of dimensions, in a single line", altkey="theta_file")
+             & There should be as many real numbers as the number of dimensions, in a single line", altkey="theta_file")
 
         call param_register(params, 'sparse_file', '', sparse_file, has_value_target = has_sparse_file, &
              help_string="Sparse points from a file. If sparse_method=FILE, descriptor values (real) listed in a text file, one &
@@ -589,7 +611,7 @@ contains
 
         call param_register(params, 'mark_sparse_atoms', 'F', mark_sparse_atoms, &
              help_string="Reprints the original xyz file after sparsification process. &
-             sparse propery added, true for atoms associated with a sparse point.")
+             & sparse propery added, true for atoms associated with a sparse point.")
 
         call param_register(params, 'add_species', 'T', add_species, &
              help_string="Create species-specific descriptor, using the descriptor string as a template.")
@@ -756,18 +778,19 @@ contains
 
   endsubroutine read_descriptors
 
-  subroutine fit_n_from_xyz(this)
+  subroutine fit_n_from_xyz(this,error)
 
     type(gap_fit), intent(inout) :: this
+    integer, optional, intent(out) :: error
 
     logical :: do_collect_tasks, do_filter_tasks
 
     type(Atoms) :: at
 
     integer :: n_con
-    logical :: has_ener, has_force, has_virial, has_stress_3_3, has_stress_voigt, has_hessian, has_local_property, has_force_mask, &
-       exclude_atom, has_local_property_mask
-    real(dp) :: ener, virial(3,3), stress_3_3(3,3)
+    logical :: has_ener, has_force, has_virial, has_dipole, has_stress_3_3, has_stress_voigt, has_hessian, has_local_property, &
+       has_force_mask, exclude_atom, has_local_property_mask
+    real(dp) :: ener, virial(3,3), stress_3_3(3,3), dipole(3)
     real(dp) :: stress_voigt(6)
     real(dp), pointer, dimension(:,:) :: f, hessian_eigenvector_j
     real(dp), pointer, dimension(:) :: local_property
@@ -775,6 +798,8 @@ contains
     integer :: i, j, k
     integer :: n_descriptors, n_cross, n_hessian
     integer :: n_current, n_last
+
+    INIT_ERROR(error)
 
     do_collect_tasks = (this%task_manager%active .and. .not. this%task_manager%distributed)
     do_filter_tasks = (this%task_manager%active .and. this%task_manager%distributed)
@@ -789,6 +814,7 @@ contains
     this%n_ener = 0
     this%n_force = 0
     this%n_virial = 0
+    this%n_dipole = 0
     this%n_hessian = 0
     this%n_local_property = 0
     n_last = 0
@@ -801,6 +827,7 @@ contains
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
        has_virial = get_value(this%at(n_con)%params,this%virial_parameter_name,virial)
+       has_dipole = get_value(this%at(n_con)%params,this%dipole_parameter_name,dipole)
        has_stress_voigt = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_voigt)
        has_stress_3_3 = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_3_3)
        has_hessian = get_value(this%at(n_con)%params,"n_"//this%hessian_parameter_name,n_hessian)
@@ -834,6 +861,10 @@ contains
           this%n_virial = this%n_virial + 6
        endif
 
+       if( has_dipole ) then
+          this%n_dipole = this%n_dipole + 3
+       endif
+
        if( has_hessian ) then
           this%n_hessian = this%n_hessian + n_hessian
           at = this%at(n_con)
@@ -862,6 +893,10 @@ contains
              this%n_cross(i) = this%n_cross(i) + n_cross*6
           endif
 
+          if( has_dipole ) then
+             this%n_cross(i) = this%n_cross(i) + n_descriptors*3
+          endif
+
           this%n_descriptors(i) = this%n_descriptors(i) + n_descriptors
 
           if( has_hessian ) then
@@ -886,13 +921,34 @@ contains
        enddo
 
        if (do_collect_tasks) then
-         n_current = this%n_ener + this%n_local_property + this%n_force + this%n_virial + this%n_hessian
+         n_current = this%n_ener + this%n_local_property + this%n_force + this%n_virial + this%n_hessian + this%n_dipole
          call task_manager_add_task(this%task_manager, n_current - n_last)
          n_last = n_current
        end if
 
        call finalise(at)
     enddo
+
+    if( this%n_dipole > 0 .and. ( &
+       this%n_ener > 0 .or. &
+       this%n_local_property > 0 .or. &
+       this%n_force > 0 .or. &
+       this%n_virial > 0 .or. &
+       this%n_hessian > 0 ) ) then
+
+       RAISE_ERROR("fit_n_from_xyz: cannot fit dipoles together with other quantities", error)
+    endif
+
+    if( this%n_local_property > 0 .and. ( &
+       this%n_ener > 0 .or. &
+       this%n_dipole > 0 .or. &
+       this%n_force > 0 .or. &
+       this%n_virial > 0 .or. &
+       this%n_hessian > 0 ) ) then
+
+       RAISE_ERROR("fit_n_from_xyz: cannot fit local properties together with other quantities", error)
+    endif
+
 
     if (.not. do_filter_tasks) then
       call print_title("Report on number of descriptors found")
@@ -917,13 +973,13 @@ contains
 
     type(Atoms) :: at
     integer :: d, n_con
-    logical :: has_ener, has_force, has_virial, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
-       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_virial_component_sigma, has_hessian_sigma, &
-       has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, has_force_mask, has_local_property_mask, &
-       exclude_atom
-    real(dp) :: ener, ener_core, my_cutoff, energy_sigma, force_sigma, virial_sigma, hessian_sigma, local_property_sigma, &
+    logical :: has_ener, has_force, has_virial, has_dipole, has_stress_voigt, has_stress_3_3, has_hessian, has_local_property, &
+       has_config_type, has_energy_sigma, has_force_sigma, has_virial_sigma, has_virial_component_sigma, has_dipole_sigma, &
+       has_hessian_sigma, has_force_atom_sigma, has_force_component_sigma, has_local_property_sigma, &
+       has_force_mask, has_local_property_mask, exclude_atom
+    real(dp) :: ener, ener_core, my_cutoff, energy_sigma, force_sigma, virial_sigma, dipole_sigma, hessian_sigma, local_property_sigma, &
        grad_covariance_cutoff, use_force_sigma
-    real(dp), dimension(3) :: pos
+    real(dp), dimension(3) :: pos, dipole
     real(dp), dimension(3,3) :: virial, virial_core, stress_3_3, virial_component_sigma
     real(dp), dimension(6) :: stress_voigt
     real(dp), dimension(:), allocatable :: theta, theta_fac, hessian, hessian_core, grad_data
@@ -934,9 +990,10 @@ contains
     real(dp), dimension(:,:), allocatable :: f_core
     integer, dimension(:,:), allocatable :: force_loc, permutations
     integer :: ie, i, j, n, k, l, i_coordinate, n_hessian, n_energy_sigma, n_force_sigma, n_force_atom_sigma, &
-    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_local_property_sigma, n_descriptors, n_virial_component_sigma
+    n_force_component_sigma, n_hessian_sigma, n_virial_sigma, n_dipole_sigma, n_local_property_sigma, n_descriptors, n_virial_component_sigma
     integer, dimension(:), allocatable :: xloc, hessian_loc, local_property_loc
     integer, dimension(3,3) :: virial_loc
+    integer, dimension(3) :: dipole_loc
 
     integer :: i_config_type, n_config_type, n_theta_fac
     character(len=STRING_LENGTH) :: config_type
@@ -960,7 +1017,7 @@ contains
     this%my_gp%do_subY_subY = merge(gap_fit_is_root(this), .true., this%task_manager%active)
 
     my_cutoff = 0.0_dp
-    call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian,this%sparse_jitter)
+    call gp_setParameters(this%my_gp,this%n_coordinate,this%n_ener+this%n_local_property,this%n_force+this%n_virial+this%n_hessian+this%n_dipole,this%sparse_jitter)
 
     do i_coordinate = 1, this%n_coordinate
        d = descriptor_dimensions(this%my_descriptor(i_coordinate))
@@ -982,6 +1039,7 @@ contains
     call print("Number of target local_properties (property name: "//trim(this%local_property_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_local_property))
     call print("Number of target forces (property name: "//trim(this%force_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_force))
     call print("Number of target virials (property name: "//trim(this%virial_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_virial))
+    call print("Number of target dipoles (property name: "//trim(this%dipole_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_dipole))
     call print("Number of target Hessian eigenvalues (property name: "//trim(this%hessian_parameter_name)//") found: "//sum(this%task_manager%MPI_obj, this%n_hessian))
     call print_title("End of report")
 
@@ -994,6 +1052,7 @@ contains
     n_virial_component_sigma=0
     n_hessian_sigma = 0
     n_virial_sigma = 0
+    n_dipole_sigma = 0
     n_local_property_sigma = 0
 
     do n_con = 1, this%n_frame
@@ -1002,6 +1061,7 @@ contains
        has_ener = get_value(this%at(n_con)%params,this%energy_parameter_name,ener)
        has_force = assign_pointer(this%at(n_con),this%force_parameter_name, f)
        has_virial = get_value(this%at(n_con)%params,this%virial_parameter_name,virial)
+       has_dipole = get_value(this%at(n_con)%params,this%dipole_parameter_name,dipole)
        has_virial_component_sigma = get_value(this%at(n_con)%params,'virial_component_'//trim(this%sigma_parameter_name),virial_component_sigma)
        has_stress_voigt = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_voigt)
        has_stress_3_3 = get_value(this%at(n_con)%params,this%stress_parameter_name,stress_3_3)
@@ -1012,6 +1072,7 @@ contains
        has_energy_sigma = get_value(this%at(n_con)%params,'energy_'//trim(this%sigma_parameter_name),energy_sigma)
        has_force_sigma = get_value(this%at(n_con)%params,'force_'//trim(this%sigma_parameter_name),force_sigma)
        has_virial_sigma = get_value(this%at(n_con)%params,'virial_'//trim(this%sigma_parameter_name),virial_sigma)
+       has_dipole_sigma = get_value(this%at(n_con)%params,'dipole_'//trim(this%sigma_parameter_name),dipole_sigma)
        has_hessian_sigma = get_value(this%at(n_con)%params,'hessian_'//trim(this%sigma_parameter_name),hessian_sigma)
        has_force_atom_sigma = assign_pointer(this%at(n_con),'force_atom_'//trim(this%sigma_parameter_name),force_atom_sigma)
        has_force_component_sigma = assign_pointer(this%at(n_con),'force_component_'//trim(this%sigma_parameter_name),force_component_sigma)
@@ -1175,6 +1236,12 @@ contains
           virial_component_sigma = virial_sigma
        endif
 
+       if( .not. has_dipole_sigma ) then
+          dipole_sigma = this%default_dipole_sigma
+       else
+          n_dipole_sigma = n_dipole_sigma + 1
+       endif
+
        if( .not. has_hessian_sigma ) then
           hessian_sigma = this%sigma(4,n_config_type)
        else
@@ -1240,6 +1307,7 @@ contains
              endif
           enddo
        endif
+
        if(has_virial) then
           ! check if virial is symmetric
           if( sum((virial - transpose(virial))**2) .fne. 0.0_dp ) &
@@ -1262,6 +1330,18 @@ contains
           enddo
        endif
 
+       if(has_dipole) then
+
+          ! Now symmetrise matrix
+          if( dipole_sigma .feq. 0.0_dp ) then
+             RAISE_ERROR("fit_data_from_xyz: too small dipole_sigma ("//dipole_sigma//"), should be greater than zero",error)
+          endif
+
+          do k = 1, 3
+             dipole_loc(k) = gp_addFunctionDerivative(this%my_gp,dipole(k),dipole_sigma)
+          enddo
+       endif
+
        if(has_hessian) then
           if( hessian_sigma .feq. 0.0_dp ) then
              RAISE_ERROR("fit_data_from_xyz: too small hessian_sigma ("//hessian_sigma//"), should be greater than zero",error)
@@ -1277,7 +1357,7 @@ contains
        do i_coordinate = 1, this%n_coordinate
 
           call calc(this%my_descriptor(i_coordinate),this%at(n_con),my_descriptor_data, &
-          do_descriptor=.true.,do_grad_descriptor=has_force .or. has_virial)
+          do_descriptor=.true.,do_grad_descriptor=has_force .or. has_virial .or. has_dipole)
 
           allocate(xloc(size(my_descriptor_data%x)))
           n_descriptors = n_descriptors + size(my_descriptor_data%x)
@@ -1340,6 +1420,26 @@ contains
                    enddo
 
                 enddo
+             enddo
+          endif
+
+          if(has_dipole) then
+             do k = 1, 3
+
+                do i = 1, size(my_descriptor_data%x)
+                   if( size( my_descriptor_data%x(i)%ci ) /= 1 ) then
+                      RAISE_ERROR("fit_data_from_xyz: descriptor must have a well-defined central atom, try e.g. SOAP",error)
+                   endif
+                   do n = lbound(my_descriptor_data%x(i)%ii,1), ubound(my_descriptor_data%x(i)%ii,1)
+                      if( .not. my_descriptor_data%x(i)%has_grad_data(n) .or. &
+                         my_descriptor_data%x(i)%ci(1) /= my_descriptor_data%x(i)%ii(n) ) cycle
+
+                      j = my_descriptor_data%x(i)%ii(n)
+                      call gp_addCoordinateDerivatives(this%my_gp,my_descriptor_data%x(i)%grad_data(:,k,n), i_coordinate, &
+                      dipole_loc(k), xloc(i), dcutoff_in=my_descriptor_data%x(i)%grad_covariance_cutoff(k,n))
+                   enddo
+                enddo
+
              enddo
           endif
 
@@ -1406,6 +1506,7 @@ contains
     call print("Number of per-configuration setting of energy_"//trim(this%sigma_parameter_name)//" found:     "//sum(this%task_manager%MPI_obj, n_energy_sigma))
     call print("Number of per-configuration setting of force_"//trim(this%sigma_parameter_name)//" found:      "//sum(this%task_manager%MPI_obj, n_force_sigma))
     call print("Number of per-configuration setting of virial_"//trim(this%sigma_parameter_name)//" found:     "//sum(this%task_manager%MPI_obj, n_virial_sigma))
+    call print("Number of per-configuration setting of dipole_"//trim(this%sigma_parameter_name)//" found:     "//sum(this%task_manager%MPI_obj, n_dipole_sigma))
     call print("Number of per-configuration setting of hessian_"//trim(this%sigma_parameter_name)//" found:    "//sum(this%task_manager%MPI_obj, n_hessian_sigma))
     call print("Number of per-configuration setting of local_propery_"//trim(this%sigma_parameter_name)//" found:"//sum(this%task_manager%MPI_obj, n_local_property_sigma))
     call print("Number of per-atom setting of force_atom_"//trim(this%sigma_parameter_name)//" found:          "//sum(this%task_manager%MPI_obj, n_force_atom_sigma))
@@ -1417,7 +1518,7 @@ contains
        if( count( (/this%has_theta_file(i_coordinate), this%has_theta_uniform(i_coordinate), &
        this%has_theta_fac(i_coordinate), this%has_zeta(i_coordinate) /) ) /= 1 ) then
           call system_abort("fit_data_from_xyz: only one of theta_file, theta_uniform, theta_fac or zeta may be &
-          specified for each GAP.")
+          & specified for each GAP.")
        endif
        if( this%covariance_type(i_coordinate) == COVARIANCE_DOT_PRODUCT ) then
           if( .not. this%has_zeta(i_coordinate) ) call system_abort("fit_data_from_xyz: covariance type is DOT_PRODUCT but no zeta was specified.")
@@ -1545,7 +1646,7 @@ contains
           do i = 1, size(found_Z)
              if( found_Z(i) .and. .not. found_isolated(i) ) then
                 call print("Atom species "//i//" present in teaching XYZ, but not found corresponding isolated &
-                   representative")
+                   & representative")
              endif
           enddo
           call system_abort("Determination of e0 was requested to be based on isolated atom energies, but not all &
@@ -2351,7 +2452,7 @@ contains
     call print("Covariances")
     memt = 0
     s1 = sum(this%config_type_n_sparseX)
-    s2 = (this%n_ener + this%n_local_property) + (this%n_force + this%n_virial + this%n_hessian)
+    s2 = (this%n_ener + this%n_local_property) + (this%n_force + this%n_virial + this%n_hessian + this%n_dipole)
 
     entries = s1 * s2
     mem = entries * rmem
